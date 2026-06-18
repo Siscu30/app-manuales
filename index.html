@@ -395,6 +395,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <button class="block-btn" onclick="addBlock('flujos')" draggable="true" data-type="flujos"><span class="icon">🔀</span>Flujos</button>
     <button class="block-btn" onclick="addBlock('video')" draggable="true" data-type="video"><span class="icon">🎬</span>Vídeo</button>
     <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><span class="icon">🔗</span>Enlace</button>
+    <button class="block-btn" onclick="addBlock('codigo')" draggable="true" data-type="codigo"><span class="icon">💻</span>Código</button>
   </div>
 
   <hr class="sid-divider">
@@ -990,6 +991,31 @@ const BLOCK_TYPES = {
       const header = 'Condición | Acción';
       return header + '\n' + (b.filas||[]).map(r=>`${r.condicion||''} | ${r.accion||''}`).join('\n');
     }
+  },
+  codigo: {
+    label: 'Código',
+    defaultData: () => ({ language:'javascript', code:'' }),
+    render(b) {
+      const lang = b.language || 'javascript';
+      return `<div class="b-codigo block-inner" ondblclick="openBlockEditor('${b.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#1e293b;border-radius:8px 8px 0 0">
+          <span style="font-size:11px;color:#94a3b8;font-family:monospace;letter-spacing:.5px">${esc(lang)}</span>
+          <span style="font-size:16px">💻</span>
+        </div>
+        <pre style="margin:0;padding:14px;background:#0f172a;border-radius:0 0 8px 8px;overflow-x:auto;font-size:13px;line-height:1.6;color:#e2e8f0;font-family:'Fira Code',Consolas,monospace;white-space:pre-wrap;word-break:break-all">${esc(b.code||'// Tu código aquí')}</pre>
+      </div>`;
+    },
+    editorHTML(b) {
+      const langs = ['javascript','typescript','python','bash','sql','html','css','json','xml','yaml','php','java','csharp','go','rust','other'];
+      return `<div class="form-group"><label class="form-label">Lenguaje</label>
+        <select class="form-input" id="be-lang">
+          ${langs.map(l=>`<option value="${l}"${(b.language||'javascript')===l?' selected':''}>${l}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label class="form-label">Código</label>
+        <textarea class="form-textarea" id="be-code" rows="10" style="font-family:monospace;font-size:13px">${esc(b.code||'')}</textarea></div>`;
+    },
+    saveEditor(b) { b.language = q('#be-lang').value; b.code = q('#be-code').value; },
+    toTeamsText(b) { return '\`\`\`' + (b.language||'') + '\n' + (b.code||'') + '\n\`\`\`'; }
   }
 };
 
@@ -1823,6 +1849,11 @@ function renderBlockForExport(b, pasoN) {
     case 'enlace': {
       const title = b.titulo || b.url || 'Enlace';
       return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:#2563eb">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
+    }
+    case 'codigo': {
+      const lang = esc(b.language||'');
+      const code = esc(b.code||'');
+      return `<div style="border-radius:8px;overflow:hidden;margin-bottom:12px;font-family:'Fira Code',Consolas,monospace"><div style="background:#1e293b;padding:8px 14px;font-size:11px;color:#94a3b8;letter-spacing:.5px">${lang}</div><pre style="margin:0;padding:14px;background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre></div>`;
     }
     default: return '';
   }
