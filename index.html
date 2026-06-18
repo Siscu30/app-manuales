@@ -405,6 +405,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
   <button class="sid-action" onclick="openMisManuals()"><span class="icon">📂</span>Mis manuales</button>
   <button class="sid-action" onclick="triggerImportHTML()"><span class="icon">📥</span>Importar HTML</button>
   <button class="sid-action" onclick="openImportModal()"><span class="icon">📄</span>Importar PDF/Word</button>
+  <button class="sid-action" onclick="openTemplatesModal()"><span class="icon">📋</span>Plantillas</button>
 
   <hr class="sid-divider">
   <div class="sb-pages-header" onclick="togglePagesPanel()">
@@ -557,6 +558,29 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Export progress -->
+<!-- Templates modal -->
+<div class="modal-backdrop hidden" id="modal-templates">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h3>📋 Plantillas</h3>
+      <button class="modal-close" onclick="closeModal('modal-templates')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Elige una plantilla para empezar. <strong>Reemplazará los bloques actuales.</strong></p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn" style="text-align:left;padding:12px 16px" onclick="applyTemplate(0)">📋 Manual de Proceso<br><small style="color:var(--text-muted)">Título + 3 pasos + consejo</small></button>
+        <button class="btn" style="text-align:left;padding:12px 16px" onclick="applyTemplate(1)">🛠 Guía de Instalación<br><small style="color:var(--text-muted)">Alerta + 4 pasos + checklist</small></button>
+        <button class="btn" style="text-align:left;padding:12px 16px" onclick="applyTemplate(2)">📄 Manual de Políticas<br><small style="color:var(--text-muted)">Texto + normas + tabla</small></button>
+        <button class="btn" style="text-align:left;padding:12px 16px" onclick="applyTemplate(3)">🚀 Nota de Versión<br><small style="color:var(--text-muted)">Changelog con lista y enlace</small></button>
+        <button class="btn" style="text-align:left;padding:12px 16px" onclick="applyTemplate(4)">⚙️ Manual Técnico<br><small style="color:var(--text-muted)">Código + tabla de componentes</small></button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-templates')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="export-progress">
   <div class="progress-card">
     <h4>Exportando manual...</h4>
@@ -3198,6 +3222,57 @@ setTimeout(() => {
     showAuthScreen();
   }
 }, 5000);
+
+function openTemplatesModal() { openModal('modal-templates'); }
+function applyTemplate(idx) {
+  const T = [
+    { name:'Manual de Proceso', blocks:() => [
+      {id:uid(),type:'titulo',order:0,emoji:'📋',titulo:'Manual de Proceso',subtitulo:'Descripción del proceso'},
+      {id:uid(),type:'paso',order:1,titulo:'Paso 1: Preparación',descripcion:'Descripción del primer paso',storagePath:null,caption:''},
+      {id:uid(),type:'paso',order:2,titulo:'Paso 2: Ejecución',descripcion:'Descripción del segundo paso',storagePath:null,caption:''},
+      {id:uid(),type:'paso',order:3,titulo:'Paso 3: Verificación',descripcion:'Comprueba que el resultado es correcto',storagePath:null,caption:''},
+      {id:uid(),type:'callout',order:4,tipo:'tip',texto:'Recuerda guardar el trabajo periódicamente'}
+    ]},
+    { name:'Guía de Instalación', blocks:() => [
+      {id:uid(),type:'titulo',order:0,emoji:'🛠',titulo:'Guía de Instalación',subtitulo:'Requisitos previos y pasos'},
+      {id:uid(),type:'alerta',order:1,tipo:'info',texto:'Asegúrate de tener permisos de administrador antes de comenzar.'},
+      {id:uid(),type:'paso',order:2,titulo:'Descargar el instalador',descripcion:'Accede al sitio oficial y descarga la última versión',storagePath:null,caption:''},
+      {id:uid(),type:'paso',order:3,titulo:'Ejecutar la instalación',descripcion:'Haz doble clic en el instalador y sigue las instrucciones',storagePath:null,caption:''},
+      {id:uid(),type:'paso',order:4,titulo:'Configuración inicial',descripcion:'Completa el asistente con tus datos',storagePath:null,caption:''},
+      {id:uid(),type:'paso',order:5,titulo:'Verificación',descripcion:'Abre la aplicación y comprueba que funciona',storagePath:null,caption:''},
+      {id:uid(),type:'lista',order:6,items:[{icono:'check',texto:'Instalación completada'},{icono:'check',texto:'Configuración verificada'},{icono:'check',texto:'Acceso probado'}]}
+    ]},
+    { name:'Manual de Políticas', blocks:() => [
+      {id:uid(),type:'titulo',order:0,emoji:'📄',titulo:'Política de [Área]',subtitulo:'Versión 1.0 · [Fecha]'},
+      {id:uid(),type:'texto',order:1,html:'<p>Esta política establece las normas y directrices que deben seguir todos los miembros de la organización en relación con este proceso.</p>'},
+      {id:uid(),type:'callout',order:2,tipo:'important',texto:'El cumplimiento de esta política es obligatorio para todos los miembros del equipo.'},
+      {id:uid(),type:'lista',order:3,items:[{icono:'check',texto:'Norma 1: descripción'},{icono:'check',texto:'Norma 2: descripción'},{icono:'check',texto:'Norma 3: descripción'}]},
+      {id:uid(),type:'tabla',order:4,columnas:['Acción','Responsable','Plazo'],filas:[['Revisión anual','RRHH','Enero'],['Actualización','Dirección','Según cambios']]}
+    ]},
+    { name:'Nota de Versión', blocks:() => [
+      {id:uid(),type:'titulo',order:0,emoji:'🚀',titulo:'Novedades v[X.Y]',subtitulo:'[Fecha de lanzamiento]'},
+      {id:uid(),type:'callout',order:1,tipo:'tip',texto:'Esta versión incluye mejoras de rendimiento y nuevas funcionalidades.'},
+      {id:uid(),type:'lista',order:2,items:[{icono:'check',texto:'Nueva funcionalidad 1'},{icono:'check',texto:'Nueva funcionalidad 2'},{icono:'check',texto:'Corrección de errores'}]},
+      {id:uid(),type:'enlace',order:3,url:'',titulo:'Ver documentación completa',descripcion:'Accede al detalle técnico de todos los cambios'}
+    ]},
+    { name:'Manual Técnico', blocks:() => [
+      {id:uid(),type:'titulo',order:0,emoji:'⚙️',titulo:'Manual Técnico',subtitulo:'Documentación del sistema'},
+      {id:uid(),type:'alerta',order:1,tipo:'advertencia',texto:'Este manual es solo para personal técnico autorizado.'},
+      {id:uid(),type:'titulo',order:2,emoji:'🔧',titulo:'Arquitectura del sistema',subtitulo:''},
+      {id:uid(),type:'texto',order:3,html:'<p>Descripción de la arquitectura y componentes principales del sistema.</p>'},
+      {id:uid(),type:'codigo',order:4,language:'bash',code:'# Comando de instalación\nnpm install && npm start'},
+      {id:uid(),type:'tabla',order:5,columnas:['Componente','Versión','Estado'],filas:[['Backend','2.0','✅ Activo'],['Frontend','1.5','✅ Activo'],['Base de datos','14.0','✅ Activo']]}
+    ]}
+  ];
+  const tmpl = T[idx];
+  if (!tmpl) return;
+  pushHistory();
+  STATE.blocks = tmpl.blocks();
+  render();
+  scheduleLocalSave();
+  closeModal('modal-templates');
+  notify(`✅ Plantilla "${tmpl.name}" aplicada`);
+}
 
 async function init() {
   renderColorPicker();
