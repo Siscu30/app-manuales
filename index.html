@@ -837,8 +837,22 @@ const BLOCK_TYPES = {
   },
   video: {
     label: 'Vídeo',
-    defaultData: () => ({ url:'', titulo:'', caption:'' }),
+    defaultData: () => ({ url:'', titulo:'', caption:'', videoType:'link', src:'' }),
     render(b) {
+      if (b.videoType === 'file' && b.src) {
+        return `<div class="b-video block-inner" ondblclick="openBlockEditor('${b.id}')">
+          <video controls style="width:100%;border-radius:6px;display:block" src="${b.src}"></video>
+          ${b.titulo?`<div class="video-caption">${esc(b.titulo)}</div>`:''}
+        </div>`;
+      }
+      if (b.videoType === 'pdf' && b.url) {
+        return `<div class="b-video block-inner video-link" ondblclick="openBlockEditor('${b.id}')">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:28px;flex-shrink:0">📄</span>
+            <div><div style="font-weight:600;font-size:14px">${esc(b.titulo||b.url)}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${esc(b.url)}</div></div>
+          </div>
+        </div>`;
+      }
       if (!b.url) {
         return `<div class="b-video block-inner" ondblclick="openBlockEditor('${b.id}')">
           <div class="video-placeholder"><span style="font-size:36px">🎬</span><span>Doble clic para añadir un vídeo (YouTube, Vimeo...)</span></div>
@@ -859,16 +873,61 @@ const BLOCK_TYPES = {
       </div>`;
     },
     editorHTML(b) {
-      return `<div class="form-group"><label class="form-label">URL del vídeo</label>
-        <input class="form-input" id="be-url" value="${esc(b.url||'')}" placeholder="https://youtu.be/... o enlace de Teams">
-        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">YouTube, Vimeo o cualquier URL de vídeo</p></div>
+      const vt = b.videoType || 'link';
+      const tab = (t, icon, label) => `<span id="be-vtab-${t}" style="flex:1;cursor:pointer;text-align:center;padding:8px 4px;border-radius:6px;border:2px solid ${vt===t?'var(--primary)':'var(--border-color)'};font-size:13px;font-weight:${vt===t?600:400};background:${vt===t?'rgba(37,99,235,0.08)':'transparent'}" onclick="switchVideoTab('${t}')">${icon} ${label}</span>`;
+      return `<div style="display:flex;gap:6px;margin-bottom:16px">
+        ${tab('link','🔗','Enlace')}${tab('file','📹','MP4')}${tab('pdf','📄','PDF')}
+      </div>
+      <input type="hidden" id="be-vtype" value="${vt}">
+      <div id="be-vsec-link" style="display:${vt==='link'?'block':'none'}">
+        <div class="form-group"><label class="form-label">URL del vídeo</label>
+          <input class="form-input" id="be-url" value="${esc(b.url||'')}" placeholder="https://youtu.be/... o enlace de Teams">
+          <p style="font-size:12px;color:var(--text-muted);margin-top:4px">YouTube, Vimeo o cualquier URL de vídeo</p></div>
         <div class="form-group"><label class="form-label">Título (opcional)</label>
-        <input class="form-input" id="be-titulo" value="${esc(b.titulo||'')}" placeholder="Nombre del vídeo"></div>
+          <input class="form-input" id="be-titulo" value="${esc(b.titulo||'')}" placeholder="Nombre del vídeo"></div>
         <div class="form-group"><label class="form-label">Pie de vídeo (opcional)</label>
-        <input class="form-input" id="be-caption" value="${esc(b.caption||'')}" placeholder="Descripción breve"></div>`;
+          <input class="form-input" id="be-caption" value="${esc(b.caption||'')}" placeholder="Descripción breve"></div>
+      </div>
+      <div id="be-vsec-file" style="display:${vt==='file'?'block':'none'}">
+        <div class="form-group"><label class="form-label">Archivo MP4</label>
+          ${b.src&&b.videoType==='file'?'<p style="color:#16a34a;font-size:12px;margin-bottom:8px">✓ Vídeo cargado</p>':''}
+          <input type="file" class="form-input" id="be-video-file" accept="video/mp4,video/*" onchange="(function(el){if(!el.files[0])return;var fr=new FileReader();fr.onload=function(e){document.getElementById('be-video-src').value=e.target.result};fr.readAsDataURL(el.files[0])})(this)">
+          <input type="hidden" id="be-video-src" value="${esc(b.videoType==='file'?b.src||'':'')}">
+        </div>
+        <div class="form-group"><label class="form-label">Título (opcional)</label>
+          <input class="form-input" id="be-titulo-file" value="${esc(b.titulo||'')}" placeholder="Nombre del vídeo"></div>
+      </div>
+      <div id="be-vsec-pdf" style="display:${vt==='pdf'?'block':'none'}">
+        <div class="form-group"><label class="form-label">URL del PDF</label>
+          <input class="form-input" id="be-pdf-url" value="${esc(b.videoType==='pdf'?b.url||'':'')}" placeholder="https://..."></div>
+        <div class="form-group"><label class="form-label">Título</label>
+          <input class="form-input" id="be-pdf-titulo" value="${esc(b.videoType==='pdf'?b.titulo||'':'')}"></div>
+      </div>`;
     },
-    saveEditor(b) { b.url=q('#be-url').value.trim(); b.titulo=q('#be-titulo').value.trim(); b.caption=q('#be-caption').value.trim(); },
-    toTeamsText(b) { return `🎬 ${b.titulo||b.url||'Vídeo'}\n${b.url||''}`; }
+    saveEditor(b) {
+      const vt = q('#be-vtype')?.value || 'link';
+      b.videoType = vt;
+      if (vt === 'file') {
+        const newSrc = q('#be-video-src')?.value;
+        if (newSrc) b.src = newSrc;
+        b.titulo = q('#be-titulo-file')?.value.trim() || '';
+        b.url = ''; b.caption = '';
+      } else if (vt === 'pdf') {
+        b.url = q('#be-pdf-url')?.value.trim() || '';
+        b.titulo = q('#be-pdf-titulo')?.value.trim() || '';
+        b.src = ''; b.caption = '';
+      } else {
+        b.url = q('#be-url')?.value.trim() || '';
+        b.titulo = q('#be-titulo')?.value.trim() || '';
+        b.caption = q('#be-caption')?.value.trim() || '';
+        b.src = '';
+      }
+    },
+    toTeamsText(b) {
+      if (b.videoType==='pdf') return `📄 ${b.titulo||b.url||'PDF'}\n${b.url||''}`;
+      if (b.videoType==='file') return `📹 ${b.titulo||'Vídeo MP4'}`;
+      return `🎬 ${b.titulo||b.url||'Vídeo'}\n${b.url||''}`;
+    }
   },
   enlace: {
     label: 'Enlace / URL',
@@ -1743,6 +1802,8 @@ function renderBlockForExport(b, pasoN) {
       return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'video': {
+      if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
+      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#2563eb">${esc(b.url)}</a></div></div>`;
       const embed = getVideoEmbedUrl(b.url);
       if (embed) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
       if (b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#2563eb">${esc(b.url)}</a></div></div>`;
@@ -1754,6 +1815,21 @@ function renderBlockForExport(b, pasoN) {
     }
     default: return '';
   }
+}
+
+function switchVideoTab(t) {
+  ['link','file','pdf'].forEach(tab => {
+    const sec = document.getElementById('be-vsec-' + tab);
+    const vtab = document.getElementById('be-vtab-' + tab);
+    if (sec) sec.style.display = tab === t ? 'block' : 'none';
+    if (vtab) {
+      vtab.style.borderColor = tab === t ? 'var(--primary)' : 'var(--border-color)';
+      vtab.style.fontWeight = tab === t ? '600' : '400';
+      vtab.style.background = tab === t ? 'rgba(37,99,235,0.08)' : 'transparent';
+    }
+  });
+  const vtype = document.getElementById('be-vtype');
+  if (vtype) vtype.value = t;
 }
 
 function buildExportHTML(titulo, empresa, color, body) {
