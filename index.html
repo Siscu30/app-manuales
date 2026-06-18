@@ -277,11 +277,24 @@ input,textarea,select{font-family:inherit;font-size:14px}
   <div class="auth-card">
     <div style="font-size:40px;margin-bottom:12px">📋</div>
     <h1>Constructor de Manuales</h1>
-    <p class="auth-sub">Introduce tu email para acceder</p>
+    <p class="auth-sub" id="auth-subtitle">Introduce tus credenciales</p>
     <div class="form-group">
-      <input type="email" id="auth-email" class="form-input" placeholder="tu@empresa.com" autocomplete="email">
+      <input type="email" id="auth-email" class="form-input" placeholder="tu@empresa.com" autocomplete="email" onkeydown="if(event.key==='Enter')q('#auth-password').focus()">
     </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="sendMagicLink()">Enviar enlace de acceso</button>
+    <div class="form-group" id="auth-pass-group">
+      <input type="password" id="auth-password" class="form-input" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')loginWithPassword()">
+    </div>
+    <div class="form-group" id="auth-pass2-group" style="display:none">
+      <input type="password" id="auth-password2" class="form-input" placeholder="Repite la contraseña" autocomplete="new-password" onkeydown="if(event.key==='Enter')setNewPassword()">
+    </div>
+    <button class="btn btn-primary" id="auth-btn" style="width:100%;justify-content:center;padding:10px" onclick="loginWithPassword()">Entrar</button>
+    <p style="margin-top:10px;font-size:12px;color:var(--text-muted);text-align:center">
+      <a href="#" onclick="showMagicLinkForm();return false" style="color:var(--primary)">¿Olvidaste la contraseña? Acceder por email</a>
+    </p>
+    <div id="magic-link-form" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Recibirás un enlace de acceso en tu email</p>
+      <button class="btn" style="width:100%;justify-content:center" onclick="sendMagicLink()">📧 Enviar enlace de acceso</button>
+    </div>
     <p id="auth-msg" style="margin-top:14px;font-size:13px;color:var(--text-muted)"></p>
   </div>
 </div>
@@ -1478,27 +1491,60 @@ document.addEventListener('click', ev=>{
 // ═══════════════════════════════════════════════════════
 function showAuthScreen() { q('#auth-screen').classList.remove('hidden'); }
 function hideAuthScreen() { q('#auth-screen').classList.add('hidden'); }
-let _authCallback = null;
-function openAuthModal(msg='') {
-  q('#auth-msg').textContent = msg || '';
-  showAuthScreen();
+function openAuthModal(msg='') { q('#auth-msg').textContent=msg||''; showAuthScreen(); }
+
+function showMagicLinkForm() {
+  const f = q('#magic-link-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function loginWithPassword() {
+  const email = q('#auth-email').value.trim();
+  const pass  = q('#auth-password').value;
+  if (!email) { q('#auth-msg').textContent='Introduce tu email'; return; }
+  if (!pass)  { q('#auth-msg').textContent='Introduce tu contraseña'; return; }
+  q('#auth-msg').textContent = 'Entrando...';
+  q('#auth-btn').disabled = true;
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+
+  if (error) {
+    // If user exists but has no password set → offer to set one via magic link first
+    if (error.message?.includes('Invalid login credentials') || error.message?.includes('Email not confirmed')) {
+      q('#auth-msg').textContent = '⚠️ Contraseña incorrecta. Usa el enlace por email para acceder la primera vez.';
+    } else {
+      q('#auth-msg').textContent = '❌ ' + error.message;
+    }
+    q('#auth-btn').disabled = false;
+    return;
+  }
+
+  q('#auth-btn').disabled = false;
+  q('#auth-msg').textContent = '';
+  // handleSession is called by onAuthStateChange → SIGNED_IN
 }
 
 async function sendMagicLink() {
-  const email = q('#auth-email').value.trim();
-  if (!email) { q('#auth-msg').textContent='Introduce tu email'; return; }
+  const email = q('#auth-email').value.trim() || 'fparedes3093@protonmail.com';
   q('#auth-msg').textContent = 'Enviando enlace...';
-  const { error } = await sb.auth.signInWithOtp({ email, options:{emailRedirectTo: window.location.origin + window.location.pathname} });
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname }
+  });
   if (error) { q('#auth-msg').textContent = '❌ ' + error.message; return; }
-  q('#auth-msg').textContent = '✅ Enlace enviado. Revisa tu bandeja de entrada (y spam).';
+  q('#auth-msg').textContent = '✅ Enlace enviado a ' + email + '. Revisa tu bandeja (y spam).';
 }
 
 async function logout() {
   await sb.auth.signOut();
   STATE.user = null; STATE.role = null;
+  q('#btn-logout').style.display = 'none';
+  q('#role-btns').innerHTML = '';
+  q('#sidebar').style.display = '';
+  q('#canvas-wrap').style.marginLeft = '';
+  q('#app').style.display = '';
+  q('#viewer').classList.remove('active');
   showAuthScreen();
-  q('#btn-logout').style.display='none';
-  q('#role-btns').innerHTML='';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1651,6 +1697,64 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   document.addEventListener('render-done', ()=>{
     document.querySelectorAll('.block-wrap').forEach(el=>el.removeAttribute('draggable'));
   });
+}
+
+// ═══════════════════════════════════════════════════════
+// SET PASSWORD FLOW
+// ═══════════════════════════════════════════════════════
+function offerSetPassword() {
+  // Only offer once per session
+  if (sessionStorage.getItem('password_offered')) return;
+  sessionStorage.setItem('password_offered', '1');
+  showSetPasswordModal();
+}
+
+function showSetPasswordModal() {
+  const existing = q('#modal-set-password');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'modal-set-password';
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>🔑 Crear contraseña</h3>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+          Has entrado con un enlace de email. Crea una contraseña para acceder directamente la próxima vez.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Nueva contraseña</label>
+          <input type="password" id="new-pass-1" class="form-input" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Repite la contraseña</label>
+          <input type="password" id="new-pass-2" class="form-input" placeholder="Repite la contraseña" autocomplete="new-password">
+        </div>
+        <p id="set-pass-msg" style="font-size:13px;color:#dc2626;min-height:18px"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="saveNewPassword()">Guardar contraseña</button>
+        <button class="btn" onclick="document.getElementById('modal-set-password').remove()">Ahora no</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => q('#new-pass-1')?.focus(), 100);
+}
+
+async function saveNewPassword() {
+  const p1 = q('#new-pass-1').value;
+  const p2 = q('#new-pass-2').value;
+  const msg = q('#set-pass-msg');
+  if (p1.length < 8) { msg.textContent = 'Mínimo 8 caracteres'; return; }
+  if (p1 !== p2)     { msg.textContent = 'Las contraseñas no coinciden'; return; }
+  msg.style.color = 'var(--text-muted)';
+  msg.textContent = 'Guardando...';
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if (error) { msg.style.color='#dc2626'; msg.textContent = '❌ ' + error.message; return; }
+  q('#modal-set-password').remove();
+  notify('✅ Contraseña creada. La próxima vez entra con email + contraseña.');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1957,6 +2061,14 @@ async function init() {
     if (event === 'INITIAL_SESSION') return; // handled by getSession() below
     clearTimeout(safetyTimer);
     await handleSession(session);
+    // After magic link login, offer to set a password
+    if (event === 'SIGNED_IN' && session?.user) {
+      const noPassword = session.user.app_metadata?.provider === 'email' &&
+                         !session.user.user_metadata?.has_password;
+      if (noPassword || event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
+        setTimeout(() => offerSetPassword(), 800);
+      }
+    }
   });
 
   // Initial load — check for existing session (covers page refresh + magic link)
