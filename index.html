@@ -507,6 +507,9 @@ input,textarea,select{font-family:inherit;font-size:14px}
 <div id="notif"></div>
 
 <script>
+// Fuerza recarga si la página viene del bfcache (pulsar Atrás) para evitar estado congelado
+window.addEventListener('pageshow', function(e) { if (e.persisted) window.location.reload(); });
+
 // ═══════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════
@@ -2306,6 +2309,16 @@ async function handleSession(session) {
   setLoading(false);
 }
 
+// Safety net: if session not resolved in 8s, clear stale Supabase keys and show login
+let _authResolved = false;
+setTimeout(() => {
+  if (!_authResolved) {
+    Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+    setLoading(false);
+    showAuthScreen();
+  }
+}, 8000);
+
 async function init() {
   renderColorPicker();
   q('#manual-titulo').addEventListener('input', scheduleLocalSave);
@@ -2330,6 +2343,7 @@ async function init() {
 
   // onAuthStateChange fires INITIAL_SESSION (existing session) or nothing (no session)
   sb.auth.onAuthStateChange(async (event, session) => {
+    _authResolved = true;
     if (event === 'INITIAL_SESSION') {
       if (session?.user) {
         setLoading(true);
