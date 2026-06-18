@@ -406,6 +406,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
   <button class="sid-action" onclick="triggerImportHTML()"><span class="icon">📥</span>Importar HTML</button>
   <button class="sid-action" onclick="openImportModal()"><span class="icon">📄</span>Importar PDF/Word</button>
   <button class="sid-action" onclick="openTemplatesModal()"><span class="icon">📋</span>Plantillas</button>
+  <button class="sid-action" onclick="openVersionHistory()"><span class="icon">📜</span>Historial</button>
 
   <hr class="sid-divider">
   <div class="sb-pages-header" onclick="togglePagesPanel()">
@@ -559,6 +560,22 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Export progress -->
+<!-- Version history modal -->
+<div class="modal-backdrop hidden" id="modal-versions">
+  <div class="modal modal-md">
+    <div class="modal-header">
+      <h3>📜 Historial de versiones</h3>
+      <button class="modal-close" onclick="closeModal('modal-versions')">×</button>
+    </div>
+    <div class="modal-body" id="versions-body" style="max-height:400px;overflow-y:auto">
+      <p>Cargando...</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-versions')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Templates modal -->
 <div class="modal-backdrop hidden" id="modal-templates">
   <div class="modal modal-md">
@@ -1653,6 +1670,7 @@ async function guardar() {
     localSave();
     setSaveStatus('✓ Guardado');
     STATE.isDirty = false;
+    saveVersion();
     notify('✅ Manual guardado');
     updateRevisionBanner();
   } catch(e) {
@@ -3239,6 +3257,45 @@ setTimeout(() => {
     showAuthScreen();
   }
 }, 5000);
+
+async function saveVersion() {
+  if (!STATE.manual.id || !STATE.user) return;
+  try {
+    const contenido = STATE.pages.length > 0
+      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage }
+      : STATE.blocks;
+    await sb.from('manual_versions').insert({ manual_id: STATE.manual.id, user_id: STATE.user.id, contenido, titulo: STATE.manual.titulo });
+    const { data } = await sb.from('manual_versions').select('id, created_at').eq('manual_id', STATE.manual.id).order('created_at', { ascending: false });
+    if (data && data.length > 10) {
+      await sb.from('manual_versions').delete().in('id', data.slice(10).map(v => v.id));
+    }
+  } catch(e) { /* non-critical */ }
+}
+async function openVersionHistory() {
+  if (!STATE.manual.id || !STATE.user) { notify('⚠ Guarda el manual primero'); return; }
+  openModal('modal-versions');
+  const body = q('#versions-body');
+  body.innerHTML = '<p>Cargando...</p>';
+  try {
+    const { data, error } = await sb.from('manual_versions').select('id, titulo, created_at').eq('manual_id', STATE.manual.id).order('created_at', { ascending: false }).limit(10);
+    if (error || !data?.length) { body.innerHTML = '<p style="color:var(--text-muted)">No hay versiones guardadas aún.</p>'; return; }
+    body.innerHTML = data.map(v => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)"><div><div style="font-size:14px;font-weight:500">${esc(v.titulo||'Sin título')}</div><div style="font-size:12px;color:var(--text-muted)">${new Date(v.created_at).toLocaleString('es')}</div></div><button class="btn btn-sm" onclick="restoreVersion('${v.id}')">Restaurar</button></div>`).join('');
+  } catch(e) { body.innerHTML = '<p style="color:#dc2626">Error al cargar.</p>'; }
+}
+async function restoreVersion(id) {
+  if (!confirm('¿Restaurar esta versión? Los cambios actuales se perderán.')) return;
+  try {
+    const { data, error } = await sb.from('manual_versions').select('contenido').eq('id', id).single();
+    if (error || !data) throw new Error('Versión no encontrada');
+    pushHistory();
+    const c = data.contenido;
+    if (Array.isArray(c)) { STATE.blocks = c; }
+    else if (c && c.pages) { STATE.blocks = c.blocks || []; STATE.pages = c.pages; STATE.activePage = c.activePage; }
+    render(); renderPagesPanel(); scheduleLocalSave();
+    closeModal('modal-versions');
+    notify('✅ Versión restaurada');
+  } catch(e) { notify('❌ Error al restaurar: ' + (e.message||e)); }
+}
 
 function openTemplatesModal() { openModal('modal-templates'); }
 function applyTemplate(idx) {
