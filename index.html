@@ -610,6 +610,8 @@ let STATE = {
   saveTimer: null,
   pages: [],
   activePage: null,
+  isDirty: false,
+  autoSaveTimer: null,
 };
 
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36); }
@@ -1492,8 +1494,16 @@ document.addEventListener('keydown', ev=>{
 // ═══════════════════════════════════════════════════════
 function scheduleLocalSave() {
   if (STATE.isDragging) return;
+  STATE.isDirty = true;
+  setSaveStatus('⚠ Sin guardar');
   clearTimeout(STATE.saveTimer);
   STATE.saveTimer = setTimeout(localSave, 800);
+}
+function startAutoSave() {
+  if (STATE.autoSaveTimer) clearInterval(STATE.autoSaveTimer);
+  STATE.autoSaveTimer = setInterval(() => {
+    if (STATE.isDirty && STATE.user && STATE.manual.id) guardar();
+  }, 60000);
 }
 function localSave() {
   if (STATE.isDragging) return;
@@ -1575,6 +1585,7 @@ async function guardar() {
     STATE.manual.estado = result.data.estado;
     localSave();
     setSaveStatus('✓ Guardado');
+    STATE.isDirty = false;
     notify('✅ Manual guardado');
     updateRevisionBanner();
   } catch(e) {
@@ -3161,6 +3172,7 @@ async function init() {
   renderColorPicker();
   q('#manual-titulo').addEventListener('input', scheduleLocalSave);
   q('#manual-empresa').addEventListener('input', scheduleLocalSave);
+  startAutoSave();
 
   // 1. Mostrar login inmediatamente, sin esperar nada
   setLoading(false);
