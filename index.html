@@ -2318,26 +2318,35 @@ async function handleSession(session) {
   setLoading(false);
 }
 
-// Safety net: if session not resolved in 8s, clear stale Supabase keys and show login
-let _authResolved = false;
+// ── onAuthStateChange: sólo para cambios POSTERIORES al arranque ──────────────
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN')         handleSession(session);
+  if (event === 'SIGNED_OUT')        handleSession(null);
+  if (event === 'PASSWORD_RECOVERY') {
+    history.replaceState(null, '', window.location.pathname);
+    hideAuthScreen();
+    setLoading(false);
+    showSetPasswordModal(true);
+  }
+});
+
+// Safety net: si en 5s la app sigue sin mostrar contenido, limpiar y forzar login
 setTimeout(() => {
-  if (!_authResolved) {
+  if (!STATE.user && !q('#auth-screen')?.classList.contains('hidden')) return; // ya en login, OK
+  if (!STATE.user) {
     Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
     setLoading(false);
     showAuthScreen();
   }
-}, 8000);
+}, 5000);
 
 async function init() {
   renderColorPicker();
   q('#manual-titulo').addEventListener('input', scheduleLocalSave);
   q('#manual-empresa').addEventListener('input', scheduleLocalSave);
 
-  // Show auth screen immediately — no spinner needed
-  // If there's a stored session, onAuthStateChange fires INITIAL_SESSION right after
+  // 1. Mostrar login inmediatamente, sin esperar nada
   setLoading(false);
-
-  // Load guest draft so canvas isn't empty while waiting for auth
   const draft = loadLocalDraft('guest');
   if (draft) {
     STATE.blocks = draft.blocks || [];
@@ -2350,39 +2359,15 @@ async function init() {
   render();
   showAuthScreen();
 
-  // onAuthStateChange fires INITIAL_SESSION (existing session) or nothing (no session)
-  sb.auth.onAuthStateChange(async (event, session) => {
-    _authResolved = true;
-    if (event === 'INITIAL_SESSION') {
-      if (session?.user) {
-        setLoading(true);
-        await handleSession(session);
-        setLoading(false);
-      }
-      return;
-    }
-    if (event === 'PASSWORD_RECOVERY') {
-      // Reset-password link — ya hay sesión activa, sólo pedir nueva contraseña
-      history.replaceState(null, '', window.location.pathname);
-      hideAuthScreen();
-      setLoading(false);
-      showSetPasswordModal(true);
-      return;
-    }
-    if (event === 'SIGNED_IN') {
-      setLoading(true);
-      await handleSession(session);
-      setLoading(false);
-      // Magic link normal (no recovery) — ofrecer crear contraseña
-      if (!sessionStorage.getItem('password_offered')) {
-        history.replaceState(null, '', window.location.pathname);
-        setTimeout(() => offerSetPassword(), 800);
-      }
-    }
-    if (event === 'SIGNED_OUT') {
-      await handleSession(null);
-    }
-  });
+  // 2. Intentar recuperar sesión en background con timeout duro de 3s
+  const sessionPromise = sb.auth.getSession();
+  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ data: { session: null } }), 3000));
+  const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+
+  if (data?.session) {
+    await handleSession(data.session);
+  }
+  // Si no hay sesión, el login ya está visible — no hacer nada más
 }
 
 // ── Procesar token en URL (magic link / reset password) antes de init normal ──
