@@ -2880,7 +2880,7 @@ function closeSearch() {
 function doSearch(term) {
   const r = document.getElementById('searchResults');
   if (!term) { r.classList.remove('open'); r.innerHTML=''; return; }
-  const re = new RegExp(term.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&'), 'gi');
+  const re = new RegExp(term.replace(/[.*+?^\${}()|[\\]\\\\]/g,'\\\\$&'), 'gi');
   const results = [];
   document.querySelectorAll('.mp-page').forEach(pg => {
     const pageTitle = (document.querySelector('#mpNav li[data-page="'+pg.id+'"]')?.textContent || '');
@@ -2894,7 +2894,7 @@ function doSearch(term) {
         const start = Math.max(0, m.index - 60);
         const end = Math.min(txt.length, m.index + term.length + 60);
         const ctx = (start>0?'…':'')+txt.slice(start,end).replace(/</g,'&lt;').replace(/>/g,'&gt;')+(end<txt.length?'…':'');
-        const hi = ctx.replace(new RegExp(term.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&'),'gi'), '<mark>$&</mark>');
+        const hi = ctx.replace(new RegExp(term.replace(/[.*+?^\${}()|[\\]\\\\]/g,'\\\\$&'),'gi'), '<mark>$&</mark>');
         results.push({ pageId: pg.id, pageTitle, ctx: hi, node });
         if (results.length >= 30) break;
       }
