@@ -1975,20 +1975,23 @@ function offerSetPassword() {
   showSetPasswordModal();
 }
 
-function showSetPasswordModal() {
+function showSetPasswordModal(required = false) {
   const existing = q('#modal-set-password');
   if (existing) existing.remove();
   const modal = document.createElement('div');
   modal.id = 'modal-set-password';
   modal.className = 'modal-backdrop';
+  modal.dataset.required = required ? '1' : '';
   modal.innerHTML = `
     <div class="modal modal-sm">
       <div class="modal-header">
-        <h3>🔑 Crear contraseña</h3>
+        <h3>🔑 ${required ? 'Establece tu contraseña' : 'Crear contraseña'}</h3>
       </div>
       <div class="modal-body">
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
-          Has entrado con un enlace de email. Crea una contraseña para acceder directamente la próxima vez.
+          ${required
+            ? 'Introduce la nueva contraseña para tu cuenta.'
+            : 'Has entrado con un enlace de email. Crea una contraseña para acceder directamente la próxima vez.'}
         </p>
         <div class="form-group">
           <label class="form-label">Nueva contraseña</label>
@@ -2002,7 +2005,7 @@ function showSetPasswordModal() {
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" onclick="saveNewPassword()">Guardar contraseña</button>
-        <button class="btn" onclick="document.getElementById('modal-set-password').remove()">Ahora no</button>
+        ${required ? '' : '<button class="btn" onclick="document.getElementById(\'modal-set-password\').remove()">Ahora no</button>'}
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -2013,14 +2016,20 @@ async function saveNewPassword() {
   const p1 = q('#new-pass-1').value;
   const p2 = q('#new-pass-2').value;
   const msg = q('#set-pass-msg');
+  const isRequired = !!q('#modal-set-password')?.dataset.required;
   if (p1.length < 8) { msg.textContent = 'Mínimo 8 caracteres'; return; }
   if (p1 !== p2)     { msg.textContent = 'Las contraseñas no coinciden'; return; }
   msg.style.color = 'var(--text-muted)';
   msg.textContent = 'Guardando...';
-  const { error } = await sb.auth.updateUser({ password: p1 });
+  const { data, error } = await sb.auth.updateUser({ password: p1 });
   if (error) { msg.style.color='#dc2626'; msg.textContent = '❌ ' + error.message; return; }
   q('#modal-set-password').remove();
-  notify('✅ Contraseña creada. La próxima vez entra con email + contraseña.');
+  notify('✅ Contraseña guardada. Ya puedes entrar con email + contraseña.');
+  if (isRequired && data?.user) {
+    // Flujo recovery: cargar sesión completa tras guardar contraseña
+    const { data: sd } = await sb.auth.getSession();
+    if (sd?.session) await handleSession(sd.session);
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2352,13 +2361,21 @@ async function init() {
       }
       return;
     }
+    if (event === 'PASSWORD_RECOVERY') {
+      // Reset-password link — ya hay sesión activa, sólo pedir nueva contraseña
+      history.replaceState(null, '', window.location.pathname);
+      hideAuthScreen();
+      setLoading(false);
+      showSetPasswordModal(true);
+      return;
+    }
     if (event === 'SIGNED_IN') {
       setLoading(true);
       await handleSession(session);
       setLoading(false);
-      // After magic link login offer to set a password
-      if (window.location.hash.includes('access_token')) {
-        window.history.replaceState(null, '', window.location.pathname);
+      // Magic link normal (no recovery) — ofrecer crear contraseña
+      if (!sessionStorage.getItem('password_offered')) {
+        history.replaceState(null, '', window.location.pathname);
         setTimeout(() => offerSetPassword(), 800);
       }
     }
@@ -2368,7 +2385,38 @@ async function init() {
   });
 }
 
-init();
+// ── Procesar token en URL (magic link / reset password) antes de init normal ──
+(async () => {
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const accessToken  = hashParams.get('access_token');
+  const refreshToken = hashParams.get('refresh_token') || '';
+  const type         = hashParams.get('type');
+
+  if (accessToken) {
+    // Limpiar localStorage corrupto primero
+    Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+    history.replaceState(null, '', window.location.pathname);
+
+    const { data, error } = await sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    if (error) {
+      console.error('Error setting session from URL token:', error.message);
+      init();
+    } else if (type === 'recovery') {
+      // Reset de contraseña — no llames a init para no disparar onAuthStateChange doblemente
+      STATE.user = data.session?.user;
+      hideAuthScreen();
+      setLoading(false);
+      renderColorPicker();
+      render();
+      showSetPasswordModal(true);
+    } else {
+      // Magic link normal — onAuthStateChange disparará SIGNED_IN con la sesión
+      init();
+    }
+  } else {
+    init();
+  }
+})();
 </script>
 </body>
 </html>
