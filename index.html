@@ -294,6 +294,8 @@ input,textarea,select{font-family:inherit;font-size:14px}
   <div class="topbar-sep"></div>
   <div class="color-picker" id="color-picker"></div>
   <div class="topbar-sep"></div>
+  <button class="tb-btn" onclick="triggerImportHTML()" title="Importar HTML existente">📥 Importar</button>
+  <input type="file" id="import-html-input" accept=".html,.htm" style="display:none" onchange="importHTMLFile(this)">
   <button class="tb-btn" onclick="nuevoManual()">＋ Nuevo</button>
   <button class="tb-btn primary" id="btn-guardar" onclick="guardar()">💾 Guardar</button>
   <button class="tb-btn" onclick="openMisManuals()">📂 Mis manuales</button>
@@ -1646,6 +1648,237 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   document.addEventListener('render-done', ()=>{
     document.querySelectorAll('.block-wrap').forEach(el=>el.removeAttribute('draggable'));
   });
+}
+
+// ═══════════════════════════════════════════════════════
+// IMPORT HTML
+// ═══════════════════════════════════════════════════════
+function triggerImportHTML() {
+  q('#import-html-input').value = '';
+  q('#import-html-input').click();
+}
+
+function importHTMLFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const blocks = parseHTMLToBlocks(e.target.result, file.name);
+      if (!blocks.length) { notify('⚠️ No se encontraron bloques reconocibles en el HTML'); return; }
+      pushHistory();
+      STATE.blocks.push(...blocks);
+      // Set title from filename if canvas is empty
+      if (STATE.blocks.length === blocks.length) {
+        const name = file.name.replace(/\.html?$/i, '').replace(/[-_]/g, ' ');
+        q('#manual-titulo').value = name.charAt(0).toUpperCase() + name.slice(1);
+      }
+      render();
+      scheduleLocalSave();
+      notify(`✅ Importados ${blocks.length} bloques desde ${file.name}`);
+    } catch(err) {
+      notify('❌ Error al importar: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseHTMLToBlocks(html, filename) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const blocks = [];
+
+  // Extract title from <title> or <h1> in header
+  const docTitle = doc.querySelector('title')?.textContent?.trim();
+  const headerEl = doc.querySelector('header, .header, [class*="header"]');
+  const h1 = (headerEl || doc.body).querySelector('h1');
+  if (h1 || docTitle) {
+    const titleText = h1?.textContent?.trim() || docTitle || '';
+    const subtitleEl = h1?.nextElementSibling;
+    const subtitle = (subtitleEl && ['P','DIV','SPAN'].includes(subtitleEl.tagName))
+      ? subtitleEl.textContent.trim() : '';
+    if (titleText) {
+      blocks.push({ id: uid(), type: 'titulo', order: 0, emoji: '📋', titulo: titleText, subtitulo: subtitle });
+      if (h1) h1.remove();
+      if (subtitle && subtitleEl) subtitleEl.remove();
+    }
+  }
+  if (headerEl) headerEl.remove();
+
+  // Main content area
+  const content = doc.querySelector('.content, main, article, #content, #main, body') || doc.body;
+
+  // Walk top-level children and classify
+  const children = Array.from(content.children);
+  for (const el of children) {
+    const tag = el.tagName;
+    const text = el.textContent.trim();
+    const cls = (el.className || '').toLowerCase();
+    const style = (el.getAttribute('style') || '').toLowerCase();
+
+    if (!text && !el.querySelector('img')) continue;
+
+    // ── H2/H3 → titulo block ──
+    if (tag === 'H2' || tag === 'H3') {
+      const next = el.nextElementSibling;
+      const subtitle = (next && ['P','DIV'].includes(next.tagName) && !next.querySelector('img'))
+        ? next.textContent.trim() : '';
+      blocks.push({ id: uid(), type: 'titulo', order: 0, emoji: '📌', titulo: text, subtitulo: subtitle });
+      if (subtitle && next) next.remove();
+      continue;
+    }
+
+    // ── IMG or element containing only img → imagen block ──
+    const imgs = el.querySelectorAll('img');
+    if (tag === 'IMG' || (imgs.length === 1 && text.length < 200)) {
+      const img = tag === 'IMG' ? el : imgs[0];
+      const src = img.getAttribute('src') || '';
+      const caption = img.getAttribute('alt') || el.querySelector('figcaption, .caption')?.textContent?.trim() || '';
+      if (src.startsWith('data:image')) {
+        // base64 image — extract blob and attach
+        blocks.push({ id: uid(), type: 'imagen', order: 0, _importedSrc: src, caption, width: '100%' });
+      } else if (src) {
+        // external URL — render as texto with <img>
+        blocks.push({ id: uid(), type: 'imagen', order: 0, storagePath: null, caption: caption || src, width: '100%', _externalSrc: src });
+      }
+      continue;
+    }
+
+    // ── TABLE → tabla or flujos ──
+    if (tag === 'TABLE' || el.querySelector('table')) {
+      const table = tag === 'TABLE' ? el : el.querySelector('table');
+      const headers = Array.from(table.querySelectorAll('thead th, thead td')).map(th => th.textContent.trim());
+      const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr =>
+        Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim())
+      );
+      // Detect flujos pattern (2 cols, first col looks like condition)
+      if (headers.length === 2 && rows.length > 0) {
+        const lh = headers.map(h => h.toLowerCase());
+        if (lh.some(h => h.includes('condic') || h.includes('if ') || h.includes('caso')) ||
+            lh.some(h => h.includes('acci') || h.includes('then') || h.includes('result'))) {
+          blocks.push({ id: uid(), type: 'flujos', order: 0,
+            filas: rows.map(r => ({ condicion: r[0]||'', accion: r[1]||'' })) });
+          continue;
+        }
+      }
+      if (headers.length || rows.length) {
+        const cols = headers.length ? headers : (rows[0]?.map((_,i) => `Col ${i+1}`) || ['Col 1']);
+        const dataRows = headers.length ? rows : rows.slice(1);
+        blocks.push({ id: uid(), type: 'tabla', order: 0, columnas: cols, filas: dataRows });
+        continue;
+      }
+    }
+
+    // ── OL/UL → lista or pasos ──
+    if (tag === 'OL' || tag === 'UL') {
+      const items = Array.from(el.querySelectorAll('li'));
+      if (tag === 'OL' && items.length > 0) {
+        // numbered list → pasos
+        for (const li of items) {
+          const strong = li.querySelector('strong, b');
+          const titulo = strong?.textContent?.trim() || li.textContent.split('\n')[0].trim().slice(0, 80);
+          let desc = '';
+          if (strong) { strong.remove(); desc = li.textContent.trim(); }
+          blocks.push({ id: uid(), type: 'paso', order: 0, titulo, descripcion: desc, storagePath: null, caption: '' });
+        }
+        continue;
+      }
+      // UL → lista
+      const liItems = items.map(li => {
+        const t = li.textContent.trim();
+        const icono = (li.className?.includes('cross') || li.className?.includes('no') || t.startsWith('✗') || t.startsWith('❌')) ? 'cross' : 'check';
+        return { icono, texto: t.replace(/^[✓✗✅❌×]\s*/,'') };
+      });
+      if (liItems.length) {
+        blocks.push({ id: uid(), type: 'lista', order: 0, items: liItems });
+        continue;
+      }
+    }
+
+    // ── Alert/callout patterns ──
+    const isAlert = cls.includes('alert') || cls.includes('alerta') || cls.includes('warning') ||
+                    cls.includes('danger') || cls.includes('success') || cls.includes('info') ||
+                    cls.includes('callout') || cls.includes('note') || cls.includes('tip') ||
+                    style.includes('border-left') || style.includes('background:#fe') || style.includes('background:#ef');
+
+    if (isAlert) {
+      let tipo = 'info';
+      if (cls.includes('danger') || cls.includes('peligro') || cls.includes('error')) tipo = 'peligro';
+      else if (cls.includes('warn') || cls.includes('advertencia')) tipo = 'advertencia';
+      else if (cls.includes('success') || cls.includes('exito') || cls.includes('ok')) tipo = 'exito';
+      else if (cls.includes('tip') || cls.includes('note') || cls.includes('important')) {
+        const calloutTipo = cls.includes('important') ? 'important' : cls.includes('warn') ? 'warning' : 'tip';
+        blocks.push({ id: uid(), type: 'callout', order: 0, tipo: calloutTipo, texto: text });
+        continue;
+      }
+      blocks.push({ id: uid(), type: 'alerta', order: 0, tipo, texto: text });
+      continue;
+    }
+
+    // ── HR / separator ──
+    if (tag === 'HR' || el.querySelector('hr')) {
+      blocks.push({ id: uid(), type: 'separador', order: 0 });
+      continue;
+    }
+
+    // ── Headings h4/h5 → callout important ──
+    if (tag === 'H4' || tag === 'H5') {
+      blocks.push({ id: uid(), type: 'callout', order: 0, tipo: 'important', texto: text });
+      continue;
+    }
+
+    // ── Everything else → texto libre ──
+    if (text.length > 0) {
+      blocks.push({ id: uid(), type: 'texto', order: 0, html: el.innerHTML });
+    }
+  }
+
+  // Post-process: upload base64 images (async, fire and forget with placeholder)
+  for (const b of blocks) {
+    if (b._importedSrc) {
+      b.storagePath = null;
+      b._pendingBase64 = b._importedSrc;
+      delete b._importedSrc;
+    }
+    if (b._externalSrc) {
+      // Render external image as html block with <img> tag
+      b.html = `<img src="${b._externalSrc}" style="max-width:100%" alt="${esc(b.caption||'')}">`;
+      b.type = 'texto';
+      delete b._externalSrc;
+    }
+    b.order = blocks.indexOf(b);
+  }
+
+  // Upload pending base64 images after render
+  setTimeout(() => uploadPendingBase64Images(blocks), 500);
+
+  return blocks;
+}
+
+async function uploadPendingBase64Images(blocks) {
+  for (const b of blocks) {
+    if (!b._pendingBase64) continue;
+    const dataUrl = b._pendingBase64;
+    delete b._pendingBase64;
+    try {
+      // Convert base64 to blob
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+      if (STATE.user && STATE.manual.id) {
+        const storagePath = `${STATE.user.id}/${STATE.manual.id}/${b.id}/${Date.now()}.${ext}`;
+        const { error } = await sb.storage.from('manual-images').upload(storagePath, blob, { contentType: blob.type, upsert: true });
+        if (!error) { b.storagePath = storagePath; render(); scheduleLocalSave(); continue; }
+      }
+      // Fallback: keep as data URL in a texto block (offline/guest)
+      b.html = `<img src="${dataUrl}" style="max-width:100%" alt="${esc(b.caption||'')}">`;
+      b.type = 'texto';
+      render();
+    } catch(e) {
+      b.html = `<em style="color:var(--text-muted)">[Imagen no pudo cargarse]</em>`;
+      b.type = 'texto';
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════
