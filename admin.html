@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Constructor de Manuales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<style>
+:root {
+  --primary:#2563EB; --primary-dark:#1d4ed8; --primary-light:#eff6ff;
+  --bg:#f8fafc; --surface:#ffffff; --border:#e2e8f0;
+  --text:#0f172a; --text-muted:#64748b;
+  --radius:8px;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:var(--bg);min-height:100vh}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:inherit;font-size:14px}
+
+/* ── TOPBAR ── */
+#topbar{position:fixed;top:0;left:0;right:0;height:56px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 20px;z-index:100;box-shadow:var(--shadow)}
+.brand{font-weight:700;font-size:15px;color:var(--primary)}
+.brand-sep{color:var(--text-muted);font-size:13px}
+.topbar-spacer{flex:1}
+.tb-btn{display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:background .12s}
+.tb-btn:hover{background:var(--bg)}
+.tb-btn.danger:hover{background:#fee2e2;color:#dc2626;border-color:#fca5a5}
+#admin-email{font-size:12px;color:var(--text-muted)}
+
+/* ── LAYOUT ── */
+#wrap{margin-top:56px;padding:32px 24px;max-width:1100px;margin-left:auto;margin-right:auto}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--text-muted);margin-bottom:28px}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:28px}
+.tab{padding:10px 18px;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .12s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-title{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* ── TABLE ── */
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{text-align:left;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;padding:8px 12px;border-bottom:2px solid var(--border)}
+.data-table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:var(--bg)}
+
+/* ── ROLE BADGES ── */
+.role-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.role-badge.admin{background:#fee2e2;color:#dc2626}
+.role-badge.editor{background:#dbeafe;color:#1d4ed8}
+.role-badge.visualizador{background:#dcfce7;color:#15803d}
+
+/* ── FORMS ── */
+.form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.form-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:180px}
+.form-group label{font-size:12px;font-weight:600;color:var(--text-muted)}
+.form-input{padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;background:var(--surface);width:100%}
+.form-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.form-select{padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;background:var(--surface)}
+.form-select:focus{border-color:var(--primary)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:background .12s,opacity .12s;border:1px solid transparent}
+.btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border)}
+.btn-secondary:hover{background:var(--bg)}
+.btn-danger{background:#dc2626;color:#fff}
+.btn-danger:hover{background:#b91c1c}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── MANUAL CARD ── */
+.manual-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;background:var(--surface)}
+.manual-card .mc-info{flex:1;min-width:0}
+.manual-card .mc-titulo{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.manual-card .mc-meta{font-size:12px;color:var(--text-muted);margin-top:2px}
+.manual-card .mc-actions{display:flex;gap:6px;flex-shrink:0}
+.en_revision-indicator{width:8px;height:8px;border-radius:50%;background:#eab308;flex-shrink:0}
+
+/* ── NOTIFICATION ── */
+#notif{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.notif-item{background:#0f172a;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;animation:slideIn .2s ease;box-shadow:var(--shadow-md)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ── INVITE HISTORY ── */
+.invite-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.invite-row:last-child{border-bottom:none}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px}
+.empty .empty-icon{font-size:32px;margin-bottom:8px}
+
+/* ── LOADING SPINNER ── */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── AUTH OVERLAY ── */
+#auth-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999}
+.auth-box{background:var(--surface);border-radius:12px;padding:40px 36px;box-shadow:var(--shadow-md);width:100%;max-width:360px;text-align:center}
+.auth-box h2{font-size:20px;font-weight:700;margin-bottom:6px}
+.auth-box p{font-size:13px;color:var(--text-muted);margin-bottom:24px}
+.auth-inputs{display:flex;flex-direction:column;gap:12px;text-align:left}
+.auth-error{color:#dc2626;font-size:12px;margin-top:8px;display:none}
+
+/* ── CONFIRM DIALOG ── */
+#confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:1000}
+#confirm-overlay.open{display:flex}
+.confirm-box{background:var(--surface);border-radius:10px;padding:28px 24px;box-shadow:var(--shadow-md);max-width:360px;width:100%}
+.confirm-box h3{font-size:15px;font-weight:700;margin-bottom:8px}
+.confirm-box p{font-size:13px;color:var(--text-muted);margin-bottom:20px}
+.confirm-actions{display:flex;gap:8px;justify-content:flex-end}
+</style>
+</head>
+<body>
+
+<!-- Auth overlay (shown when not logged in or not admin) -->
+<div id="auth-overlay">
+  <div class="auth-box">
+    <div style="font-size:32px;margin-bottom:12px">🔐</div>
+    <h2>Panel de administración</h2>
+    <p>Inicia sesión con tu cuenta de administrador</p>
+    <div class="auth-inputs">
+      <input id="auth-email" class="form-input" type="email" placeholder="tu@empresa.com" autocomplete="email">
+      <input id="auth-pass" class="form-input" type="password" placeholder="Contraseña" autocomplete="current-password">
+      <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center">Entrar</button>
+      <button class="btn btn-secondary" onclick="doMagicLink()" style="width:100%;justify-content:center">📧 Enviar enlace de acceso</button>
+      <div id="auth-error" class="auth-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div id="confirm-overlay">
+  <div class="confirm-box">
+    <h3 id="confirm-title">¿Confirmar acción?</h3>
+    <p id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Cancelar</button>
+      <button id="confirm-ok" class="btn btn-danger">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Top bar -->
+<div id="topbar">
+  <span class="brand">📋 Manuales</span>
+  <span class="brand-sep">/</span>
+  <span style="font-size:13px;font-weight:600">Administración</span>
+  <div class="topbar-spacer"></div>
+  <span id="admin-email"></span>
+  <a href="index.html" class="tb-btn" style="text-decoration:none">← Volver al editor</a>
+  <button class="tb-btn danger" id="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+</div>
+
+<!-- Main content -->
+<div id="wrap">
+  <div class="page-title">Panel de administración</div>
+  <div class="page-sub" id="page-sub">Gestión de usuarios, invitaciones y revisión de manuales</div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="users" onclick="switchTab('users')">👥 Usuarios</div>
+    <div class="tab" data-tab="invite" onclick="switchTab('invite')">✉️ Invitaciones</div>
+    <div class="tab" data-tab="revision" onclick="switchTab('revision')">📋 En revisión <span id="revision-count"></span></div>
+  </div>
+
+  <!-- TAB: Usuarios -->
+  <div id="tab-users" class="tab-panel active">
+    <div class="card">
+      <div class="card-title">👥 Usuarios registrados <span id="users-count" style="font-size:12px;color:var(--text-muted);font-weight:400"></span></div>
+      <div id="users-table-wrap">
+        <div class="empty"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Invitaciones -->
+  <div id="tab-invite" class="tab-panel">
+    <div class="card">
+      <div class="card-title">✉️ Invitar nuevo usuario</div>
+      <div class="form-row" style="margin-bottom:0">
+        <div class="form-group">
+          <label>Email</label>
+          <input id="inv-email" class="form-input" type="email" placeholder="usuario@empresa.com">
+        </div>
+        <div class="form-group" style="max-width:180px">
+          <label>Rol</label>
+          <select id="inv-role" class="form-select">
+            <option value="editor">Editor</option>
+            <option value="visualizador">Visualizador</option>
+          </select>
+        </div>
+        <div class="form-group" style="max-width:160px;justify-content:flex-end">
+          <label style="visibility:hidden">.</label>
+          <button class="btn btn-primary" onclick="sendInvite()" id="inv-btn">Enviar invitación</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="invite-history-card" style="display:none">
+      <div class="card-title">📬 Invitaciones enviadas esta sesión</div>
+      <div id="invite-history"></div>
+    </div>
+  </div>
+
+  <!-- TAB: En revisión -->
+  <div id="tab-revision" class="tab-panel">
+    <div id="revision-list">
+      <div class="empty"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="notif"></div>
+
+<script>
+const SUPABASE_URL = 'https://tbeqkabdkqffdcufvfof.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXFrYWJka3FmZmRjdWZ2Zm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NzA3NjYsImV4cCI6MjA5NzM0Njc2Nn0.bPywboiecnWj7XHhWoM1ACG26mId4Naa5CYFSPAwzYg';
+const EDGE_URL = `${SUPABASE_URL}/functions/v1/admin-users`;
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { detectSessionInUrl: true, persistSession: true, autoRefreshToken: true }
+});
+
+// ── state ──────────────────────────────────────────────────────────────────
+let STATE = { session: null, role: null, inviteHistory: [] };
+
+// ── auth ───────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const err   = document.getElementById('auth-error');
+  err.style.display = 'none';
+  if (!email || !pass) { err.textContent = 'Completa email y contraseña'; err.style.display = 'block'; return; }
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) { err.textContent = error.message; err.style.display = 'block'; }
+}
+
+async function doMagicLink() {
+  const email = document.getElementById('auth-email').value.trim();
+  const err   = document.getElementById('auth-error');
+  err.style.display = 'none';
+  if (!email) { err.textContent = 'Introduce tu email primero'; err.style.display = 'block'; return; }
+  const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.href } });
+  if (error) { err.textContent = error.message; err.style.display = 'block'; }
+  else { err.style.color = '#16a34a'; err.textContent = '✅ Enlace enviado — revisa tu email'; err.style.display = 'block'; }
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  STATE.session = session;
+  if (!session) { showAuthOverlay(); return; }
+  await checkAdminAccess(session);
+});
+
+async function checkAdminAccess(session) {
+  // Use get_my_role() RPC to avoid any RLS recursion
+  const { data: role, error } = await sb.rpc('get_my_role');
+  if (error || role !== 'admin') {
+    document.getElementById('auth-error').textContent = '⛔ Sin acceso: se requiere rol de administrador';
+    document.getElementById('auth-error').style.display = 'block';
+    await sb.auth.signOut();
+    return;
+  }
+  STATE.role = role;
+  hideAuthOverlay(session);
+  loadAll();
+}
+
+function showAuthOverlay() {
+  document.getElementById('auth-overlay').style.display = 'flex';
+}
+function hideAuthOverlay(session) {
+  document.getElementById('auth-overlay').style.display = 'none';
+  if (session?.user?.email) {
+    document.getElementById('admin-email').textContent = session.user.email;
+  }
+}
+
+// ── navigation ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
+}
+
+// ── load everything ────────────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([loadUsers(), loadRevision()]);
+}
+
+// ── users tab ──────────────────────────────────────────────────────────────
+async function loadUsers() {
+  const wrap = document.getElementById('users-table-wrap');
+  wrap.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  const session = STATE.session;
+  if (!session) return;
+
+  const res = await fetch(EDGE_URL, {
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    wrap.innerHTML = `<div class="empty" style="color:#dc2626">❌ ${esc(err.error || 'Error cargando usuarios')}</div>`;
+    return;
+  }
+
+  const { users } = await res.json();
+  document.getElementById('users-count').textContent = `(${users.length})`;
+
+  if (!users.length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">👤</div>No hay usuarios registrados</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Rol</th>
+          <th>Registro</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${users.map(u => `
+          <tr id="user-row-${u.user_id}">
+            <td style="font-weight:500">${esc(u.email)}</td>
+            <td>
+              <span class="role-badge ${u.role}" id="badge-${u.user_id}">${u.role}</span>
+            </td>
+            <td style="color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('es')}</td>
+            <td>
+              <div style="display:flex;gap:6px;align-items:center">
+                <select class="form-select" style="font-size:12px;padding:4px 8px" onchange="changeRole('${u.user_id}','${esc(u.email)}',this)">
+                  ${['admin','editor','visualizador'].map(r => `<option value="${r}" ${u.role === r ? 'selected' : ''}>${r}</option>`).join('')}
+                </select>
+                <button class="btn btn-sm" style="color:#dc2626;border-color:#fca5a5" onclick="confirmDelete('${u.user_id}','${esc(u.email)}')" title="Eliminar usuario">🗑</button>
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function changeRole(userId, email, sel) {
+  const role = sel.value;
+  const session = STATE.session;
+  const res = await fetch(`${EDGE_URL}/role`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, role })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    notify('❌ ' + (err.error || 'Error'));
+    return;
+  }
+  // Update badge
+  const badge = document.getElementById('badge-' + userId);
+  if (badge) { badge.className = `role-badge ${role}`; badge.textContent = role; }
+  notify(`✅ Rol de ${email} cambiado a ${role}`);
+}
+
+// ── delete user ────────────────────────────────────────────────────────────
+let _pendingDelete = null;
+
+function confirmDelete(userId, email) {
+  _pendingDelete = userId;
+  document.getElementById('confirm-title').textContent = 'Eliminar usuario';
+  document.getElementById('confirm-msg').textContent = `¿Eliminar permanentemente a ${email}? Esta acción no se puede deshacer.`;
+  document.getElementById('confirm-ok').textContent = 'Eliminar';
+  document.getElementById('confirm-ok').onclick = executeDelete;
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+
+function closeConfirm() {
+  _pendingDelete = null;
+  document.getElementById('confirm-overlay').classList.remove('open');
+}
+
+async function executeDelete() {
+  closeConfirm();
+  const userId = _pendingDelete;
+  if (!userId) return;
+  const session = STATE.session;
+  const res = await fetch(`${EDGE_URL}/${userId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${session.access_token}` }
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    notify('❌ ' + (err.error || 'Error eliminando usuario'));
+    return;
+  }
+  const row = document.getElementById('user-row-' + userId);
+  if (row) row.remove();
+  notify('✅ Usuario eliminado');
+}
+
+// ── invite tab ─────────────────────────────────────────────────────────────
+async function sendInvite() {
+  const email = document.getElementById('inv-email').value.trim();
+  const role  = document.getElementById('inv-role').value;
+  const btn   = document.getElementById('inv-btn');
+
+  if (!email) { notify('⚠️ Introduce un email'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+
+  const session = STATE.session;
+  const res = await fetch(`${EDGE_URL}/invite`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, role })
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Enviar invitación';
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    notify('❌ ' + (err.error || 'Error enviando invitación'));
+    return;
+  }
+
+  document.getElementById('inv-email').value = '';
+  notify(`✅ Invitación enviada a ${email} como ${role}`);
+
+  // Add to history
+  STATE.inviteHistory.unshift({ email, role, ts: new Date() });
+  renderInviteHistory();
+  loadUsers();
+}
+
+function renderInviteHistory() {
+  const card = document.getElementById('invite-history-card');
+  const wrap = document.getElementById('invite-history');
+  if (!STATE.inviteHistory.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  wrap.innerHTML = STATE.inviteHistory.map((inv, i) => `
+    <div class="invite-row">
+      <div>
+        <span style="font-weight:500">${esc(inv.email)}</span>
+        <span class="role-badge ${inv.role}" style="margin-left:8px">${inv.role}</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:12px;color:var(--text-muted)">${inv.ts.toLocaleTimeString('es')}</span>
+        <button class="btn btn-sm btn-secondary" onclick="resendInvite(${i})">Reenviar</button>
+      </div>
+    </div>`).join('');
+}
+
+async function resendInvite(i) {
+  const inv = STATE.inviteHistory[i];
+  if (!inv) return;
+  document.getElementById('inv-email').value = inv.email;
+  document.getElementById('inv-role').value  = inv.role;
+  switchTab('invite');
+  notify(`📧 Rellena el formulario y envía de nuevo a ${inv.email}`);
+}
+
+// ── revision tab ───────────────────────────────────────────────────────────
+async function loadRevision() {
+  const wrap = document.getElementById('revision-list');
+  wrap.innerHTML = '<div class="empty"><div class="spinner"></div></div>';
+
+  const { data, error } = await sb
+    .from('manuales')
+    .select('id,titulo,empresa,created_by,updated_at')
+    .eq('estado', 'en_revision')
+    .order('updated_at', { ascending: false });
+
+  const badge = document.getElementById('revision-count');
+
+  if (error) {
+    wrap.innerHTML = `<div class="empty" style="color:#dc2626">❌ ${esc(error.message)}</div>`;
+    badge.textContent = '';
+    return;
+  }
+
+  badge.textContent = data.length ? ` (${data.length})` : '';
+  badge.style.color = data.length ? '#ca8a04' : '';
+
+  if (!data.length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>No hay manuales pendientes de revisión</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(m => `
+    <div class="manual-card" id="manual-card-${m.id}">
+      <div class="en_revision-indicator"></div>
+      <div class="mc-info">
+        <div class="mc-titulo">${esc(m.titulo || 'Sin título')}</div>
+        <div class="mc-meta">${esc(m.empresa || '—')} · Actualizado ${new Date(m.updated_at).toLocaleDateString('es', { day:'2-digit', month:'short', year:'numeric' })}</div>
+      </div>
+      <div class="mc-actions">
+        <button class="btn btn-primary btn-sm" onclick="approveManual('${m.id}')">✅ Aprobar</button>
+        <button class="btn btn-sm btn-secondary" onclick="rejectManual('${m.id}')">✗ Rechazar</button>
+      </div>
+    </div>`).join('');
+}
+
+async function approveManual(id) {
+  const { error } = await sb.from('manuales').update({ estado: 'publicado' }).eq('id', id);
+  if (error) { notify('❌ ' + error.message); return; }
+  const card = document.getElementById('manual-card-' + id);
+  if (card) card.remove();
+  updateRevisionBadge();
+  notify('✅ Manual publicado');
+}
+
+async function rejectManual(id) {
+  const comment = prompt('Motivo del rechazo (opcional):');
+  const updates = { estado: 'rechazado' };
+  if (comment) updates.revision_comment = comment;
+  const { error } = await sb.from('manuales').update(updates).eq('id', id);
+  if (error) { notify('❌ ' + error.message); return; }
+  const card = document.getElementById('manual-card-' + id);
+  if (card) card.remove();
+  updateRevisionBadge();
+  notify('Manual rechazado');
+}
+
+function updateRevisionBadge() {
+  const remaining = document.querySelectorAll('[id^="manual-card-"]').length;
+  const badge = document.getElementById('revision-count');
+  badge.textContent = remaining ? ` (${remaining})` : '';
+  if (!remaining) {
+    document.getElementById('revision-list').innerHTML = '<div class="empty"><div class="empty-icon">✅</div>No hay manuales pendientes de revisión</div>';
+  }
+}
+
+// ── notifications ──────────────────────────────────────────────────────────
+function notify(msg) {
+  const wrap = document.getElementById('notif');
+  const el = document.createElement('div');
+  el.className = 'notif-item';
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ── helpers ────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── close confirm on overlay click ────────────────────────────────────────
+document.getElementById('confirm-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('confirm-overlay')) closeConfirm();
+});
+
+// ── enter key on auth fields ───────────────────────────────────────────────
+document.getElementById('auth-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('auth-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>
