@@ -690,6 +690,12 @@ const BLOCK_TYPES = {
     label: 'Imagen',
     defaultData: () => ({ storagePath:null, caption:'', width:'100%' }),
     render(b) {
+      if (b.src) {
+        return `<div class="b-imagen block-inner">
+          <img src="${b.src}" style="width:${b.width||'100%'};display:block" alt="${esc(b.alt||b.caption||'')}">
+          <div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div>
+        </div>`;
+      }
       if (b.storagePath) {
         return `<div class="b-imagen block-inner">
           <img src="" data-path="${b.storagePath}" class="lazy-img" style="width:${b.width||'100%'}" alt="${esc(b.caption||'')}">
