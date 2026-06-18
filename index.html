@@ -429,6 +429,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
   <input id="manual-empresa" type="text" placeholder="Empresa" spellcheck="false">
   <div class="topbar-spacer"></div>
   <span id="save-status"></span>
+  <span id="stats-indicator" style="font-size:11px;color:rgba(255,255,255,.35);white-space:nowrap;margin:0 6px"></span>
   <div id="role-btns"></div>
   <div class="topbar-sep"></div>
   <div class="color-picker" id="color-picker"></div>
@@ -1128,6 +1129,22 @@ function render() {
   applyBlockColors();
   // Load lazy images
   loadLazyImages();
+  updateStats();
+}
+function updateStats() {
+  const el = q('#stats-indicator');
+  if (!el) return;
+  const blocks = STATE.blocks.length;
+  let words = 0;
+  STATE.blocks.forEach(b => {
+    const parts = [b.titulo||'', b.subtitulo||'', b.descripcion||'', b.texto||'', b.caption||''];
+    if (b.html) { const tmp = document.createElement('div'); tmp.innerHTML = b.html; parts.push(tmp.textContent); }
+    if (b.items) b.items.forEach(it => parts.push(it.texto||''));
+    if (b.code) parts.push(b.code);
+    words += parts.join(' ').trim().split(/\s+/).filter(w => w.length > 0).length;
+  });
+  const pages = STATE.pages && STATE.pages.length > 0 ? STATE.pages.length : 1;
+  el.textContent = `${blocks} bloq · ${words} pal · ${pages} pág`;
 }
 
 function applyBlockColors() {
