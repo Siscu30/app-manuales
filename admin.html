@@ -206,8 +206,17 @@ input,select,textarea{font-family:inherit;font-size:14px}
         </div>
         <div class="form-group" style="max-width:160px;justify-content:flex-end">
           <label style="visibility:hidden">.</label>
-          <button class="btn btn-primary" onclick="sendInvite()" id="inv-btn">Enviar invitación</button>
+          <button class="btn btn-primary" onclick="sendInvite()" id="inv-btn">Crear acceso</button>
         </div>
+      </div>
+    </div>
+
+    <div class="card" id="invite-link-card" style="display:none">
+      <div class="card-title">🔗 Enlace de acceso generado</div>
+      <p style="margin:0 0 12px;font-size:14px;color:var(--text-muted)">Comparte este enlace con el usuario. Expira en 24h y solo funciona una vez.</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="invite-link-input" class="form-input" type="text" readonly style="flex:1;font-size:12px;font-family:monospace">
+        <button class="btn btn-secondary" onclick="copyInviteLink()">Copiar</button>
       </div>
     </div>
 
@@ -496,17 +505,41 @@ async function sendInvite() {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    notify('❌ ' + (err.error || 'Error enviando invitación'));
+    notify('❌ ' + (err.error || 'Error creando acceso'));
     return;
   }
 
+  const data = await res.json().catch(() => ({}));
   document.getElementById('inv-email').value = '';
-  notify(`✅ Invitación enviada a ${email} como ${role}`);
+  notify(`✅ Acceso creado para ${email} como ${role}`);
+
+  // Show setup link if returned
+  const linkCard = document.getElementById('invite-link-card');
+  const linkInput = document.getElementById('invite-link-input');
+  if (data.setup_link) {
+    linkInput.value = data.setup_link;
+    linkCard.style.display = 'block';
+    linkInput.select();
+  } else {
+    linkCard.style.display = 'none';
+  }
 
   // Add to history
-  STATE.inviteHistory.unshift({ email, role, ts: new Date() });
+  STATE.inviteHistory.unshift({ email, role, ts: new Date(), link: data.setup_link });
   renderInviteHistory();
   loadUsers();
+}
+
+function copyInviteLink() {
+  const input = document.getElementById('invite-link-input');
+  if (!input.value) return;
+  navigator.clipboard.writeText(input.value).then(() => {
+    notify('📋 Enlace copiado al portapapeles');
+  }).catch(() => {
+    input.select();
+    document.execCommand('copy');
+    notify('📋 Enlace copiado');
+  });
 }
 
 function renderInviteHistory() {
