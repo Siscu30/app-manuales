@@ -1730,10 +1730,11 @@ async function logout() {
 // ═══════════════════════════════════════════════════════
 // ROLES
 // ═══════════════════════════════════════════════════════
-async function loadUserRole(userId) {
-  const { data, error } = await sb.from('user_roles').select('role').eq('user_id', userId).single();
+async function loadUserRole(_userId) {
+  // Uses get_my_role() RPC (SECURITY DEFINER) to avoid RLS recursion on user_roles
+  const { data, error } = await sb.rpc('get_my_role');
   if (error || !data) return null;
-  return data.role;
+  return data;
 }
 
 async function ensureAdminExists(userId) {
@@ -1752,7 +1753,7 @@ function applyRoleUI(role) {
   q('#btn-logout').style.display = 'flex';
 
   if (role === 'admin') {
-    btns.innerHTML = `<button class="tb-btn" onclick="openModal('modal-users')">👥 Usuarios</button>`;
+    btns.innerHTML = `<button class="tb-btn" onclick="openModal('modal-users')">👥 Usuarios</button><a href="admin.html" class="tb-btn" style="text-decoration:none">⚙️ Admin</a>`;
   }
   if (role === 'editor') {
     btns.innerHTML = `<button class="tb-btn" onclick="enviarRevision()">📤 Enviar revisión</button>`;
