@@ -295,13 +295,10 @@ sb.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') showAuthOverlay();
 });
 
-// Safety net: si en 5s la UI sigue sin resolverse, limpiar y mostrar login
+// Safety net: si en 10s no se resuelve el rol, mostrar login (sin borrar sesión)
 setTimeout(() => {
-  if (!STATE.role) {
-    Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
-    showAuthOverlay();
-  }
-}, 5000);
+  if (!STATE.role) showAuthOverlay();
+}, 10000);
 
 async function init() {
   // 1. Mostrar login inmediatamente
@@ -322,15 +319,22 @@ async function init() {
 init();
 
 async function checkAdminAccess(session) {
-  // Use get_my_role() RPC to avoid any RLS recursion
-  const { data: role, error } = await sb.rpc('get_my_role');
-  if (error || role !== 'admin') {
-    document.getElementById('auth-error').textContent = '⛔ Sin acceso: se requiere rol de administrador';
-    document.getElementById('auth-error').style.display = 'block';
+  const userId = session?.user?.id;
+  if (!userId) { showAuthError('Sesión inválida'); await sb.auth.signOut(); return; }
+
+  const { data, error } = await sb
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .single();
+
+  if (error || data?.role !== 'admin') {
+    const msg = error ? `Error: ${error.message}` : '⛔ Sin acceso: se requiere rol de administrador';
+    showAuthError(msg);
     await sb.auth.signOut();
     return;
   }
-  STATE.role = role;
+  STATE.role = data.role;
   hideAuthOverlay(session);
   loadAll();
 }
