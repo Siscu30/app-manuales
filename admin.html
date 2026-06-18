@@ -108,11 +108,12 @@ input,select,textarea{font-family:inherit;font-size:14px}
 
 /* ── AUTH OVERLAY ── */
 #auth-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999}
-.auth-box{background:var(--surface);border-radius:12px;padding:40px 36px;box-shadow:var(--shadow-md);width:100%;max-width:360px;text-align:center}
+.auth-box{background:var(--surface);border-radius:12px;padding:40px 36px;box-shadow:var(--shadow-md);width:100%;max-width:380px;text-align:center}
 .auth-box h2{font-size:20px;font-weight:700;margin-bottom:6px}
 .auth-box p{font-size:13px;color:var(--text-muted);margin-bottom:24px}
 .auth-inputs{display:flex;flex-direction:column;gap:12px;text-align:left}
-.auth-error{color:#dc2626;font-size:12px;margin-top:8px;display:none}
+.auth-error{color:#dc2626;font-size:13px;font-weight:500;margin-top:4px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;display:none;line-height:1.45}
+.auth-hint{font-size:12px;color:var(--text-muted);margin-top:4px;display:none;line-height:1.4}
 
 /* ── CONFIRM DIALOG ── */
 #confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:1000}
@@ -137,6 +138,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
       <button class="btn btn-primary" onclick="doLogin()" style="width:100%;justify-content:center">Entrar</button>
       <button class="btn btn-secondary" onclick="doMagicLink()" style="width:100%;justify-content:center">📧 Enviar enlace de acceso</button>
       <div id="auth-error" class="auth-error"></div>
+      <div id="auth-hint" class="auth-hint"></div>
     </div>
   </div>
 </div>
@@ -226,6 +228,9 @@ input,select,textarea{font-family:inherit;font-size:14px}
 <div id="notif"></div>
 
 <script>
+// Fuerza recarga si la página viene del bfcache (pulsar Atrás) para evitar estado congelado
+window.addEventListener('pageshow', function(e) { if (e.persisted) window.location.reload(); });
+
 const SUPABASE_URL = 'https://tbeqkabdkqffdcufvfof.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXFrYWJka3FmZmRjdWZ2Zm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NzA3NjYsImV4cCI6MjA5NzM0Njc2Nn0.bPywboiecnWj7XHhWoM1ACG26mId4Naa5CYFSPAwzYg';
 const EDGE_URL = `${SUPABASE_URL}/functions/v1/admin-users`;
@@ -239,13 +244,33 @@ let STATE = { session: null, role: null, inviteHistory: [] };
 
 // ── auth ───────────────────────────────────────────────────────────────────
 async function doLogin() {
-  const email = document.getElementById('auth-email').value.trim();
-  const pass  = document.getElementById('auth-pass').value;
-  const err   = document.getElementById('auth-error');
+  const email   = document.getElementById('auth-email').value.trim();
+  const pass    = document.getElementById('auth-pass').value;
+  const err     = document.getElementById('auth-error');
+  const hint    = document.getElementById('auth-hint');
+  const btn     = document.querySelector('#auth-overlay .btn-primary');
   err.style.display = 'none';
-  if (!email || !pass) { err.textContent = 'Completa email y contraseña'; err.style.display = 'block'; return; }
+  hint.style.display = 'none';
+  if (!email || !pass) { showAuthError('Completa email y contraseña'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Verificando…';
   const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if (error) { err.textContent = error.message; err.style.display = 'block'; }
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+  if (error) {
+    const isCredErr = error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed');
+    showAuthError(isCredErr ? 'Contraseña incorrecta o no configurada.' : error.message);
+    if (isCredErr) {
+      hint.textContent = '¿No tienes contraseña? Usa el botón "Enviar enlace de acceso" que aparece abajo — recibirás un email para entrar sin contraseña.';
+      hint.style.display = 'block';
+    }
+  }
+}
+
+function showAuthError(msg) {
+  const err = document.getElementById('auth-error');
+  err.textContent = msg;
+  err.style.display = 'block';
 }
 
 async function doMagicLink() {
