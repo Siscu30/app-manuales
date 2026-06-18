@@ -159,6 +159,27 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .b-flujos td:first-child{border-right:1px solid var(--border);font-weight:500}
 .b-flujos tr:last-child td{border-bottom:none}
 
+/* block: video */
+.b-video{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
+.b-video iframe{width:100%;display:block;border:none;aspect-ratio:16/9}
+.b-video .video-placeholder{padding:40px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;color:var(--text-muted);text-align:center}
+.b-video .video-caption{font-size:12px;color:var(--text-muted);padding:6px 12px;border-top:1px solid var(--border);background:#fafafa}
+.b-video .video-link{padding:14px 16px}
+
+/* block: enlace */
+.b-enlace{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px 16px;transition:box-shadow .15s}
+.b-enlace:hover{box-shadow:var(--shadow-md)}
+.b-enlace .enlace-title{font-weight:600;font-size:14px;color:var(--primary)}
+.b-enlace .enlace-url{font-size:12px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.b-enlace .enlace-desc{font-size:13px;color:var(--text);margin-top:6px;line-height:1.4}
+
+/* per-block color picker */
+.block-color-popup{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;z-index:30;box-shadow:var(--shadow-md);min-width:220px}
+.block-color-popup label{font-size:12px;font-weight:500;display:block;margin-bottom:4px}
+.block-color-popup .color-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.block-color-popup input[type=color]{width:36px;height:28px;border:1px solid var(--border);border-radius:4px;padding:2px;cursor:pointer}
+.block-color-popup .reset-btn{font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;padding:0}
+
 /* empty canvas */
 #canvas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;color:var(--text-muted);border:2px dashed var(--border);border-radius:12px;min-height:300px;cursor:default}
 #canvas-empty .ec-icon{font-size:48px;margin-bottom:12px}
@@ -352,6 +373,8 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <button class="block-btn" onclick="addBlock('separador')" draggable="true" data-type="separador"><span class="icon">—</span>Separador</button>
     <button class="block-btn" onclick="addBlock('texto')" draggable="true" data-type="texto"><span class="icon">📝</span>Texto libre</button>
     <button class="block-btn" onclick="addBlock('flujos')" draggable="true" data-type="flujos"><span class="icon">🔀</span>Tabla de flujos</button>
+    <button class="block-btn" onclick="addBlock('video')" draggable="true" data-type="video"><span class="icon">🎬</span>Vídeo</button>
+    <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><span class="icon">🔗</span>Enlace / URL</button>
   </aside>
 
   <div id="canvas-wrap">
@@ -697,6 +720,69 @@ const BLOCK_TYPES = {
       return tmp.textContent||'';
     }
   },
+  video: {
+    label: 'Vídeo',
+    defaultData: () => ({ url:'', titulo:'', caption:'' }),
+    render(b) {
+      if (!b.url) {
+        return `<div class="b-video block-inner" ondblclick="openBlockEditor('${b.id}')">
+          <div class="video-placeholder"><span style="font-size:36px">🎬</span><span>Doble clic para añadir un vídeo (YouTube, Vimeo...)</span></div>
+        </div>`;
+      }
+      const embed = getVideoEmbedUrl(b.url);
+      if (embed) {
+        return `<div class="b-video block-inner" ondblclick="openBlockEditor('${b.id}')">
+          <iframe src="${embed}" allowfullscreen></iframe>
+          ${b.caption?`<div class="video-caption">${esc(b.caption)}</div>`:''}
+        </div>`;
+      }
+      return `<div class="b-video block-inner video-link" ondblclick="openBlockEditor('${b.id}')">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:28px;flex-shrink:0">🎬</span>
+          <div><div style="font-weight:600;font-size:14px">${esc(b.titulo||b.url)}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${esc(b.url)}</div></div>
+        </div>
+      </div>`;
+    },
+    editorHTML(b) {
+      return `<div class="form-group"><label class="form-label">URL del vídeo</label>
+        <input class="form-input" id="be-url" value="${esc(b.url||'')}" placeholder="https://youtu.be/... o enlace de Teams">
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">YouTube, Vimeo o cualquier URL de vídeo</p></div>
+        <div class="form-group"><label class="form-label">Título (opcional)</label>
+        <input class="form-input" id="be-titulo" value="${esc(b.titulo||'')}" placeholder="Nombre del vídeo"></div>
+        <div class="form-group"><label class="form-label">Pie de vídeo (opcional)</label>
+        <input class="form-input" id="be-caption" value="${esc(b.caption||'')}" placeholder="Descripción breve"></div>`;
+    },
+    saveEditor(b) { b.url=q('#be-url').value.trim(); b.titulo=q('#be-titulo').value.trim(); b.caption=q('#be-caption').value.trim(); },
+    toTeamsText(b) { return `🎬 ${b.titulo||b.url||'Vídeo'}\n${b.url||''}`; }
+  },
+  enlace: {
+    label: 'Enlace / URL',
+    defaultData: () => ({ url:'', titulo:'', descripcion:'' }),
+    render(b) {
+      const title = b.titulo || b.url || 'Enlace';
+      return `<div class="b-enlace block-inner" ondblclick="openBlockEditor('${b.id}')">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span style="font-size:22px;flex-shrink:0;margin-top:1px">🔗</span>
+          <div style="flex:1;min-width:0">
+            <div class="enlace-title">${esc(title)}</div>
+            ${b.url?`<div class="enlace-url">${esc(b.url)}</div>`:''}
+            ${b.descripcion?`<div class="enlace-desc">${esc(b.descripcion)}</div>`:''}
+          </div>
+          ${b.url?`<a href="${esc(b.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="btn btn-sm" style="flex-shrink:0">Abrir →</a>`:''}
+        </div>
+      </div>`;
+    },
+    editorHTML(b) {
+      return `<div class="form-group"><label class="form-label">URL</label>
+        <input class="form-input" id="be-url" value="${esc(b.url||'')}" placeholder="https://..."></div>
+        <div class="form-group"><label class="form-label">Título</label>
+        <input class="form-input" id="be-titulo" value="${esc(b.titulo||'')}" placeholder="Nombre del enlace"></div>
+        <div class="form-group"><label class="form-label">Descripción (opcional)</label>
+        <textarea class="form-textarea" id="be-desc">${esc(b.descripcion||'')}</textarea></div>`;
+    },
+    saveEditor(b) { b.url=q('#be-url').value.trim(); b.titulo=q('#be-titulo').value.trim(); b.descripcion=q('#be-desc').value.trim(); },
+    toTeamsText(b) { return `🔗 ${b.titulo||b.url||'Enlace'} → ${b.url||''}`; }
+  },
   flujos: {
     label: 'Tabla de flujos',
     defaultData: () => ({ filas:[{condicion:'Condición de ejemplo',accion:'Acción a tomar'},{condicion:'',accion:''}] }),
@@ -736,6 +822,14 @@ const BLOCK_TYPES = {
 // ═══════════════════════════════════════════════════════
 function q(sel){ return document.querySelector(sel); }
 function esc(str){ const d=document.createElement('div');d.textContent=str;return d.innerHTML; }
+function getVideoEmbedUrl(url) {
+  if (!url) return null;
+  const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+  const vimeo = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+  return null;
+}
 function notify(msg, duration=2500) {
   const n=q('#notif'); n.textContent=msg; n.classList.add('show');
   setTimeout(()=>n.classList.remove('show'), duration);
@@ -799,13 +893,85 @@ function render() {
       <div class="block-bar">
         <button title="Subir" onclick="moveBlock(${i},-1,event)">↑</button>
         <button title="Bajar" onclick="moveBlock(${i},1,event)">↓</button>
+        <button title="Color personalizado" onclick="openBlockColorPicker('${b.id}',event)" style="position:relative">🎨</button>
         <button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
         <button class="del" title="Eliminar" onclick="deleteBlock('${b.id}',event)">🗑</button>
       </div>
     </div>`;
   }).join('');
+  applyBlockColors();
   // Load lazy images
   loadLazyImages();
+}
+
+function applyBlockColors() {
+  STATE.blocks.forEach(b => {
+    if (!b.blockBorderColor && !b.blockBgColor) return;
+    const inner = document.querySelector(`[data-id="${b.id}"] .block-inner`);
+    if (!inner) return;
+    if (b.blockBgColor) inner.style.backgroundColor = b.blockBgColor;
+    if (b.blockBorderColor) {
+      const cls = inner.className;
+      if (cls.includes('b-titulo') || cls.includes('b-alerta') || cls.includes('b-callout')) {
+        inner.style.borderLeftColor = b.blockBorderColor;
+      }
+      inner.style.borderColor = b.blockBorderColor;
+    }
+  });
+}
+
+function openBlockColorPicker(blockId, ev) {
+  if (ev) ev.stopPropagation();
+  document.querySelectorAll('.block-color-popup').forEach(p=>p.remove());
+  const block = STATE.blocks.find(b=>b.id===blockId);
+  if (!block) return;
+  const btn = ev.currentTarget;
+  const popup = document.createElement('div');
+  popup.className = 'block-color-popup';
+  popup.innerHTML = `
+    <label>Color de borde / acento</label>
+    <div class="color-row">
+      <input type="color" id="bcp-border" value="${block.blockBorderColor||'#2563EB'}">
+      <span style="font-size:12px;flex:1;color:var(--text-muted)">${block.blockBorderColor||'Por defecto'}</span>
+      <button class="reset-btn" onclick="clearBlockColor('${blockId}','border')">Quitar</button>
+    </div>
+    <label>Color de fondo</label>
+    <div class="color-row">
+      <input type="color" id="bcp-bg" value="${block.blockBgColor||'#ffffff'}">
+      <span style="font-size:12px;flex:1;color:var(--text-muted)">${block.blockBgColor||'Por defecto'}</span>
+      <button class="reset-btn" onclick="clearBlockColor('${blockId}','bg')">Quitar</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveBlockColors('${blockId}')">Aplicar</button>
+      <button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove()">✕</button>
+    </div>`;
+  btn.style.position = 'relative';
+  btn.appendChild(popup);
+  setTimeout(()=>document.addEventListener('click', function handler(e){
+    if(!popup.contains(e.target)){popup.remove();document.removeEventListener('click',handler);}
+  }), 10);
+}
+
+function saveBlockColors(blockId) {
+  const block = STATE.blocks.find(b=>b.id===blockId);
+  if (!block) return;
+  const bInput = document.getElementById('bcp-border');
+  const bgInput = document.getElementById('bcp-bg');
+  if (bInput) block.blockBorderColor = bInput.value;
+  if (bgInput) block.blockBgColor = bgInput.value;
+  document.querySelectorAll('.block-color-popup').forEach(p=>p.remove());
+  applyBlockColors();
+  scheduleLocalSave();
+}
+
+function clearBlockColor(blockId, which) {
+  const block = STATE.blocks.find(b=>b.id===blockId);
+  if (!block) return;
+  if (which==='border') delete block.blockBorderColor;
+  if (which==='bg') delete block.blockBgColor;
+  document.querySelectorAll('.block-color-popup').forEach(p=>p.remove());
+  applyBlockColors();
+  scheduleLocalSave();
 }
 
 async function loadLazyImages() {
@@ -1389,15 +1555,19 @@ function blobToBase64(blob) {
 function renderBlockForExport(b, pasoN) {
   const color = STATE.manual.color || '#2563EB';
   const imgTag = src => src ? `<img src="${src}" style="width:100%;display:block" alt="">` : '';
+  const blockStyle = (b.blockBorderColor || b.blockBgColor)
+    ? ` data-custom-colors="1"` : '';
+  const wrapStyle = b.blockBgColor ? `background:${b.blockBgColor};` : '';
+  const borderAccent = b.blockBorderColor || color;
 
   switch(b.type) {
-    case 'titulo': return `<div style="padding:20px 24px 16px;background:#fff;border-radius:8px;border-left:4px solid ${color};margin-bottom:12px"><div style="font-size:28px;margin-bottom:6px">${b.emoji||'📋'}</div><h2 style="font-size:22px;font-weight:700;margin:0">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="color:#64748b;margin-top:4px">${esc(b.subtitulo)}</p>`:''}</div>`;
+    case 'titulo': return `<div style="padding:20px 24px 16px;background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border-left:4px solid ${borderAccent};margin-bottom:12px"><div style="font-size:28px;margin-bottom:6px">${b.emoji||'📋'}</div><h2 style="font-size:22px;font-weight:700;margin:0">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="color:#64748b;margin-top:4px">${esc(b.subtitulo)}</p>`:''}</div>`;
     case 'alerta': {
       const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
       const icons={info:'ℹ️',advertencia:'⚠️',peligro:'🚨',exito:'✅'};
       return `<div style="padding:12px 16px;border-radius:8px;display:flex;gap:10px;${styles[b.tipo||'info']||styles.info};margin-bottom:12px"><span style="font-size:18px">${icons[b.tipo||'info']}</span><div>${esc(b.texto||'')}</div></div>`;
     }
-    case 'paso': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${color};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div><div style="font-weight:600;font-size:15px">${esc(b.titulo||'')}</div><div style="color:#374151;margin-top:4px">${esc(b.descripcion||'')}</div></div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
+    case 'paso': return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div><div style="font-weight:600;font-size:15px">${esc(b.titulo||'')}</div><div style="color:#374151;margin-top:4px">${esc(b.descripcion||'')}</div></div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
     case 'imagen': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
       const headers=(b.columnas||[]).map(c=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">${esc(c)}</th>`).join('');
@@ -1415,6 +1585,16 @@ function renderBlockForExport(b, pasoN) {
     case 'flujos': {
       const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0">${esc(r.accion||'')}</td></tr>`).join('');
       return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    case 'video': {
+      const embed = getVideoEmbedUrl(b.url);
+      if (embed) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
+      if (b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#2563eb">${esc(b.url)}</a></div></div>`;
+      return '';
+    }
+    case 'enlace': {
+      const title = b.titulo || b.url || 'Enlace';
+      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:#2563eb">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
     }
     default: return '';
   }
@@ -1659,17 +1839,56 @@ async function inviteUser() {
 
 async function loadUsersList() {
   const list = q('#users-list');
-  const { data, error } = await sb.from('user_roles').select('user_id,role,created_at');
-  if (error || !data?.length) { list.innerHTML='<p style="color:var(--text-muted);font-size:13px">No hay otros usuarios registrados</p>'; return; }
-  list.innerHTML = `<p style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Usuarios registrados</p>` +
-    data.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div><div style="font-size:13px;font-weight:500">${u.user_id.slice(0,8)}...</div><div style="font-size:12px;color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('es')}</div></div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <select class="form-select" style="font-size:12px;padding:4px" onchange="changeUserRole('${u.user_id}',this.value)">
-          ${['admin','editor','visualizador'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
-        </select>
+  list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">Cargando...</div>';
+
+  const [rolesRes, manualesRes] = await Promise.all([
+    sb.from('user_roles').select('user_id,role,created_at'),
+    sb.from('manuales').select('id,titulo,empresa,estado,updated_at').eq('estado','en_revision').order('updated_at',{ascending:false})
+  ]);
+
+  let html = '';
+
+  // Pending review section
+  if (!manualesRes.error && manualesRes.data?.length) {
+    html += `<p style="font-size:12px;font-weight:600;color:#ca8a04;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">⏳ En revisión (${manualesRes.data.length})</p>`;
+    html += manualesRes.data.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #fef08a;background:#fefce8;border-radius:6px;margin-bottom:6px">
+      <div><div style="font-size:13px;font-weight:500">${esc(m.titulo||'Sin título')}</div><div style="font-size:12px;color:var(--text-muted)">${esc(m.empresa||'')} · ${new Date(m.updated_at).toLocaleDateString('es')}</div></div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-primary btn-sm" onclick="adminPublish('${m.id}')">Publicar</button>
+        <button class="btn btn-sm" onclick="adminReject('${m.id}')">Rechazar</button>
       </div>
     </div>`).join('');
+    html += '<hr style="margin:12px 0;border-color:var(--border)">';
+  }
+
+  if (rolesRes.error || !rolesRes.data?.length) {
+    html += '<p style="color:var(--text-muted);font-size:13px">No hay usuarios registrados</p>';
+  } else {
+    html += `<p style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Usuarios (${rolesRes.data.length})</p>`;
+    html += rolesRes.data.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div><div style="font-size:13px;font-weight:500">${u.user_id.slice(0,8)}…</div><div style="font-size:12px;color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('es')}</div></div>
+      <select class="form-select" style="font-size:12px;padding:4px" onchange="changeUserRole('${u.user_id}',this.value)">
+        ${['admin','editor','visualizador'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
+      </select>
+    </div>`).join('');
+  }
+
+  list.innerHTML = html;
+}
+
+async function adminPublish(id) {
+  const { error } = await sb.from('manuales').update({estado:'publicado'}).eq('id',id);
+  if (error) { notify('❌ '+error.message); return; }
+  notify('✅ Manual publicado'); loadUsersList();
+  if (STATE.manual.id===id) { STATE.manual.estado='publicado'; updateRevisionBanner(); }
+}
+
+async function adminReject(id) {
+  const comment = prompt('Motivo del rechazo (opcional):');
+  const { error } = await sb.from('manuales').update({estado:'rechazado',revision_comment:comment||null}).eq('id',id);
+  if (error) { notify('❌ '+error.message); return; }
+  notify('Manual rechazado'); loadUsersList();
+  if (STATE.manual.id===id) { STATE.manual.estado='rechazado'; STATE.manual.revisionComment=comment||''; updateRevisionBanner(); }
 }
 
 async function changeUserRole(userId, role) {
