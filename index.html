@@ -2506,7 +2506,10 @@ async function handleImportFileSelect(input) {
 
 async function parseDOCXtoBlocks(ab) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
-  const result = await mammoth.convertToHtml({ arrayBuffer: ab });
+  const imageConverter = mammoth.images.imgElement(img =>
+    img.read('base64').then(b64 => ({ src: 'data:' + img.contentType + ';base64,' + b64 }))
+  );
+  const result = await mammoth.convertToHtml({ arrayBuffer: ab }, { convertImage: imageConverter });
   return htmlToImportBlocks(result.value);
 }
 
@@ -2583,6 +2586,13 @@ function htmlToImportBlocks(html) {
     if (tag==='H2'||tag==='H3') { blocks.push({id:uid(),type:'titulo',order:0,emoji:'📌',titulo:text,subtitulo:''}); continue; }
     if (tag==='H4'||tag==='H5') { blocks.push({id:uid(),type:'callout',order:0,tipo:'important',texto:text}); continue; }
     if (tag==='HR') { blocks.push({id:uid(),type:'separador',order:0}); continue; }
+    if (tag==='IMG' || (!text && el.querySelector('img[src^="data:"]'))) {
+      const imgEl = tag==='IMG' ? el : el.querySelector('img[src^="data:"]');
+      if (imgEl && imgEl.src && imgEl.src.startsWith('data:')) {
+        blocks.push({id:uid(),type:'imagen',order:0,src:imgEl.src,storagePath:null,caption:'',width:'100%'});
+        continue;
+      }
+    }
     if (tag==='TABLE') {
       const headers = Array.from(el.querySelectorAll('thead th,thead td')).map(th=>th.textContent.trim());
       const rows = Array.from(el.querySelectorAll('tbody tr')).map(tr=>Array.from(tr.querySelectorAll('td,th')).map(td=>td.textContent.trim()));
