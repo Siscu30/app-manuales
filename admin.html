@@ -45,7 +45,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .tab-panel.active{display:block}
 
 /* ── CARDS ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);color:#0f172a}
 .card-title{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 
 /* ── TABLE ── */
@@ -82,7 +82,7 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 
 /* ── MANUAL CARD ── */
-.manual-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;background:var(--surface)}
+.manual-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:8px;background:#f8fafc;box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .manual-card .mc-info{flex:1;min-width:0}
 .manual-card .mc-titulo{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .manual-card .mc-meta{font-size:12px;color:var(--text-muted);margin-top:2px}
@@ -288,11 +288,38 @@ async function doLogout() {
   location.reload();
 }
 
-sb.auth.onAuthStateChange(async (event, session) => {
+// ── onAuthStateChange: sólo para cambios POSTERIORES al arranque ──────────────
+sb.auth.onAuthStateChange((event, session) => {
   STATE.session = session;
-  if (!session) { showAuthOverlay(); return; }
-  await checkAdminAccess(session);
+  if (event === 'SIGNED_IN')  checkAdminAccess(session);
+  if (event === 'SIGNED_OUT') showAuthOverlay();
 });
+
+// Safety net: si en 5s la UI sigue sin resolverse, limpiar y mostrar login
+setTimeout(() => {
+  if (!STATE.role) {
+    Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+    showAuthOverlay();
+  }
+}, 5000);
+
+async function init() {
+  // 1. Mostrar login inmediatamente
+  showAuthOverlay();
+
+  // 2. Intentar recuperar sesión con timeout duro de 3s
+  const sessionPromise = sb.auth.getSession();
+  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ data: { session: null } }), 3000));
+  const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+
+  if (data?.session) {
+    STATE.session = data.session;
+    await checkAdminAccess(data.session);
+  }
+  // Sin sesión: el overlay ya está visible
+}
+
+init();
 
 async function checkAdminAccess(session) {
   // Use get_my_role() RPC to avoid any RLS recursion
