@@ -2044,44 +2044,51 @@ async function handleSession(session) {
 }
 
 async function init() {
-  setLoading(true);
   renderColorPicker();
-
   q('#manual-titulo').addEventListener('input', scheduleLocalSave);
   q('#manual-empresa').addEventListener('input', scheduleLocalSave);
 
-  // Safety timeout — never leave the spinner on forever
-  const safetyTimer = setTimeout(() => {
-    setLoading(false);
-    if (!STATE.user) showAuthScreen();
-  }, 3000);
+  // Show auth screen immediately — no spinner needed
+  // If there's a stored session, onAuthStateChange fires INITIAL_SESSION right after
+  setLoading(false);
 
-  // onAuthStateChange handles magic link redirects and subsequent sign-in/out
+  // Load guest draft so canvas isn't empty while waiting for auth
+  const draft = loadLocalDraft('guest');
+  if (draft) {
+    STATE.blocks = draft.blocks || [];
+    STATE.manual = { ...STATE.manual, ...draft.manual };
+    if (draft.titulo) q('#manual-titulo').value = draft.titulo;
+    if (draft.empresa) q('#manual-empresa').value = draft.empresa;
+    if (draft.manual?.color) setColor(draft.manual.color);
+  }
+  pushHistory();
+  render();
+  showAuthScreen();
+
+  // onAuthStateChange fires INITIAL_SESSION (existing session) or nothing (no session)
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'INITIAL_SESSION') return; // handled by getSession() below
-    clearTimeout(safetyTimer);
-    await handleSession(session);
-    // After magic link login, offer to set a password
-    if (event === 'SIGNED_IN' && session?.user) {
-      const noPassword = session.user.app_metadata?.provider === 'email' &&
-                         !session.user.user_metadata?.has_password;
-      if (noPassword || event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
+    if (event === 'INITIAL_SESSION') {
+      if (session?.user) {
+        setLoading(true);
+        await handleSession(session);
+        setLoading(false);
+      }
+      return;
+    }
+    if (event === 'SIGNED_IN') {
+      setLoading(true);
+      await handleSession(session);
+      setLoading(false);
+      // After magic link login offer to set a password
+      if (window.location.hash.includes('access_token')) {
+        window.history.replaceState(null, '', window.location.pathname);
         setTimeout(() => offerSetPassword(), 800);
       }
     }
+    if (event === 'SIGNED_OUT') {
+      await handleSession(null);
+    }
   });
-
-  // Initial load — check for existing session (covers page refresh + magic link)
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    clearTimeout(safetyTimer);
-    await handleSession(session);
-  } catch (e) {
-    clearTimeout(safetyTimer);
-    setLoading(false);
-    showAuthScreen();
-    render();
-  }
 }
 
 init();
