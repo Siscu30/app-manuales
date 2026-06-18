@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constructor de Manuales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<style>
+:root {
+  --primary: #2563EB;
+  --primary-dark: #1d4ed8;
+  --primary-light: #eff6ff;
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --sidebar-w: 260px;
+  --topbar-h: 56px;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:var(--bg);min-height:100vh}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input,textarea,select{font-family:inherit;font-size:14px}
+[contenteditable]{outline:none}
+[contenteditable]:empty::before{content:attr(data-placeholder);color:var(--text-muted);pointer-events:none}
+
+/* ── TOP BAR ── */
+#topbar{position:fixed;top:0;left:0;right:0;height:var(--topbar-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 16px;z-index:100;box-shadow:var(--shadow)}
+#topbar .brand{font-weight:700;font-size:15px;color:var(--primary);white-space:nowrap;margin-right:4px}
+#manual-titulo{font-size:15px;font-weight:600;min-width:120px;max-width:240px;padding:4px 8px;border:1px solid transparent;border-radius:6px;background:transparent}
+#manual-titulo:hover,#manual-titulo:focus{border-color:var(--border);background:var(--surface)}
+#manual-empresa{font-size:12px;color:var(--text-muted);min-width:80px;max-width:160px;padding:3px 6px;border:1px solid transparent;border-radius:6px;background:transparent}
+#manual-empresa:hover,#manual-empresa:focus{border-color:var(--border);background:var(--surface)}
+.topbar-sep{width:1px;height:24px;background:var(--border);margin:0 4px;flex-shrink:0}
+.tb-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;transition:background .15s,color .15s;white-space:nowrap;border:1px solid transparent}
+.tb-btn:hover{background:var(--bg)}
+.tb-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.tb-btn.primary:hover{background:var(--primary-dark)}
+.tb-btn.danger:hover{background:#fee2e2;color:#dc2626}
+.color-picker{display:flex;gap:4px;align-items:center}
+.color-dot{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .15s}
+.color-dot.active,.color-dot:hover{transform:scale(1.2);border-color:#fff;box-shadow:0 0 0 2px var(--primary)}
+.topbar-spacer{flex:1}
+/* dropdown */
+.dropdown{position:relative}
+.dropdown-menu{position:absolute;top:calc(100% + 4px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);min-width:180px;z-index:200;display:none}
+.dropdown-menu.open{display:block}
+.dropdown-item{display:flex;align-items:center;gap:8px;padding:8px 14px;font-size:13px;cursor:pointer;transition:background .12s}
+.dropdown-item:hover{background:var(--bg)}
+#save-status{font-size:12px;color:var(--text-muted);white-space:nowrap}
+
+/* ── LAYOUT ── */
+#app{display:flex;padding-top:var(--topbar-h)}
+#sidebar{width:var(--sidebar-w);min-height:calc(100vh - var(--topbar-h));background:var(--surface);border-right:1px solid var(--border);padding:12px 8px;position:fixed;top:var(--topbar-h);left:0;bottom:0;overflow-y:auto;flex-shrink:0}
+#canvas-wrap{margin-left:var(--sidebar-w);flex:1;min-height:calc(100vh - var(--topbar-h));padding:32px 24px;display:flex;flex-direction:column;align-items:center}
+#canvas{width:100%;max-width:800px;min-height:400px}
+
+/* ── SIDEBAR ── */
+.sb-section{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;padding:8px 8px 4px}
+.block-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:6px;background:transparent;color:var(--text);font-size:13px;font-weight:500;cursor:pointer;transition:background .12s;text-align:left;border:1px solid transparent}
+.block-btn:hover{background:var(--primary-light);color:var(--primary)}
+.block-btn .icon{font-size:16px;width:20px;text-align:center}
+.block-btn[draggable="true"]{cursor:grab}
+
+/* ── BLOCKS ── */
+.block-wrap{position:relative;margin-bottom:8px}
+.block-wrap:hover .block-bar,.block-wrap.selected .block-bar{opacity:1}
+.block-bar{position:absolute;top:6px;right:6px;display:flex;gap:2px;background:rgba(255,255,255,.95);border:1px solid var(--border);border-radius:6px;padding:2px;opacity:0;transition:opacity .15s;z-index:10;box-shadow:var(--shadow)}
+.block-bar button{background:none;border:none;padding:4px 6px;border-radius:4px;font-size:13px;cursor:pointer;color:var(--text-muted);line-height:1}
+.block-bar button:hover{background:var(--bg);color:var(--text)}
+.block-bar button.del:hover{background:#fee2e2;color:#dc2626}
+.block-wrap.selected>.block-inner{outline:2px dashed var(--primary);outline-offset:2px;border-radius:var(--radius)}
+.block-wrap.drag-over-top{border-top:2px solid var(--primary)}
+.block-wrap.drag-over-bottom{border-bottom:2px solid var(--primary)}
+
+/* block: titulo */
+.b-titulo{padding:20px 24px 16px;background:var(--surface);border-radius:var(--radius);border-left:4px solid var(--primary)}
+.b-titulo .emoji-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.b-titulo .b-emoji{font-size:28px;cursor:pointer}
+.b-titulo h2{font-size:22px;font-weight:700;line-height:1.2}
+.b-titulo .subtitulo{font-size:14px;color:var(--text-muted);margin-top:4px}
+
+/* block: alerta */
+.b-alerta{padding:12px 16px;border-radius:var(--radius);display:flex;gap:10px;align-items:flex-start}
+.b-alerta.info{background:#eff6ff;border-left:4px solid #3b82f6}
+.b-alerta.advertencia{background:#fefce8;border-left:4px solid #eab308}
+.b-alerta.peligro{background:#fef2f2;border-left:4px solid #ef4444}
+.b-alerta.exito{background:#f0fdf4;border-left:4px solid #22c55e}
+.b-alerta .alert-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.b-alerta .alert-text{flex:1;font-size:14px;line-height:1.5}
+
+/* block: paso */
+.b-paso{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
+.b-paso-header{display:flex;align-items:flex-start;gap:12px;padding:16px}
+.paso-num{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.paso-body{flex:1}
+.paso-titulo{font-weight:600;font-size:15px;margin-bottom:4px}
+.paso-desc{font-size:14px;color:#374151;line-height:1.5}
+.b-paso-img{width:100%;display:block}
+.b-paso-img-wrap{position:relative}
+.b-paso-img-wrap img{width:100%;display:block;border-top:1px solid var(--border)}
+.paso-caption{font-size:12px;color:var(--text-muted);padding:6px 16px;border-top:1px solid var(--border);background:#fafafa}
+.paso-upload-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 16px 16px;padding:10px;border:2px dashed var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-muted);transition:all .15s}
+.paso-upload-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.img-uploading{opacity:.5;pointer-events:none}
+
+/* block: imagen */
+.b-imagen{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;text-align:center}
+.img-placeholder{padding:40px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;color:var(--text-muted);transition:all .15s}
+.img-placeholder:hover{background:var(--primary-light);color:var(--primary)}
+.img-placeholder svg{width:32px;height:32px;opacity:.5}
+.b-imagen img{width:100%;display:block}
+.img-caption{font-size:12px;color:var(--text-muted);padding:6px 12px;border-top:1px solid var(--border);background:#fafafa}
+
+/* block: tabla */
+.b-tabla{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
+.b-tabla table{width:100%;border-collapse:collapse}
+.b-tabla th{background:var(--bg);font-weight:600;font-size:13px;padding:10px 12px;text-align:left;border-bottom:2px solid var(--border)}
+.b-tabla td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top}
+.b-tabla tr:last-child td{border-bottom:none}
+
+/* block: callout */
+.b-callout{padding:14px 16px;border-radius:var(--radius);display:flex;gap:10px}
+.b-callout.tip{background:#f0fdf4;border:1px solid #bbf7d0}
+.b-callout.warning{background:#fefce8;border:1px solid #fef08a}
+.b-callout.important{background:#eff6ff;border:1px solid #bfdbfe}
+.callout-icon{font-size:18px;flex-shrink:0}
+.callout-text{flex:1;font-size:14px;line-height:1.5}
+
+/* block: lista */
+.b-lista{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:12px 16px}
+.lista-item{display:flex;align-items:center;gap:10px;padding:5px 0}
+.lista-item .li-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}
+.lista-item .li-text{flex:1;font-size:14px}
+
+/* block: separador */
+.b-separador{padding:8px 0}
+.b-separador hr{border:none;border-top:2px solid var(--border)}
+
+/* block: texto */
+.b-texto{background:var(--surface);border-radius:var(--radius);border:1px solid transparent;padding:12px 16px;font-size:14px;line-height:1.6}
+.b-texto:hover{border-color:var(--border)}
+
+/* block: flujos */
+.b-flujos{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden}
+.b-flujos table{width:100%;border-collapse:collapse}
+.b-flujos th{background:var(--bg);font-weight:600;font-size:13px;padding:10px 12px;text-align:left;border-bottom:2px solid var(--border)}
+.b-flujos th:first-child{width:45%;border-right:1px solid var(--border)}
+.b-flujos td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.b-flujos td:first-child{border-right:1px solid var(--border);font-weight:500}
+.b-flujos tr:last-child td{border-bottom:none}
+
+/* empty canvas */
+#canvas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;text-align:center;color:var(--text-muted);border:2px dashed var(--border);border-radius:12px;min-height:300px;cursor:default}
+#canvas-empty .ec-icon{font-size:48px;margin-bottom:12px}
+#canvas-empty p{font-size:15px;font-weight:500;margin-bottom:6px;color:var(--text)}
+#canvas-empty span{font-size:13px}
+
+/* ── MODALS ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.4);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.hidden{display:none}
+.modal{background:var(--surface);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.15);width:100%;overflow:hidden;max-height:90vh;display:flex;flex-direction:column}
+.modal-sm{max-width:420px}
+.modal-md{max-width:560px}
+.modal-lg{max-width:720px}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-header h3{font-size:16px;font-weight:600}
+.modal-close{background:none;font-size:20px;color:var(--text-muted);border:none;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1}
+.modal-close:hover{background:var(--bg);color:var(--text)}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+
+/* forms */
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:13px;font-weight:500;margin-bottom:5px}
+.form-input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;transition:border-color .15s}
+.form-input:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.form-select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--surface)}
+.form-textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;resize:vertical;min-height:80px}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);transition:all .15s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-danger{background:#dc2626;color:#fff;border-color:#dc2626}
+.btn-danger:hover{background:#b91c1c}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ── AUTH ── */
+#auth-screen{position:fixed;inset:0;background:var(--bg);z-index:600;display:flex;align-items:center;justify-content:center}
+#auth-screen.hidden{display:none}
+.auth-card{background:var(--surface);border-radius:12px;padding:40px;width:100%;max-width:400px;box-shadow:var(--shadow-md);text-align:center}
+.auth-card h1{font-size:24px;font-weight:700;margin-bottom:6px}
+.auth-card .auth-sub{color:var(--text-muted);font-size:14px;margin-bottom:28px}
+.auth-card .form-input{text-align:center;font-size:16px}
+
+/* ── LOADING ── */
+#loading{position:fixed;inset:0;background:var(--bg);z-index:700;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+#loading.hidden{display:none}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── VIEWER MODE ── */
+#viewer{display:none;padding-top:var(--topbar-h)}
+#viewer.active{display:block}
+.viewer-list{max-width:800px;margin:40px auto;padding:0 24px}
+.viewer-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:16px 20px;margin-bottom:10px;cursor:pointer;transition:box-shadow .15s;display:flex;justify-content:space-between;align-items:center}
+.viewer-card:hover{box-shadow:var(--shadow-md)}
+.viewer-card h3{font-size:15px;font-weight:600}
+.viewer-card .meta{font-size:12px;color:var(--text-muted);margin-top:2px}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--bg);color:var(--text-muted);border:1px solid var(--border)}
+.badge.publicado{background:#f0fdf4;color:#16a34a;border-color:#bbf7d0}
+.badge.en_revision{background:#fefce8;color:#ca8a04;border-color:#fef08a}
+.badge.borrador{background:var(--bg);color:var(--text-muted)}
+
+/* manual read view */
+#manual-view{max-width:800px;margin:32px auto;padding:0 24px 60px}
+
+/* revision banner */
+#revision-banner{background:#fefce8;border-bottom:1px solid #fef08a;padding:10px 16px;display:flex;align-items:center;gap:10px;font-size:13px;display:none}
+#revision-banner.show{display:flex}
+
+/* notification */
+#notif{position:fixed;bottom:20px;right:20px;background:#1e293b;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:800;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none}
+#notif.show{opacity:1;transform:translateY(0)}
+
+/* ── TOAST / progress ── */
+#export-progress{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:700;display:flex;align-items:center;justify-content:center;display:none}
+#export-progress.show{display:flex}
+.progress-card{background:var(--surface);border-radius:12px;padding:28px 32px;width:320px;text-align:center}
+.progress-card h4{font-size:15px;font-weight:600;margin-bottom:8px}
+.progress-card p{font-size:13px;color:var(--text-muted);margin-bottom:16px}
+.progress-bar-wrap{background:var(--bg);border-radius:100px;height:8px;overflow:hidden}
+.progress-bar{height:100%;background:var(--primary);border-radius:100px;transition:width .3s}
+
+/* ── TABLA EDITOR ── */
+.tabla-editor table{width:100%;border-collapse:collapse}
+.tabla-editor th,.tabla-editor td{border:1px solid var(--border);padding:6px 8px}
+.tabla-editor th input,.tabla-editor td input{width:100%;border:none;background:transparent;font-size:13px}
+.tabla-add-btn{margin-top:8px;font-size:12px;color:var(--primary);cursor:pointer;background:none;border:none;padding:4px 0}
+
+/* ── EMOJI PICKER ── */
+.emoji-picker{display:flex;flex-wrap:wrap;gap:4px;max-width:280px}
+.ep-btn{font-size:20px;padding:4px;border-radius:4px;cursor:pointer;background:none;border:none;transition:background .12s}
+.ep-btn:hover{background:var(--bg)}
+
+@media print{
+  #topbar,#sidebar,#auth-screen,#loading,.block-bar,#notif,#export-progress,#revision-banner{display:none!important}
+  #app{padding-top:0}
+  #canvas-wrap{margin-left:0;padding:0}
+  #canvas{max-width:100%}
+  .block-wrap{break-inside:avoid}
+  .b-paso{break-inside:avoid}
+}
+
+/* touch warning */
+#touch-warning{display:none;background:#fefce8;border-bottom:1px solid #fef08a;padding:8px 16px;font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+
+<!-- ── LOADING ── -->
+<div id="loading"><div class="spinner"></div><span>Cargando...</span></div>
+
+<!-- ── AUTH SCREEN ── -->
+<div id="auth-screen" class="hidden">
+  <div class="auth-card">
+    <div style="font-size:40px;margin-bottom:12px">📋</div>
+    <h1>Constructor de Manuales</h1>
+    <p class="auth-sub">Introduce tu email para acceder</p>
+    <div class="form-group">
+      <input type="email" id="auth-email" class="form-input" placeholder="tu@empresa.com" autocomplete="email">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="sendMagicLink()">Enviar enlace de acceso</button>
+    <p id="auth-msg" style="margin-top:14px;font-size:13px;color:var(--text-muted)"></p>
+  </div>
+</div>
+
+<!-- ── TOUCH WARNING ── -->
+<div id="touch-warning">📱 App optimizada para Chrome/Edge en escritorio. En dispositivos táctiles, usa los botones del panel para añadir bloques.</div>
+
+<!-- ── TOP BAR ── -->
+<div id="topbar">
+  <span class="brand">📋</span>
+  <input id="manual-titulo" type="text" value="Nuevo manual" spellcheck="false" title="Título del manual">
+  <input id="manual-empresa" type="text" placeholder="Empresa / Departamento" spellcheck="false">
+  <div class="topbar-sep"></div>
+  <div class="color-picker" id="color-picker"></div>
+  <div class="topbar-sep"></div>
+  <button class="tb-btn" onclick="nuevoManual()">＋ Nuevo</button>
+  <button class="tb-btn primary" id="btn-guardar" onclick="guardar()">💾 Guardar</button>
+  <button class="tb-btn" onclick="openMisManuals()">📂 Mis manuales</button>
+  <!-- Role-specific buttons injected by JS -->
+  <div id="role-btns"></div>
+  <div class="topbar-spacer"></div>
+  <span id="save-status"></span>
+  <div class="topbar-sep"></div>
+  <div class="dropdown" id="share-dropdown">
+    <button class="tb-btn" onclick="toggleShareMenu()">Compartir ▾</button>
+    <div class="dropdown-menu" id="share-menu">
+      <div class="dropdown-item" onclick="exportHTML()">🗂 Exportar HTML</div>
+      <div class="dropdown-item" onclick="openTeamsModal()">💬 Copiar para Teams</div>
+      <div class="dropdown-item" onclick="window.print()">🖨 Imprimir / PDF</div>
+    </div>
+  </div>
+  <button class="tb-btn danger" onclick="logout()" id="btn-logout" title="Cerrar sesión" style="display:none">⎋</button>
+</div>
+
+<!-- ── REVISION BANNER ── -->
+<div id="revision-banner">
+  <span>⏳ Este manual está en revisión.</span>
+  <span id="revision-comment" style="flex:1;color:#92400e"></span>
+  <span id="revision-admin-btns"></span>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+  <aside id="sidebar">
+    <div class="sb-section">Bloques</div>
+    <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><span class="icon">📑</span>Título de sección</button>
+    <button class="block-btn" onclick="addBlock('alerta')" draggable="true" data-type="alerta"><span class="icon">⚠️</span>Alerta / Aviso</button>
+    <button class="block-btn" onclick="addBlock('paso')" draggable="true" data-type="paso"><span class="icon">🔢</span>Paso numerado</button>
+    <button class="block-btn" onclick="addBlock('imagen')" draggable="true" data-type="imagen"><span class="icon">🖼</span>Imagen</button>
+    <button class="block-btn" onclick="addBlock('tabla')" draggable="true" data-type="tabla"><span class="icon">📊</span>Tabla de referencia</button>
+    <button class="block-btn" onclick="addBlock('callout')" draggable="true" data-type="callout"><span class="icon">💡</span>Callout / Nota</button>
+    <button class="block-btn" onclick="addBlock('lista')" draggable="true" data-type="lista"><span class="icon">✅</span>Lista verificación</button>
+    <button class="block-btn" onclick="addBlock('separador')" draggable="true" data-type="separador"><span class="icon">—</span>Separador</button>
+    <button class="block-btn" onclick="addBlock('texto')" draggable="true" data-type="texto"><span class="icon">📝</span>Texto libre</button>
+    <button class="block-btn" onclick="addBlock('flujos')" draggable="true" data-type="flujos"><span class="icon">🔀</span>Tabla de flujos</button>
+  </aside>
+
+  <div id="canvas-wrap">
+    <div id="canvas"></div>
+  </div>
+
+  <!-- VIEWER MODE (visualizadores) -->
+  <div id="viewer">
+    <div class="viewer-list" id="viewer-list"></div>
+    <div id="manual-view"></div>
+  </div>
+</div>
+
+<!-- ── MODALS ── -->
+
+<!-- Mis Manuales -->
+<div class="modal-backdrop hidden" id="modal-manuales">
+  <div class="modal modal-md">
+    <div class="modal-header"><h3>📂 Mis manuales</h3><button class="modal-close" onclick="closeModal('modal-manuales')">×</button></div>
+    <div class="modal-body" id="manuales-list" style="min-height:200px"></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-manuales')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Teams copy -->
+<div class="modal-backdrop hidden" id="modal-teams">
+  <div class="modal modal-md">
+    <div class="modal-header"><h3>💬 Copiar para Teams</h3><button class="modal-close" onclick="closeModal('modal-teams')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Copia el texto y pégalo en Teams. Las imágenes no se incluyen.</p>
+      <textarea id="teams-text" class="form-textarea" style="min-height:300px;font-family:monospace;font-size:12px" readonly></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="copyTeamsText()">📋 Copiar al portapapeles</button>
+      <button class="btn" onclick="closeModal('modal-teams')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Block editor (generic) -->
+<div class="modal-backdrop hidden" id="modal-block-editor">
+  <div class="modal modal-md">
+    <div class="modal-header"><h3 id="block-editor-title">Editar bloque</h3><button class="modal-close" onclick="closeModal('modal-block-editor')">×</button></div>
+    <div class="modal-body" id="block-editor-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveBlockEditor()">Guardar</button>
+      <button class="btn" onclick="closeModal('modal-block-editor')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gestionar usuarios (admin) -->
+<div class="modal-backdrop hidden" id="modal-users">
+  <div class="modal modal-md">
+    <div class="modal-header"><h3>👥 Gestionar usuarios</h3><button class="modal-close" onclick="closeModal('modal-users')">×</button></div>
+    <div class="modal-body" id="users-body">
+      <div class="form-group">
+        <label class="form-label">Invitar usuario (email)</label>
+        <div style="display:flex;gap:8px">
+          <input type="email" id="invite-email" class="form-input" placeholder="email@empresa.com" style="flex:1">
+          <select id="invite-role" class="form-select" style="width:130px">
+            <option value="editor">Editor</option>
+            <option value="visualizador">Visualizador</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:4px">El usuario recibirá un magic link para acceder. Su rol se asignará automáticamente.</p>
+      </div>
+      <button class="btn btn-primary" onclick="inviteUser()">Enviar invitación</button>
+      <hr style="margin:16px 0;border-color:var(--border)">
+      <div id="users-list"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-users')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Export progress -->
+<div id="export-progress">
+  <div class="progress-card">
+    <h4>Exportando manual...</h4>
+    <p id="export-msg">Preparando...</p>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="export-bar" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- Notification -->
+<div id="notif"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://tbeqkabdkqffdcufvfof.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXFrYWJka3FmZmRjdWZ2Zm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NzA3NjYsImV4cCI6MjA5NzM0Njc2Nn0.bPywboiecnWj7XHhWoM1ACG26mId4Naa5CYFSPAwzYg';
+const COLORS = [
+  {name:'Azul',    hex:'#2563EB'},
+  {name:'Verde',   hex:'#16A34A'},
+  {name:'Rojo',    hex:'#DC2626'},
+  {name:'Morado',  hex:'#7C3AED'},
+  {name:'Naranja', hex:'#EA580C'},
+  {name:'Gris',    hex:'#4B5563'},
+];
+const EMOJIS = ['📋','📄','📌','🔧','⚙️','🛠','📊','🖥','🖨','📡','🔑','🔐','📁','💡','🚀','✅','⚡','🔍','📞','🏢'];
+
+// ═══════════════════════════════════════════════════════
+// SUPABASE CLIENT
+// ═══════════════════════════════════════════════════════
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { detectSessionInUrl: true, persistSession: true, autoRefreshToken: true }
+});
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let STATE = {
+  user: null,
+  role: null, // 'admin' | 'editor' | 'visualizador' | null (guest)
+  manual: { id: null, titulo: 'Nuevo manual', empresa: '', color: '#2563EB', estado: 'borrador' },
+  blocks: [],
+  isDragging: false,
+  dragSrcIdx: null,
+  history: [],
+  historyIdx: -1,
+  selectedBlockId: null,
+  editingBlockId: null,
+  saveTimer: null,
+};
+
+function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36); }
+
+// ═══════════════════════════════════════════════════════
+// BLOCK TYPES REGISTRY
+// ═══════════════════════════════════════════════════════
+const BLOCK_TYPES = {
+  titulo: {
+    label: 'Título de sección',
+    defaultData: () => ({ emoji:'📋', titulo:'Nueva sección', subtitulo:'' }),
+    render(b) {
+      return `<div class="b-titulo block-inner" style="border-left-color:var(--primary)">
+        <div class="emoji-row">
+          <span class="b-emoji" onclick="openEmojiPicker('${b.id}')" title="Cambiar emoji">${b.emoji||'📋'}</span>
+          <div style="flex:1">
+            <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
+          </div>
+        </div>
+        <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.subtitulo||'')}</div>
+      </div>`;
+    },
+    toTeamsText(b) { return `${b.emoji||'📋'} **${b.titulo||''}**\n${b.subtitulo ? b.subtitulo+'\n' : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`; }
+  },
+  alerta: {
+    label: 'Alerta / Aviso',
+    defaultData: () => ({ tipo:'info', texto:'Texto de la alerta' }),
+    render(b) {
+      const icons = {info:'ℹ️', advertencia:'⚠️', peligro:'🚨', exito:'✅'};
+      return `<div class="b-alerta block-inner ${b.tipo||'info'}" ondblclick="openBlockEditor('${b.id}')">
+        <span class="alert-icon">${icons[b.tipo||'info']||'ℹ️'}</span>
+        <div class="alert-text">${esc(b.texto||'')}</div>
+      </div>`;
+    },
+    editorHTML(b) {
+      return `<div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="be-tipo">
+          ${['info','advertencia','peligro','exito'].map(t=>`<option value="${t}" ${b.tipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label class="form-label">Texto</label>
+        <textarea class="form-textarea" id="be-texto">${esc(b.texto||'')}</textarea></div>`;
+    },
+    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; },
+    toTeamsText(b) {
+      const icons = {info:'ℹ️', advertencia:'⚠️', peligro:'🚨', exito:'✅'};
+      return `${icons[b.tipo||'info']} ${b.texto||''}`;
+    }
+  },
+  paso: {
+    label: 'Paso numerado',
+    defaultData: () => ({ titulo:'Título del paso', descripcion:'Describe el paso...', storagePath:null, caption:'' }),
+    render(b, pasoN) {
+      const imgHTML = b.storagePath
+        ? `<div class="b-paso-img-wrap">
+             <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" alt="${esc(b.caption||'')}">
+             <div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div>
+           </div>`
+        : `<label class="paso-upload-btn" title="Añadir imagen">
+             📷 <span>Añadir imagen</span>
+             <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
+           </label>`;
+      return `<div class="b-paso block-inner">
+        <div class="b-paso-header">
+          <div class="paso-num">${pasoN}</div>
+          <div class="paso-body">
+            <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
+            <div contenteditable="true" class="paso-desc" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." onblur="saveInlineEdit(this)">${esc(b.descripcion||'')}</div>
+          </div>
+        </div>
+        ${imgHTML}
+      </div>`;
+    },
+    toTeamsText(b, pasoN) {
+      return `${pasoN}. **${b.titulo||''}**\n   ${b.descripcion||''}${b.storagePath ? `\n   📷 [Imagen: ${b.caption||''}]` : ''}`;
+    }
+  },
+  imagen: {
+    label: 'Imagen',
+    defaultData: () => ({ storagePath:null, caption:'', width:'100%' }),
+    render(b) {
+      if (b.storagePath) {
+        return `<div class="b-imagen block-inner">
+          <img src="" data-path="${b.storagePath}" class="lazy-img" style="width:${b.width||'100%'}" alt="${esc(b.caption||'')}">
+          <div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div>
+        </div>`;
+      }
+      return `<div class="b-imagen block-inner">
+        <label class="img-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+          <span>Clic o arrastra una imagen</span>
+          <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
+        </label>
+      </div>`;
+    },
+    toTeamsText(b) { return `📷 [Imagen: ${b.caption||''}]`; }
+  },
+  tabla: {
+    label: 'Tabla de referencia',
+    defaultData: () => ({ columnas:['Columna 1','Columna 2'], filas:[['',''],['','']] }),
+    render(b) {
+      const headers = (b.columnas||[]).map(c=>`<th>${esc(c)}</th>`).join('');
+      const rows = (b.filas||[]).map(row=>`<tr>${(row||[]).map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
+      return `<div class="b-tabla block-inner" ondblclick="openBlockEditor('${b.id}')">
+        <table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
+    },
+    editorHTML(b) {
+      const cols = b.columnas||['Columna 1','Columna 2'];
+      const rows = b.filas||[['',''],['','']];
+      return `<div class="tabla-editor">
+        <div class="form-group"><label class="form-label">Columnas (${cols.length})</label>
+          <div id="cols-editor">${cols.map((c,i)=>`<input class="form-input" style="margin-bottom:4px" value="${esc(c)}" data-ci="${i}" placeholder="Nombre columna">`).join('')}</div>
+          <button class="tabla-add-btn" onclick="addTablaCol()">+ Añadir columna</button>
+        </div>
+        <div class="form-group"><label class="form-label">Filas</label>
+          <table style="width:100%;border-collapse:collapse" id="rows-editor">
+            <thead><tr id="rows-header">${cols.map((_,i)=>`<th style="border:1px solid var(--border);padding:4px;font-size:12px">Col ${i+1}</th>`).join('')}</tr></thead>
+            <tbody id="rows-body">
+              ${rows.map((row,ri)=>`<tr>${cols.map((_,ci)=>`<td style="border:1px solid var(--border);padding:2px"><input class="form-input" style="border:none;padding:6px" value="${esc((row||[])[ci]||'')}" data-ri="${ri}" data-ci="${ci}"></td>`).join('')}</tr>`).join('')}
+            </tbody>
+          </table>
+          <button class="tabla-add-btn" onclick="addTablaRow()">+ Añadir fila</button>
+        </div>
+      </div>`;
+    },
+    saveEditor(b) {
+      const colInputs = document.querySelectorAll('#cols-editor input');
+      b.columnas = Array.from(colInputs).map(i=>i.value||'');
+      const rowInputs = document.querySelectorAll('#rows-body input');
+      const nCols = b.columnas.length;
+      const nRows = Math.ceil(rowInputs.length / nCols);
+      b.filas = [];
+      for(let r=0;r<nRows;r++) {
+        b.filas.push(Array.from({length:nCols},(_,c)=>{ const el=rowInputs[r*nCols+c]; return el?el.value:''; }));
+      }
+    },
+    toTeamsText(b) {
+      const header = (b.columnas||[]).join(' | ');
+      const rows = (b.filas||[]).map(r=>(r||[]).join(' | ')).join('\n');
+      return `${header}\n${'─'.repeat(header.length)}\n${rows}`;
+    }
+  },
+  callout: {
+    label: 'Callout / Nota',
+    defaultData: () => ({ tipo:'tip', texto:'Texto del callout' }),
+    render(b) {
+      const icons = {tip:'💡', warning:'⚠️', important:'📌'};
+      return `<div class="b-callout block-inner ${b.tipo||'tip'}" ondblclick="openBlockEditor('${b.id}')">
+        <span class="callout-icon">${icons[b.tipo||'tip']||'💡'}</span>
+        <div class="callout-text">${esc(b.texto||'')}</div>
+      </div>`;
+    },
+    editorHTML(b) {
+      return `<div class="form-group"><label class="form-label">Tipo</label>
+        <select class="form-select" id="be-tipo">
+          ${['tip','warning','important'].map(t=>`<option value="${t}" ${b.tipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
+        </select></div>
+        <div class="form-group"><label class="form-label">Texto</label>
+        <textarea class="form-textarea" id="be-texto">${esc(b.texto||'')}</textarea></div>`;
+    },
+    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; },
+    toTeamsText(b) {
+      const icons = {tip:'💡', warning:'⚠️', important:'📌'};
+      return `${icons[b.tipo||'tip']} *${b.texto||''}*`;
+    }
+  },
+  lista: {
+    label: 'Lista verificación',
+    defaultData: () => ({ items:[{icono:'check',texto:'Elemento 1'},{icono:'cross',texto:'Elemento 2'}] }),
+    render(b) {
+      const items = (b.items||[]).map(it=>`<div class="lista-item">
+        <span class="li-icon">${it.icono==='check'?'✅':'❌'}</span>
+        <span class="li-text">${esc(it.texto||'')}</span>
+      </div>`).join('');
+      return `<div class="b-lista block-inner" ondblclick="openBlockEditor('${b.id}')">${items||'<em style="color:var(--text-muted)">Sin elementos</em>'}</div>`;
+    },
+    editorHTML(b) {
+      const items = b.items||[];
+      return `<div id="lista-items">
+        ${items.map((it,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px" data-li="${i}">
+          <select class="form-select" style="width:100px" data-field="icono">
+            <option value="check" ${it.icono==='check'?'selected':''}>✅ Check</option>
+            <option value="cross" ${it.icono==='cross'?'selected':''}>❌ Cruz</option>
+          </select>
+          <input class="form-input" style="flex:1" value="${esc(it.texto||'')}" data-field="texto" placeholder="Texto del elemento">
+          <button class="btn btn-sm" onclick="this.closest('[data-li]').remove()" style="flex-shrink:0">🗑</button>
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-sm" onclick="addListaItem()" style="margin-top:4px">+ Añadir elemento</button>`;
+    },
+    saveEditor(b) {
+      const rows = document.querySelectorAll('#lista-items [data-li]');
+      b.items = Array.from(rows).map(row=>({
+        icono: row.querySelector('[data-field="icono"]').value,
+        texto: row.querySelector('[data-field="texto"]').value
+      }));
+    },
+    toTeamsText(b) {
+      return (b.items||[]).map(it=>`${it.icono==='check'?'✅':'❌'} ${it.texto||''}`).join('\n');
+    }
+  },
+  separador: {
+    label: 'Separador',
+    defaultData: () => ({}),
+    render() { return `<div class="b-separador block-inner"><hr></div>`; },
+    toTeamsText() { return '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'; }
+  },
+  texto: {
+    label: 'Texto libre',
+    defaultData: () => ({ html:'Escribe aquí tu texto...' }),
+    render(b) {
+      return `<div class="b-texto block-inner" contenteditable="true" data-id="${b.id}" data-field="html" onblur="saveInlineEdit(this)" onkeydown="handleTextoKey(event)">${b.html||''}</div>`;
+    },
+    toTeamsText(b) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = b.html||'';
+      return tmp.textContent||'';
+    }
+  },
+  flujos: {
+    label: 'Tabla de flujos',
+    defaultData: () => ({ filas:[{condicion:'Condición de ejemplo',accion:'Acción a tomar'},{condicion:'',accion:''}] }),
+    render(b) {
+      const rows = (b.filas||[]).map(r=>`<tr><td>${esc(r.condicion||'')}</td><td>${esc(r.accion||'')}</td></tr>`).join('');
+      return `<div class="b-flujos block-inner" ondblclick="openBlockEditor('${b.id}')">
+        <table><thead><tr><th>Condición</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table>
+      </div>`;
+    },
+    editorHTML(b) {
+      const rows = b.filas||[];
+      return `<div id="flujos-rows">
+        ${rows.map((r,i)=>`<div style="display:grid;grid-template-columns:1fr 1fr 32px;gap:6px;margin-bottom:6px" data-ri="${i}">
+          <input class="form-input" value="${esc(r.condicion||'')}" placeholder="Condición" data-field="condicion">
+          <input class="form-input" value="${esc(r.accion||'')}" placeholder="Acción" data-field="accion">
+          <button class="btn btn-sm" onclick="this.closest('[data-ri]').remove()">🗑</button>
+        </div>`).join('')}
+      </div>
+      <button class="btn btn-sm" onclick="addFlujoRow()" style="margin-top:4px">+ Añadir fila</button>`;
+    },
+    saveEditor(b) {
+      const rows = document.querySelectorAll('#flujos-rows [data-ri]');
+      b.filas = Array.from(rows).map(row=>({
+        condicion: row.querySelector('[data-field="condicion"]').value,
+        accion: row.querySelector('[data-field="accion"]').value
+      }));
+    },
+    toTeamsText(b) {
+      const header = 'Condición | Acción';
+      return header + '\n' + (b.filas||[]).map(r=>`${r.condicion||''} | ${r.accion||''}`).join('\n');
+    }
+  }
+};
+
+// ═══════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════
+function q(sel){ return document.querySelector(sel); }
+function esc(str){ const d=document.createElement('div');d.textContent=str;return d.innerHTML; }
+function notify(msg, duration=2500) {
+  const n=q('#notif'); n.textContent=msg; n.classList.add('show');
+  setTimeout(()=>n.classList.remove('show'), duration);
+}
+function setSaveStatus(txt){ q('#save-status').textContent=txt; }
+function openModal(id){ q('#'+id).classList.remove('hidden'); }
+function closeModal(id){ q('#'+id).classList.add('hidden'); }
+function setLoading(v){ q('#loading').classList.toggle('hidden',!v); }
+
+// ═══════════════════════════════════════════════════════
+// COLOR PICKER
+// ═══════════════════════════════════════════════════════
+function renderColorPicker() {
+  const cp = q('#color-picker');
+  cp.innerHTML = COLORS.map(c=>`<div class="color-dot ${c.hex===STATE.manual.color?'active':''}" style="background:${c.hex}" title="${c.name}" onclick="setColor('${c.hex}')"></div>`).join('');
+}
+function setColor(hex) {
+  STATE.manual.color = hex;
+  document.documentElement.style.setProperty('--primary', hex);
+  document.documentElement.style.setProperty('--primary-dark', shadeColor(hex,-15));
+  document.documentElement.style.setProperty('--primary-light', hexToLight(hex));
+  renderColorPicker();
+  scheduleLocalSave();
+}
+function shadeColor(hex,pct){
+  let n=parseInt(hex.slice(1),16),r=(n>>16)+pct,g=((n>>8)&0xFF)+pct,b=(n&0xFF)+pct;
+  return '#'+(0x1000000+Math.max(0,Math.min(255,r))*0x10000+Math.max(0,Math.min(255,g))*0x100+Math.max(0,Math.min(255,b))).toString(16).slice(1);
+}
+function hexToLight(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},0.08)`;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════
+function render() {
+  const canvas = q('#canvas');
+  if (!STATE.blocks.length) {
+    canvas.innerHTML = `<div id="canvas-empty">
+      <div class="ec-icon">📄</div>
+      <p>Tu manual está vacío</p>
+      <span>Haz clic en un bloque del panel izquierdo para añadirlo</span>
+    </div>`;
+    return;
+  }
+  let pasoN = 0;
+  canvas.innerHTML = STATE.blocks.map((b,i) => {
+    if (b.type === 'paso') pasoN++;
+    const def = BLOCK_TYPES[b.type];
+    if (!def) return '';
+    const blockHTML = def.render(b, pasoN);
+    return `<div class="block-wrap ${STATE.selectedBlockId===b.id?'selected':''}" data-idx="${i}" data-id="${b.id}"
+        draggable="true"
+        ondragstart="onDragStart(event,${i})"
+        ondragover="onDragOver(event,${i})"
+        ondragend="onDragEnd(event)"
+        ondrop="onDrop(event,${i})"
+        onclick="selectBlock('${b.id}')">
+      ${blockHTML}
+      <div class="block-bar">
+        <button title="Subir" onclick="moveBlock(${i},-1,event)">↑</button>
+        <button title="Bajar" onclick="moveBlock(${i},1,event)">↓</button>
+        <button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
+        <button class="del" title="Eliminar" onclick="deleteBlock('${b.id}',event)">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+  // Load lazy images
+  loadLazyImages();
+}
+
+async function loadLazyImages() {
+  const imgs = document.querySelectorAll('.lazy-img[data-path]');
+  for (const img of imgs) {
+    if (img.src && img.src !== window.location.href) continue;
+    const path = img.getAttribute('data-path');
+    if (!path) continue;
+    try {
+      const { data, error } = await sb.storage.from('manual-images').createSignedUrl(path, 3600);
+      if (!error && data?.signedUrl) img.src = data.signedUrl;
+    } catch(e) {}
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BLOCK OPERATIONS
+// ═══════════════════════════════════════════════════════
+function addBlock(type) {
+  const def = BLOCK_TYPES[type];
+  if (!def) return;
+  const block = { id: uid(), type, order: STATE.blocks.length, ...def.defaultData() };
+  pushHistory();
+  STATE.blocks.push(block);
+  render();
+  scheduleLocalSave();
+  // Scroll to new block
+  setTimeout(()=>{
+    const el = document.querySelector(`[data-id="${block.id}"]`);
+    if (el) el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }, 100);
+}
+
+function deleteBlock(id, ev) {
+  if (ev) ev.stopPropagation();
+  pushHistory();
+  STATE.blocks = STATE.blocks.filter(b=>b.id!==id);
+  if (STATE.selectedBlockId === id) STATE.selectedBlockId = null;
+  render();
+  scheduleLocalSave();
+}
+
+function moveBlock(idx, dir, ev) {
+  if (ev) ev.stopPropagation();
+  const to = idx + dir;
+  if (to < 0 || to >= STATE.blocks.length) return;
+  pushHistory();
+  [STATE.blocks[idx], STATE.blocks[to]] = [STATE.blocks[to], STATE.blocks[idx]];
+  render();
+  scheduleLocalSave();
+}
+
+function selectBlock(id) { STATE.selectedBlockId = id; render(); }
+
+function saveInlineEdit(el) {
+  const id = el.dataset.id, field = el.dataset.field;
+  if (!id || !field) return;
+  const block = STATE.blocks.find(b=>b.id===id);
+  if (!block) return;
+  block[field] = field === 'html' ? el.innerHTML : el.textContent;
+  scheduleLocalSave();
+}
+
+function handleTextoKey(ev) {
+  if (ev.ctrlKey && ev.key === 'b') { ev.preventDefault(); document.execCommand('bold'); }
+  if (ev.ctrlKey && ev.key === 'i') { ev.preventDefault(); document.execCommand('italic'); }
+}
+
+// ═══════════════════════════════════════════════════════
+// BLOCK EDITOR MODAL
+// ═══════════════════════════════════════════════════════
+let _editingId = null;
+function openBlockEditor(id, ev) {
+  if (ev) ev.stopPropagation();
+  const block = STATE.blocks.find(b=>b.id===id);
+  if (!block) return;
+  const def = BLOCK_TYPES[block.type];
+  if (!def?.editorHTML) return; // simple blocks use inline edit
+  _editingId = id;
+  q('#block-editor-title').textContent = 'Editar: ' + def.label;
+  q('#block-editor-body').innerHTML = def.editorHTML(block);
+  openModal('modal-block-editor');
+}
+function saveBlockEditor() {
+  if (!_editingId) return;
+  const block = STATE.blocks.find(b=>b.id===_editingId);
+  if (!block) return;
+  const def = BLOCK_TYPES[block.type];
+  if (def?.saveEditor) { pushHistory(); def.saveEditor(block); render(); scheduleLocalSave(); }
+  closeModal('modal-block-editor');
+  _editingId = null;
+}
+
+// Editor helpers
+function addTablaCol() {
+  const n = document.querySelectorAll('#cols-editor input').length;
+  const inp = document.createElement('input');
+  inp.className='form-input'; inp.style.marginBottom='4px';
+  inp.placeholder='Nombre columna'; inp.setAttribute('data-ci', n);
+  q('#cols-editor').appendChild(inp);
+  // add cell to each row
+  document.querySelectorAll('#rows-body tr').forEach((tr,ri)=>{
+    const td=document.createElement('td');
+    td.style='border:1px solid var(--border);padding:2px';
+    const inp2=document.createElement('input');
+    inp2.className='form-input'; inp2.style='border:none;padding:6px';
+    inp2.setAttribute('data-ri',ri); inp2.setAttribute('data-ci',n);
+    td.appendChild(inp2); tr.appendChild(td);
+  });
+}
+function addTablaRow() {
+  const nCols = document.querySelectorAll('#cols-editor input').length;
+  const ri = document.querySelectorAll('#rows-body tr').length;
+  const tr=document.createElement('tr');
+  tr.setAttribute('data-ri',ri);
+  for(let c=0;c<nCols;c++){
+    const td=document.createElement('td');
+    td.style='border:1px solid var(--border);padding:2px';
+    const inp=document.createElement('input');
+    inp.className='form-input'; inp.style='border:none;padding:6px';
+    inp.setAttribute('data-ri',ri); inp.setAttribute('data-ci',c);
+    td.appendChild(inp); tr.appendChild(td);
+  }
+  q('#rows-body').appendChild(tr);
+}
+function addListaItem() {
+  const n = document.querySelectorAll('#lista-items [data-li]').length;
+  const div=document.createElement('div');
+  div.style='display:flex;gap:8px;margin-bottom:8px';
+  div.setAttribute('data-li',n);
+  div.innerHTML=`<select class="form-select" style="width:100px" data-field="icono"><option value="check">✅ Check</option><option value="cross">❌ Cruz</option></select><input class="form-input" style="flex:1" data-field="texto" placeholder="Texto del elemento"><button class="btn btn-sm" onclick="this.closest('[data-li]').remove()">🗑</button>`;
+  q('#lista-items').appendChild(div);
+}
+function addFlujoRow() {
+  const n = document.querySelectorAll('#flujos-rows [data-ri]').length;
+  const div=document.createElement('div');
+  div.style='display:grid;grid-template-columns:1fr 1fr 32px;gap:6px;margin-bottom:6px';
+  div.setAttribute('data-ri',n);
+  div.innerHTML=`<input class="form-input" placeholder="Condición" data-field="condicion"><input class="form-input" placeholder="Acción" data-field="accion"><button class="btn btn-sm" onclick="this.closest('[data-ri]').remove()">🗑</button>`;
+  q('#flujos-rows').appendChild(div);
+}
+
+// ═══════════════════════════════════════════════════════
+// EMOJI PICKER
+// ═══════════════════════════════════════════════════════
+function openEmojiPicker(blockId) {
+  const existing = q('#emoji-picker-popup');
+  if (existing) existing.remove();
+  const popup = document.createElement('div');
+  popup.id = 'emoji-picker-popup';
+  popup.style = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px;z-index:600;box-shadow:var(--shadow-md)';
+  popup.innerHTML = `<p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Selecciona un emoji</p>
+    <div class="emoji-picker">${EMOJIS.map(e=>`<button class="ep-btn" onclick="setBlockEmoji('${blockId}','${e}',this)">${e}</button>`).join('')}</div>
+    <button class="btn btn-sm" style="margin-top:8px;width:100%" onclick="q('#emoji-picker-popup').remove()">Cerrar</button>`;
+  document.body.appendChild(popup);
+}
+function setBlockEmoji(blockId, emoji) {
+  const block = STATE.blocks.find(b=>b.id===blockId);
+  if (block) { block.emoji = emoji; render(); scheduleLocalSave(); }
+  const p = q('#emoji-picker-popup'); if (p) p.remove();
+}
+
+// ═══════════════════════════════════════════════════════
+// IMAGE UPLOAD
+// ═══════════════════════════════════════════════════════
+async function resizeImage(file) {
+  return new Promise(resolve=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const MAX_W=1280; let w=img.width,h=img.height;
+      if(w>MAX_W){h=Math.round(h*MAX_W/w);w=MAX_W;}
+      const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+      // check transparency
+      let hasAlpha=false;
+      try{const d=ctx.getImageData(0,0,Math.min(w,50),Math.min(h,50)).data;for(let i=3;i<d.length;i+=4)if(d[i]<255){hasAlpha=true;break;}}catch(e){}
+      const mime=hasAlpha?'image/png':'image/jpeg', q=hasAlpha?1:.85;
+      canvas.toBlob(b=>{URL.revokeObjectURL(url);resolve(b);},mime,q);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
+    img.src=url;
+  });
+}
+
+async function uploadBlockImage(input, blockId) {
+  const file = input.files[0]; if (!file) return;
+  if (!STATE.user) { notify('⚠️ Guarda el manual primero para subir imágenes'); return; }
+  const block = STATE.blocks.find(b=>b.id===blockId); if (!block) return;
+
+  // Show uploading state
+  const wrap = document.querySelector(`[data-id="${blockId}"]`);
+  if (wrap) wrap.classList.add('img-uploading');
+  setSaveStatus('Subiendo imagen...');
+
+  try {
+    const blob = await resizeImage(file);
+    const ext = blob.type==='image/png'?'png':'jpg';
+    const manualId = STATE.manual.id || 'guest';
+    const storagePath = `${STATE.user.id}/${manualId}/${blockId}/${Date.now()}.${ext}`;
+
+    const { error } = await sb.storage.from('manual-images').upload(storagePath, blob, { contentType: blob.type, upsert: true });
+    if (error) throw error;
+
+    block.storagePath = storagePath;
+    render();
+    scheduleLocalSave();
+    setSaveStatus('');
+    notify('✅ Imagen subida');
+  } catch(e) {
+    setSaveStatus('');
+    notify('❌ Error al subir imagen: ' + (e.message||e));
+    if (wrap) wrap.classList.remove('img-uploading');
+  }
+}
+
+// drop images onto canvas
+document.addEventListener('dragover', e=>{ if(e.dataTransfer.types.includes('Files')) e.preventDefault(); });
+document.addEventListener('drop', async e=>{
+  if (!e.dataTransfer.files.length) return;
+  const file = e.dataTransfer.files[0];
+  if (!file.type.startsWith('image/')) return;
+  e.preventDefault();
+  // Find target block
+  const el = e.target.closest('[data-id]');
+  if (el) {
+    const id = el.getAttribute('data-id');
+    const block = STATE.blocks.find(b=>b.id===id);
+    if (block && (block.type==='imagen'||block.type==='paso')) {
+      // fake file input
+      const fakeInput = {files:[file]};
+      await uploadBlockImage(fakeInput, id);
+      return;
+    }
+  }
+  // Create new imagen block
+  addBlock('imagen');
+  const newBlock = STATE.blocks[STATE.blocks.length-1];
+  const fakeInput = {files:[file]};
+  setTimeout(()=>uploadBlockImage(fakeInput, newBlock.id), 100);
+});
+
+// ═══════════════════════════════════════════════════════
+// DRAG & DROP REORDER
+// ═══════════════════════════════════════════════════════
+function onDragStart(ev, idx) {
+  if (STATE.isDragging) return;
+  // Only drag if from the block-wrap itself (not a child input/contenteditable)
+  if (ev.target.closest('[contenteditable]')) { ev.preventDefault(); return; }
+  STATE.isDragging = true;
+  STATE.dragSrcIdx = idx;
+  ev.dataTransfer.effectAllowed = 'move';
+  ev.dataTransfer.setData('text/plain', idx);
+  ev.currentTarget.style.opacity = '.4';
+}
+function onDragOver(ev, idx) {
+  if (!STATE.isDragging) return;
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  // Clear all indicators
+  document.querySelectorAll('.block-wrap').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
+  const rect = ev.currentTarget.getBoundingClientRect();
+  const mid = rect.top + rect.height/2;
+  ev.currentTarget.classList.add(ev.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+}
+function onDrop(ev, toIdx) {
+  ev.preventDefault();
+  const fromIdx = STATE.dragSrcIdx;
+  if (fromIdx === null || fromIdx === toIdx) { onDragEnd(ev); return; }
+  document.querySelectorAll('.block-wrap').forEach(el=>el.classList.remove('drag-over-top','drag-over-bottom'));
+  pushHistory();
+  const [moved] = STATE.blocks.splice(fromIdx, 1);
+  const insertAt = fromIdx < toIdx ? toIdx - 1 : toIdx; // compensate for removal
+  // Determine if dropping above or below
+  const wrap = document.querySelector(`[data-idx="${toIdx}"]`);
+  let finalIdx = toIdx;
+  if (wrap) {
+    const rect = wrap.getBoundingClientRect();
+    if (ev.clientY > rect.top + rect.height/2) finalIdx = insertAt + 1;
+    else finalIdx = insertAt;
+  }
+  STATE.blocks.splice(Math.max(0, Math.min(STATE.blocks.length, finalIdx < fromIdx ? toIdx : toIdx)), 0, moved);
+  onDragEnd(ev);
+  render();
+  scheduleLocalSave();
+}
+function onDragEnd(ev) {
+  STATE.isDragging = false;
+  STATE.dragSrcIdx = null;
+  document.querySelectorAll('.block-wrap').forEach(el=>{ el.style.opacity=''; el.classList.remove('drag-over-top','drag-over-bottom'); });
+}
+
+// Palette drag to canvas
+q('#sidebar').addEventListener('dragstart', ev=>{
+  const btn = ev.target.closest('[data-type]');
+  if (!btn) return;
+  ev.dataTransfer.setData('palette-type', btn.dataset.type);
+  ev.dataTransfer.effectAllowed = 'copy';
+});
+q('#canvas-wrap').addEventListener('dragover', ev=>{
+  if (ev.dataTransfer.types.includes('palette-type')) ev.preventDefault();
+});
+q('#canvas-wrap').addEventListener('drop', ev=>{
+  const type = ev.dataTransfer.getData('palette-type');
+  if (type) { ev.preventDefault(); addBlock(type); }
+});
+
+// ═══════════════════════════════════════════════════════
+// UNDO / REDO
+// ═══════════════════════════════════════════════════════
+const MAX_HISTORY = 20;
+function pushHistory() {
+  const snap = JSON.stringify(STATE.blocks);
+  STATE.history = STATE.history.slice(0, STATE.historyIdx + 1);
+  STATE.history.push(snap);
+  if (STATE.history.length > MAX_HISTORY) STATE.history.shift();
+  STATE.historyIdx = STATE.history.length - 1;
+}
+document.addEventListener('keydown', ev=>{
+  if ((ev.ctrlKey||ev.metaKey) && ev.key==='z' && !ev.shiftKey) {
+    ev.preventDefault();
+    if (STATE.historyIdx > 0) {
+      STATE.historyIdx--;
+      STATE.blocks = JSON.parse(STATE.history[STATE.historyIdx]);
+      render(); scheduleLocalSave();
+    }
+  }
+  if ((ev.ctrlKey||ev.metaKey) && (ev.key==='y'||(ev.shiftKey&&ev.key==='z'))) {
+    ev.preventDefault();
+    if (STATE.historyIdx < STATE.history.length - 1) {
+      STATE.historyIdx++;
+      STATE.blocks = JSON.parse(STATE.history[STATE.historyIdx]);
+      render(); scheduleLocalSave();
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// LOCAL SAVE
+// ═══════════════════════════════════════════════════════
+function scheduleLocalSave() {
+  if (STATE.isDragging) return;
+  clearTimeout(STATE.saveTimer);
+  STATE.saveTimer = setTimeout(localSave, 800);
+}
+function localSave() {
+  if (STATE.isDragging) return;
+  const data = {
+    manual: STATE.manual,
+    blocks: STATE.blocks,
+    titulo: q('#manual-titulo').value,
+    empresa: q('#manual-empresa').value
+  };
+  try { localStorage.setItem('manual_draft_' + (STATE.manual.id||'guest'), JSON.stringify(data)); } catch(e){}
+}
+function loadLocalDraft(id) {
+  try {
+    const raw = localStorage.getItem('manual_draft_' + (id||'guest'));
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
+// Listen for other tabs
+window.addEventListener('storage', ev=>{
+  if (!STATE.manual.id) return;
+  if (ev.key === 'manual_draft_' + STATE.manual.id) {
+    notify('⚠️ Manual modificado en otra pestaña', 4000);
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// SUPABASE SYNC
+// ═══════════════════════════════════════════════════════
+async function guardar() {
+  // Auth gate
+  if (!STATE.user) { openAuthModal('Guarda el manual para sincronizar en la nube'); return; }
+  if (STATE.role === 'visualizador') { notify('⚠️ Los visualizadores no pueden guardar'); return; }
+
+  STATE.manual.titulo = q('#manual-titulo').value || 'Sin título';
+  STATE.manual.empresa = q('#manual-empresa').value || '';
+
+  const btn = q('#btn-guardar');
+  btn.textContent = '⏳ Guardando...'; btn.disabled = true;
+  setSaveStatus('');
+
+  try {
+    // Build contenido (blocks without inline image data — storagePaths are references)
+    const contenido = STATE.blocks;
+    const manualData = {
+      titulo: STATE.manual.titulo,
+      empresa: STATE.manual.empresa,
+      color: STATE.manual.color,
+      contenido,
+      estado: STATE.manual.estado || 'borrador',
+      updated_at: new Date().toISOString(),
+      user_id: STATE.user.id,
+      created_by: STATE.manual.createdBy || STATE.user.id
+    };
+
+    let result;
+    if (STATE.manual.id) {
+      result = await sb.from('manuales').update(manualData).eq('id', STATE.manual.id).select().single();
+    } else {
+      result = await sb.from('manuales').insert(manualData).select().single();
+    }
+    if (result.error) throw result.error;
+
+    STATE.manual.id = result.data.id;
+    STATE.manual.estado = result.data.estado;
+    localSave();
+    setSaveStatus('✓ Guardado');
+    notify('✅ Manual guardado');
+    updateRevisionBanner();
+  } catch(e) {
+    setSaveStatus('⚠ Solo guardado local');
+    notify('❌ Error al guardar: ' + (e.message||e), 4000);
+    localSave();
+  } finally {
+    btn.textContent = '💾 Guardar'; btn.disabled = false;
+  }
+}
+
+async function openMisManuals() {
+  if (!STATE.user) { openAuthModal('Accede para ver tus manuales guardados'); return; }
+  openModal('modal-manuales');
+  const list = q('#manuales-list');
+  list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)">Cargando...</div>';
+  try {
+    let query = sb.from('manuales').select('id,titulo,empresa,estado,updated_at,created_by').order('updated_at',{ascending:false});
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data.length) { list.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:20px">No hay manuales guardados</p>'; return; }
+    list.innerHTML = data.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;cursor:pointer" onclick="loadManual('${m.id}')">
+      <div>
+        <div style="font-weight:600;font-size:14px">${esc(m.titulo||'Sin título')}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${esc(m.empresa||'')} · ${new Date(m.updated_at).toLocaleDateString('es')}</div>
+      </div>
+      <span class="badge ${m.estado||'borrador'}">${m.estado||'borrador'}</span>
+    </div>`).join('');
+  } catch(e) { list.innerHTML=`<p style="color:#dc2626;padding:20px">Error: ${e.message}</p>`; }
+}
+
+async function loadManual(id) {
+  closeModal('modal-manuales');
+  setSaveStatus('Cargando...');
+  try {
+    const { data, error } = await sb.from('manuales').select('*').eq('id',id).single();
+    if (error) throw error;
+    STATE.manual = { id:data.id, titulo:data.titulo, empresa:data.empresa||'', color:data.color||'#2563EB', estado:data.estado||'borrador', createdBy:data.created_by };
+    STATE.blocks = Array.isArray(data.contenido) ? data.contenido : [];
+    pushHistory();
+    q('#manual-titulo').value = data.titulo||'';
+    q('#manual-empresa').value = data.empresa||'';
+    setColor(data.color||'#2563EB');
+    render();
+    setSaveStatus('');
+    updateRevisionBanner();
+    notify('📂 Manual cargado');
+  } catch(e) { setSaveStatus(''); notify('❌ Error al cargar: '+(e.message||e), 4000); }
+}
+
+function nuevoManual() {
+  if (STATE.blocks.length && !confirm('¿Empezar un manual nuevo? Los cambios no guardados se perderán.')) return;
+  STATE.manual = { id:null, titulo:'Nuevo manual', empresa:'', color:'#2563EB', estado:'borrador' };
+  STATE.blocks = [];
+  STATE.history = [];
+  STATE.historyIdx = -1;
+  q('#manual-titulo').value = 'Nuevo manual';
+  q('#manual-empresa').value = '';
+  setColor('#2563EB');
+  render();
+  setSaveStatus('');
+}
+
+// ═══════════════════════════════════════════════════════
+// REVISION WORKFLOW (admin/editor)
+// ═══════════════════════════════════════════════════════
+function updateRevisionBanner() {
+  const banner = q('#revision-banner');
+  const estado = STATE.manual.estado;
+  if (!STATE.user || !estado || estado==='borrador') { banner.classList.remove('show'); return; }
+  banner.classList.add('show');
+  q('#revision-comment').textContent = STATE.manual.revisionComment ? ' · ' + STATE.manual.revisionComment : '';
+  const adminBtns = q('#revision-admin-btns');
+  if (STATE.role==='admin' && estado==='en_revision') {
+    adminBtns.innerHTML = `<button class="btn btn-primary btn-sm" onclick="publishManual()">Publicar</button>
+      <button class="btn btn-sm" onclick="rejectManual()" style="margin-left:6px">Rechazar</button>`;
+  } else { adminBtns.innerHTML=''; }
+}
+async function enviarRevision() {
+  if (!STATE.manual.id) { notify('Guarda el manual primero'); return; }
+  const { error } = await sb.from('manuales').update({estado:'en_revision'}).eq('id',STATE.manual.id);
+  if (error) { notify('❌ '+error.message); return; }
+  STATE.manual.estado = 'en_revision';
+  updateRevisionBanner();
+  notify('✅ Enviado a revisión');
+}
+async function publishManual() {
+  if (!STATE.manual.id) return;
+  const { error } = await sb.from('manuales').update({estado:'publicado'}).eq('id',STATE.manual.id);
+  if (error) { notify('❌ '+error.message); return; }
+  STATE.manual.estado = 'publicado';
+  updateRevisionBanner();
+  notify('✅ Manual publicado');
+}
+async function rejectManual() {
+  const comment = prompt('Motivo del rechazo (opcional):');
+  const { error } = await sb.from('manuales').update({estado:'rechazado', revision_comment:comment||null}).eq('id',STATE.manual.id);
+  if (error) { notify('❌ '+error.message); return; }
+  STATE.manual.estado = 'rechazado';
+  STATE.manual.revisionComment = comment||'';
+  updateRevisionBanner();
+  notify('Manual rechazado con comentario');
+}
+
+// ═══════════════════════════════════════════════════════
+// EXPORT HTML
+// ═══════════════════════════════════════════════════════
+async function exportHTML() {
+  if (!STATE.blocks.length) { notify('El manual está vacío'); return; }
+  if (!navigator.onLine && STATE.blocks.some(b=>b.storagePath)) {
+    notify('⚠️ Necesitas conexión para exportar con imágenes'); return;
+  }
+
+  const prog = q('#export-progress'); prog.classList.add('show');
+  const bar = q('#export-bar'); const msg = q('#export-msg');
+  const imgBlocks = STATE.blocks.filter(b=>b.storagePath);
+  let done = 0;
+
+  const imgCache = {};
+  for (const block of imgBlocks) {
+    msg.textContent = `Descargando imagen ${done+1} de ${imgBlocks.length}...`;
+    bar.style.width = Math.round((done/Math.max(imgBlocks.length,1))*80) + '%';
+    try {
+      const { data, error } = await sb.storage.from('manual-images').download(block.storagePath);
+      if (!error && data) {
+        imgCache[block.storagePath] = await blobToBase64(data);
+      }
+    } catch(e) { /* continue with broken img */ }
+    done++;
+  }
+
+  msg.textContent = 'Generando HTML...';
+  bar.style.width = '90%';
+
+  const titulo = q('#manual-titulo').value || 'Manual';
+  const empresa = q('#manual-empresa').value || '';
+  const color = STATE.manual.color || '#2563EB';
+
+  let pasoN = 0;
+  const body = STATE.blocks.map(b=>{
+    const def = BLOCK_TYPES[b.type];
+    if (!def) return '';
+    if (b.type==='paso') pasoN++;
+    // Substitute images
+    const bCopy = {...b};
+    if (bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+    return renderBlockForExport(bCopy, pasoN);
+  }).join('\n');
+
+  const html = buildExportHTML(titulo, empresa, color, body);
+
+  bar.style.width = '100%';
+  setTimeout(()=>{
+    prog.classList.remove('show');
+    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (titulo.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g,'').trim() || 'manual') + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    const size = (blob.size/1024/1024).toFixed(1);
+    notify(`✅ Exportado: ${size} MB`);
+  }, 400);
+}
+
+function blobToBase64(blob) {
+  return new Promise(res=>{ const fr=new FileReader(); fr.onload=e=>res(e.target.result); fr.readAsDataURL(blob); });
+}
+
+function renderBlockForExport(b, pasoN) {
+  const color = STATE.manual.color || '#2563EB';
+  const imgTag = src => src ? `<img src="${src}" style="width:100%;display:block" alt="">` : '';
+
+  switch(b.type) {
+    case 'titulo': return `<div style="padding:20px 24px 16px;background:#fff;border-radius:8px;border-left:4px solid ${color};margin-bottom:12px"><div style="font-size:28px;margin-bottom:6px">${b.emoji||'📋'}</div><h2 style="font-size:22px;font-weight:700;margin:0">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="color:#64748b;margin-top:4px">${esc(b.subtitulo)}</p>`:''}</div>`;
+    case 'alerta': {
+      const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
+      const icons={info:'ℹ️',advertencia:'⚠️',peligro:'🚨',exito:'✅'};
+      return `<div style="padding:12px 16px;border-radius:8px;display:flex;gap:10px;${styles[b.tipo||'info']||styles.info};margin-bottom:12px"><span style="font-size:18px">${icons[b.tipo||'info']}</span><div>${esc(b.texto||'')}</div></div>`;
+    }
+    case 'paso': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${color};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div><div style="font-weight:600;font-size:15px">${esc(b.titulo||'')}</div><div style="color:#374151;margin-top:4px">${esc(b.descripcion||'')}</div></div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
+    case 'imagen': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
+    case 'tabla': {
+      const headers=(b.columnas||[]).map(c=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">${esc(c)}</th>`).join('');
+      const rows=(b.filas||[]).map(row=>`<tr>${(row||[]).map(cell=>`<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0">${esc(cell)}</td>`).join('')}</tr>`).join('');
+      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    case 'callout': {
+      const styles={tip:'background:#f0fdf4;border:1px solid #bbf7d0',warning:'background:#fefce8;border:1px solid #fef08a',important:'background:#eff6ff;border:1px solid #bfdbfe'};
+      const icons={tip:'💡',warning:'⚠️',important:'📌'};
+      return `<div style="padding:14px 16px;border-radius:8px;display:flex;gap:10px;${styles[b.tipo||'tip']||styles.tip};margin-bottom:12px"><span style="font-size:18px">${icons[b.tipo||'tip']}</span><div>${esc(b.texto||'')}</div></div>`;
+    }
+    case 'lista': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;margin-bottom:12px">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0"><span style="font-size:16px">${it.icono==='check'?'✅':'❌'}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
+    case 'separador': return `<div style="padding:8px 0;margin-bottom:12px"><hr style="border:none;border-top:2px solid #e2e8f0"></div>`;
+    case 'texto': return `<div style="padding:12px 16px;background:#fff;border-radius:8px;font-size:14px;line-height:1.6;margin-bottom:12px">${b.html||''}</div>`;
+    case 'flujos': {
+      const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0">${esc(r.accion||'')}</td></tr>`).join('');
+      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    default: return '';
+  }
+}
+
+function buildExportHTML(titulo, empresa, color, body) {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(titulo)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;padding:0}
+.header{background:${color};color:#fff;padding:32px 40px}
+.header h1{font-size:28px;font-weight:700}
+.header .empresa{opacity:.85;margin-top:4px}
+.content{max-width:800px;margin:0 auto;padding:32px 24px}
+@media print{body{background:#fff}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>${esc(titulo)}</h1>
+  ${empresa?`<div class="empresa">${esc(empresa)}</div>`:''}
+  <div style="font-size:12px;opacity:.7;margin-top:8px">Generado el ${new Date().toLocaleDateString('es')}</div>
+</div>
+<div class="content">
+${body}
+</div>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════════════
+// TEAMS COPY
+// ═══════════════════════════════════════════════════════
+function openTeamsModal() {
+  let pasoN = 0;
+  const lines = STATE.blocks.map(b=>{
+    const def = BLOCK_TYPES[b.type];
+    if (!def?.toTeamsText) return '';
+    if (b.type==='paso') pasoN++;
+    return def.toTeamsText(b, pasoN);
+  }).filter(Boolean);
+
+  const titulo = q('#manual-titulo').value||'Manual';
+  const empresa = q('#manual-empresa').value||'';
+  const header = `📋 **${titulo}**${empresa?'\n'+empresa:''}\n${'━'.repeat(40)}`;
+  q('#teams-text').value = header + '\n\n' + lines.join('\n\n');
+  openModal('modal-teams');
+}
+function copyTeamsText() {
+  const txt = q('#teams-text').value;
+  navigator.clipboard.writeText(txt).then(()=>notify('✅ Copiado al portapapeles')).catch(()=>{
+    q('#teams-text').select(); document.execCommand('copy'); notify('✅ Copiado');
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// SHARE MENU
+// ═══════════════════════════════════════════════════════
+function toggleShareMenu() {
+  q('#share-menu').classList.toggle('open');
+}
+document.addEventListener('click', ev=>{
+  if (!ev.target.closest('#share-dropdown')) q('#share-menu')?.classList.remove('open');
+});
+
+// ═══════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════
+function showAuthScreen() { q('#auth-screen').classList.remove('hidden'); }
+function hideAuthScreen() { q('#auth-screen').classList.add('hidden'); }
+let _authCallback = null;
+function openAuthModal(msg='') {
+  q('#auth-msg').textContent = msg || '';
+  showAuthScreen();
+}
+
+async function sendMagicLink() {
+  const email = q('#auth-email').value.trim();
+  if (!email) { q('#auth-msg').textContent='Introduce tu email'; return; }
+  q('#auth-msg').textContent = 'Enviando enlace...';
+  const { error } = await sb.auth.signInWithOtp({ email, options:{emailRedirectTo: window.location.origin + window.location.pathname} });
+  if (error) { q('#auth-msg').textContent = '❌ ' + error.message; return; }
+  q('#auth-msg').textContent = '✅ Enlace enviado. Revisa tu bandeja de entrada (y spam).';
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  STATE.user = null; STATE.role = null;
+  showAuthScreen();
+  q('#btn-logout').style.display='none';
+  q('#role-btns').innerHTML='';
+}
+
+// ═══════════════════════════════════════════════════════
+// ROLES
+// ═══════════════════════════════════════════════════════
+async function loadUserRole(userId) {
+  const { data, error } = await sb.from('user_roles').select('role').eq('user_id', userId).single();
+  if (error || !data) return null;
+  return data.role;
+}
+
+async function ensureAdminExists(userId) {
+  // If no roles exist at all, make this user admin
+  const { count } = await sb.from('user_roles').select('*', {count:'exact',head:true});
+  if (count === 0) {
+    await sb.from('user_roles').insert({ user_id: userId, role: 'admin' });
+    return 'admin';
+  }
+  return null;
+}
+
+function applyRoleUI(role) {
+  const btns = q('#role-btns');
+  btns.innerHTML = '';
+  q('#btn-logout').style.display = 'flex';
+
+  if (role === 'admin') {
+    btns.innerHTML = `<button class="tb-btn" onclick="openModal('modal-users')">👥 Usuarios</button>`;
+  }
+  if (role === 'editor') {
+    btns.innerHTML = `<button class="tb-btn" onclick="enviarRevision()">📤 Enviar revisión</button>`;
+  }
+  if (role === 'admin' && STATE.manual.id && STATE.manual.estado === 'en_revision') {
+    // Already handled by revision banner
+  }
+
+  // Sidebar visibility
+  q('#sidebar').style.display = role==='visualizador' ? 'none' : '';
+  q('#canvas-wrap').style.marginLeft = role==='visualizador' ? '0' : '';
+
+  if (role === 'visualizador') {
+    showViewerMode();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// VIEWER MODE
+// ═══════════════════════════════════════════════════════
+async function showViewerMode() {
+  q('#app').style.display = 'none';
+  q('#viewer').classList.add('active');
+  const list = q('#viewer-list');
+  list.innerHTML = '<p style="color:var(--text-muted);padding:20px;text-align:center">Cargando manuales...</p>';
+  try {
+    const { data, error } = await sb.from('manuales').select('id,titulo,empresa,estado,updated_at').eq('estado','publicado').order('updated_at',{ascending:false});
+    if (error) throw error;
+    if (!data.length) { list.innerHTML='<p style="color:var(--text-muted);padding:40px;text-align:center">No hay manuales publicados aún</p>'; return; }
+    list.innerHTML = `<h2 style="font-size:18px;font-weight:700;margin-bottom:16px">Manuales disponibles</h2>` +
+      data.map(m=>`<div class="viewer-card" onclick="viewManual('${m.id}')">
+        <div><h3>${esc(m.titulo||'Sin título')}</h3><div class="meta">${esc(m.empresa||'')} · ${new Date(m.updated_at).toLocaleDateString('es')}</div></div>
+        <span class="badge publicado">publicado</span>
+      </div>`).join('');
+  } catch(e) { list.innerHTML=`<p style="color:#dc2626;padding:20px">${e.message}</p>`; }
+}
+
+async function viewManual(id) {
+  q('#viewer-list').style.display='none';
+  const view = q('#manual-view');
+  view.innerHTML='<p style="text-align:center;padding:40px;color:var(--text-muted)">Cargando...</p>';
+  try {
+    const { data, error } = await sb.from('manuales').select('*').eq('id',id).single();
+    if (error) throw error;
+    const blocks = Array.isArray(data.contenido)?data.contenido:[];
+    let pasoN=0;
+    const tempState = {...STATE};
+    STATE.manual = {id:data.id, titulo:data.titulo, empresa:data.empresa||'', color:data.color||'#2563EB'};
+    const bodyHTML = blocks.map(b=>{
+      if(b.type==='paso') pasoN++;
+      return renderBlockForExport(b, pasoN);
+    }).join('');
+    view.innerHTML=`<button onclick="q('#viewer-list').style.display='';q('#manual-view').innerHTML=''" style="margin-bottom:20px" class="btn">← Volver</button>
+      <div style="background:${data.color||'#2563EB'};color:#fff;padding:24px;border-radius:12px;margin-bottom:24px">
+        <h1 style="font-size:24px;font-weight:700">${esc(data.titulo||'')}</h1>
+        ${data.empresa?`<div style="opacity:.85;margin-top:4px">${esc(data.empresa)}</div>`:''}
+      </div>
+      ${bodyHTML}`;
+    loadLazyImages();
+    STATE.manual = tempState.manual;
+  } catch(e) { view.innerHTML=`<p style="color:#dc2626;padding:20px">${e.message}</p>`; }
+}
+
+// ═══════════════════════════════════════════════════════
+// USER MANAGEMENT (admin)
+// ═══════════════════════════════════════════════════════
+async function inviteUser() {
+  const email = q('#invite-email').value.trim();
+  const role = q('#invite-role').value;
+  if (!email) { notify('Introduce un email'); return; }
+
+  // Send magic link + create role (role created after first login via trigger or manual)
+  // For simplicity: store pending invitation in a separate approach
+  // We use signInWithOtp to invite, then admin must assign role after user logs in
+  const { error } = await sb.auth.signInWithOtp({ email, options:{emailRedirectTo: window.location.origin + window.location.pathname} });
+  if (error) { notify('❌ '+error.message); return; }
+
+  // Store the intended role (we'll apply it when user first logs in)
+  localStorage.setItem('pending_role_'+email, role);
+  notify(`✅ Invitación enviada a ${email} como ${role}`);
+  q('#invite-email').value='';
+  loadUsersList();
+}
+
+async function loadUsersList() {
+  const list = q('#users-list');
+  const { data, error } = await sb.from('user_roles').select('user_id,role,created_at');
+  if (error || !data?.length) { list.innerHTML='<p style="color:var(--text-muted);font-size:13px">No hay otros usuarios registrados</p>'; return; }
+  list.innerHTML = `<p style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Usuarios registrados</p>` +
+    data.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div><div style="font-size:13px;font-weight:500">${u.user_id.slice(0,8)}...</div><div style="font-size:12px;color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('es')}</div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select class="form-select" style="font-size:12px;padding:4px" onchange="changeUserRole('${u.user_id}',this.value)">
+          ${['admin','editor','visualizador'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+    </div>`).join('');
+}
+
+async function changeUserRole(userId, role) {
+  const { error } = await sb.from('user_roles').update({role}).eq('user_id',userId);
+  if (error) notify('❌ '+error.message);
+  else notify('✅ Rol actualizado');
+}
+
+q('#modal-users').addEventListener('click', ev=>{
+  if(ev.target===q('#modal-users')) closeModal('modal-users');
+});
+// Load users when modal opens
+const origOpenModal=openModal;
+// Override to load users list when modal-users opens
+document.addEventListener('click', ev=>{
+  if(ev.target.closest('[onclick*="modal-users"]')) setTimeout(loadUsersList,100);
+});
+
+// ═══════════════════════════════════════════════════════
+// TOUCH DETECTION
+// ═══════════════════════════════════════════════════════
+if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+  q('#touch-warning').style.display = 'block';
+  // Disable draggable on block-wraps (set after render via mutation observer)
+  document.addEventListener('render-done', ()=>{
+    document.querySelectorAll('.block-wrap').forEach(el=>el.removeAttribute('draggable'));
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+async function init() {
+  setLoading(true);
+  renderColorPicker();
+
+  // Listen for auth state changes
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      hideAuthScreen();
+      STATE.user = session.user;
+
+      // Auto-assign role if pending invitation
+      const pendingRole = localStorage.getItem('pending_role_'+session.user.email);
+      if (pendingRole) {
+        await sb.from('user_roles').upsert({user_id:session.user.id, role:pendingRole});
+        localStorage.removeItem('pending_role_'+session.user.email);
+      }
+
+      let role = await loadUserRole(session.user.id);
+      if (!role) role = await ensureAdminExists(session.user.id);
+      if (!role) role = await loadUserRole(session.user.id); // retry after insert
+      STATE.role = role || 'editor';
+      applyRoleUI(STATE.role);
+      setLoading(false);
+    } else if (event === 'SIGNED_OUT' || (!session && event === 'INITIAL_SESSION')) {
+      STATE.user = null; STATE.role = null;
+      setLoading(false);
+      showAuthScreen();
+    }
+  });
+
+  // Check existing session
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) {
+    setLoading(false);
+    // Guest mode: load local draft
+    const draft = loadLocalDraft('guest');
+    if (draft) {
+      STATE.blocks = draft.blocks || [];
+      STATE.manual = {...STATE.manual, ...draft.manual};
+      if (draft.titulo) q('#manual-titulo').value = draft.titulo;
+      if (draft.empresa) q('#manual-empresa').value = draft.empresa;
+      if (draft.manual?.color) setColor(draft.manual.color);
+    }
+    pushHistory();
+    render();
+    showAuthScreen();
+  }
+
+  // title/empresa inputs
+  q('#manual-titulo').addEventListener('input', scheduleLocalSave);
+  q('#manual-empresa').addEventListener('input', scheduleLocalSave);
+}
+
+init();
+</script>
+</body>
+</html>
