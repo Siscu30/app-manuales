@@ -1070,7 +1070,12 @@ function moveBlock(idx, dir, ev) {
   scheduleLocalSave();
 }
 
-function selectBlock(id) { STATE.selectedBlockId = id; render(); }
+function selectBlock(id) {
+  STATE.selectedBlockId = id;
+  document.querySelectorAll('#canvas .block-wrap').forEach(w => {
+    w.classList.toggle('selected', w.dataset.id === id);
+  });
+}
 
 function saveInlineEdit(el) {
   const id = el.dataset.id, field = el.dataset.field;
@@ -2357,6 +2362,13 @@ async function init() {
   }
   pushHistory();
   render();
+
+  // Ensure contenteditable fields get focus when clicked (selectBlock no longer re-renders)
+  document.getElementById('canvas').addEventListener('click', e => {
+    const editable = e.target.closest('[contenteditable]');
+    if (editable) editable.focus();
+  });
+
   showAuthScreen();
 
   // 2. Intentar recuperar sesión en background con timeout duro de 3s
