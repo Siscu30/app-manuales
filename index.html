@@ -2569,6 +2569,48 @@ async function parsePDFtoBlocks(ab) {
         }
       }
     }
+    try {
+      const opList = await page.getOperatorList();
+      const imgNames = new Set();
+      for (let j = 0; j < opList.fnArray.length; j++) {
+        const fn = opList.fnArray[j];
+        if (fn === pdfjsLib.OPS.paintImageXObject || fn === pdfjsLib.OPS.paintJpegXObject) imgNames.add(opList.argsArray[j][0]);
+      }
+      for (const name of imgNames) {
+        await new Promise(resolve => {
+          page.objs.get(name, imgObj => {
+            if (!imgObj) { resolve(); return; }
+            const { width, height, kind, data } = imgObj;
+            if (!width || !height || width < 30 || height < 30 || !data) { resolve(); return; }
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = width; canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              const iData = ctx.createImageData(width, height);
+              if (kind === 3) { iData.data.set(data); }
+              else if (kind === 2) {
+                for (let p = 0; p < width * height; p++) {
+                  iData.data[p*4]=data[p*3]; iData.data[p*4+1]=data[p*3+1];
+                  iData.data[p*4+2]=data[p*3+2]; iData.data[p*4+3]=255;
+                }
+              } else { resolve(); return; }
+              ctx.putImageData(iData, 0, 0);
+              let src = canvas.toDataURL('image/jpeg', 0.85);
+              if (src.length > 512000) {
+                const sc = Math.sqrt(512000 / src.length);
+                const c2 = document.createElement('canvas');
+                c2.width = Math.max(1, Math.round(width * sc));
+                c2.height = Math.max(1, Math.round(height * sc));
+                c2.getContext('2d').drawImage(canvas, 0, 0, c2.width, c2.height);
+                src = c2.toDataURL('image/jpeg', 0.75);
+              }
+              allBlocks.push({id:uid(), type:'imagen', order:0, src, storagePath:null, caption:'', width:'100%'});
+            } catch(e) { /* skip */ }
+            resolve();
+          });
+        });
+      }
+    } catch(e) { /* image extraction is optional */ }
   }
   return allBlocks;
 }
