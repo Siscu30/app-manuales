@@ -1884,57 +1884,89 @@ async function uploadPendingBase64Images(blocks) {
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
-async function init() {
-  setLoading(true);
-  renderColorPicker();
+async function handleSession(session) {
+  if (session?.user) {
+    hideAuthScreen();
+    STATE.user = session.user;
 
-  // Listen for auth state changes
-  sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session?.user) {
-      hideAuthScreen();
-      STATE.user = session.user;
-
-      // Auto-assign role if pending invitation
-      const pendingRole = localStorage.getItem('pending_role_'+session.user.email);
-      if (pendingRole) {
-        await sb.from('user_roles').upsert({user_id:session.user.id, role:pendingRole});
-        localStorage.removeItem('pending_role_'+session.user.email);
-      }
-
-      let role = await loadUserRole(session.user.id);
-      if (!role) role = await ensureAdminExists(session.user.id);
-      if (!role) role = await loadUserRole(session.user.id); // retry after insert
-      STATE.role = role || 'editor';
-      applyRoleUI(STATE.role);
-      setLoading(false);
-    } else if (event === 'SIGNED_OUT' || (!session && event === 'INITIAL_SESSION')) {
-      STATE.user = null; STATE.role = null;
-      setLoading(false);
-      showAuthScreen();
+    // Apply pending invitation role
+    const pendingRole = localStorage.getItem('pending_role_' + session.user.email);
+    if (pendingRole) {
+      await sb.from('user_roles').upsert({ user_id: session.user.id, role: pendingRole });
+      localStorage.removeItem('pending_role_' + session.user.email);
     }
-  });
 
-  // Check existing session
-  const { data:{ session } } = await sb.auth.getSession();
-  if (!session) {
-    setLoading(false);
-    // Guest mode: load local draft
+    let role = await loadUserRole(session.user.id);
+    if (!role) role = await ensureAdminExists(session.user.id);
+    if (!role) role = await loadUserRole(session.user.id);
+    STATE.role = role || 'editor';
+    applyRoleUI(STATE.role);
+
+    // Load local draft for the current manual if any
+    const draft = loadLocalDraft(STATE.manual.id || 'guest');
+    if (draft && !STATE.blocks.length) {
+      STATE.blocks = draft.blocks || [];
+      STATE.manual = { ...STATE.manual, ...draft.manual };
+      if (draft.titulo) q('#manual-titulo').value = draft.titulo;
+      if (draft.empresa) q('#manual-empresa').value = draft.empresa;
+      if (draft.manual?.color) setColor(draft.manual.color);
+      pushHistory();
+      render();
+    }
+  } else {
+    STATE.user = null; STATE.role = null;
+    q('#btn-logout').style.display = 'none';
+    q('#role-btns').innerHTML = '';
+    q('#sidebar').style.display = '';
+    q('#canvas-wrap').style.marginLeft = '';
+    showAuthScreen();
+
+    // Load guest draft
     const draft = loadLocalDraft('guest');
     if (draft) {
       STATE.blocks = draft.blocks || [];
-      STATE.manual = {...STATE.manual, ...draft.manual};
+      STATE.manual = { ...STATE.manual, ...draft.manual };
       if (draft.titulo) q('#manual-titulo').value = draft.titulo;
       if (draft.empresa) q('#manual-empresa').value = draft.empresa;
       if (draft.manual?.color) setColor(draft.manual.color);
     }
     pushHistory();
     render();
-    showAuthScreen();
   }
+  setLoading(false);
+}
 
-  // title/empresa inputs
+async function init() {
+  setLoading(true);
+  renderColorPicker();
+
   q('#manual-titulo').addEventListener('input', scheduleLocalSave);
   q('#manual-empresa').addEventListener('input', scheduleLocalSave);
+
+  // Safety timeout — never leave the spinner on forever
+  const safetyTimer = setTimeout(() => {
+    setLoading(false);
+    if (!STATE.user) showAuthScreen();
+  }, 6000);
+
+  // onAuthStateChange handles magic link redirects and subsequent sign-in/out
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'INITIAL_SESSION') return; // handled by getSession() below
+    clearTimeout(safetyTimer);
+    await handleSession(session);
+  });
+
+  // Initial load — check for existing session (covers page refresh + magic link)
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    clearTimeout(safetyTimer);
+    await handleSession(session);
+  } catch (e) {
+    clearTimeout(safetyTimer);
+    setLoading(false);
+    showAuthScreen();
+    render();
+  }
 }
 
 init();
