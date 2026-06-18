@@ -439,6 +439,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <button class="tb-btn" onclick="toggleShareMenu()">Compartir ▾</button>
     <div class="dropdown-menu" id="share-menu">
       <div class="dropdown-item" onclick="exportHTML()">🗂 Exportar HTML</div>
+      <div class="dropdown-item" onclick="exportPDF()">📄 Exportar PDF</div>
       <div class="dropdown-item" onclick="openTeamsModal()">💬 Copiar para Teams</div>
       <div class="dropdown-item" onclick="window.print()">🖨 Imprimir / PDF</div>
     </div>
@@ -1915,6 +1916,67 @@ function renderBlockForExport(b, pasoN) {
       return `<div style="border-radius:8px;overflow:hidden;margin-bottom:12px;font-family:'Fira Code',Consolas,monospace"><div style="background:#1e293b;padding:8px 14px;font-size:11px;color:#94a3b8;letter-spacing:.5px">${lang}</div><pre style="margin:0;padding:14px;background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre></div>`;
     }
     default: return '';
+  }
+}
+
+async function exportPDF() {
+  if (!STATE.blocks.length) { notify('El manual está vacío'); return; }
+  setSaveStatus('Generando PDF...');
+  const prog = q('#export-progress'); prog.classList.add('show');
+  const bar = q('#export-bar'); const msg = q('#export-msg');
+  try {
+    msg.textContent = 'Cargando librerías...'; bar.style.width = '10%';
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    const imgBlocks = STATE.blocks.filter(b => b.storagePath);
+    const imgCache = {};
+    let done = 0;
+    for (const block of imgBlocks) {
+      msg.textContent = `Descargando imagen ${done+1} de ${imgBlocks.length}...`;
+      bar.style.width = Math.round(10 + (done / Math.max(imgBlocks.length,1)) * 40) + '%';
+      try {
+        const { data, error } = await sb.storage.from('manual-images').download(block.storagePath);
+        if (!error && data) imgCache[block.storagePath] = await blobToBase64(data);
+      } catch(e) { /* continue */ }
+      done++;
+    }
+    let pasoN = 0;
+    const body = STATE.blocks.map(b => {
+      const bCopy = {...b};
+      if (bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+      if (b.type === 'paso') pasoN++;
+      return renderBlockForExport(bCopy, pasoN);
+    }).join('\n');
+    const titulo = q('#manual-titulo').value || 'Manual';
+    const color = STATE.manual.color || '#2563EB';
+    msg.textContent = 'Renderizando...'; bar.style.width = '55%';
+    const container = document.createElement('div');
+    container.style.cssText = `position:fixed;top:0;left:-9999px;width:794px;background:#f8fafc;padding:32px;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;color:#1e293b`;
+    container.innerHTML = `<div style="margin-bottom:20px;padding:20px;background:${color};border-radius:8px;color:#fff"><h1 style="margin:0;font-size:24px">${esc(titulo)}</h1></div>` + body;
+    document.body.appendChild(container);
+    const canvas = await window.html2canvas(container, { scale: 1.5, useCORS: true, allowTaint: true, backgroundColor: '#f8fafc' });
+    document.body.removeChild(container);
+    msg.textContent = 'Generando PDF...'; bar.style.width = '80%';
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const totalPages = Math.max(1, Math.ceil((canvas.height * pageW / canvas.width) / pageH));
+    const sliceH = Math.floor(canvas.height / totalPages);
+    for (let i = 0; i < totalPages; i++) {
+      if (i > 0) pdf.addPage();
+      const sc = document.createElement('canvas');
+      sc.width = canvas.width; sc.height = sliceH;
+      sc.getContext('2d').drawImage(canvas, 0, i * sliceH, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+      pdf.addImage(sc.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, pageH);
+    }
+    bar.style.width = '100%';
+    pdf.save((titulo.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g,'').trim() || 'manual') + '.pdf');
+    setTimeout(() => { prog.classList.remove('show'); setSaveStatus(''); }, 500);
+    notify('✅ PDF descargado');
+  } catch(e) {
+    prog.classList.remove('show'); setSaveStatus('');
+    notify('❌ Error al generar PDF: ' + (e.message||e), 4000);
   }
 }
 
