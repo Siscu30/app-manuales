@@ -673,6 +673,19 @@ input,textarea,select{font-family:inherit;font-size:14px}
 <!-- Notification -->
 <div id="notif"></div>
 
+<!-- Format toolbar -->
+<div id="format-toolbar" style="display:none;position:fixed;z-index:400;background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:8px;padding:4px 6px;align-items:center;gap:2px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+  <button data-cmd="bold" title="Negrita (Ctrl+B)" onmousedown="event.preventDefault();fmt('bold')" style="width:28px;height:28px;border-radius:5px;background:none;border:none;color:var(--ui-text);font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">B</button>
+  <button data-cmd="italic" title="Cursiva (Ctrl+I)" onmousedown="event.preventDefault();fmt('italic')" style="width:28px;height:28px;border-radius:5px;background:none;border:none;color:var(--ui-text);font-style:italic;font-size:14px;cursor:pointer;font-family:inherit">I</button>
+  <button data-cmd="underline" title="Subrayado (Ctrl+U)" onmousedown="event.preventDefault();fmt('underline')" style="width:28px;height:28px;border-radius:5px;background:none;border:none;color:var(--ui-text);text-decoration:underline;font-size:14px;cursor:pointer;font-family:inherit">U</button>
+  <div style="width:1px;height:18px;background:var(--panel-border);margin:0 4px;flex-shrink:0"></div>
+  <select id="fmt-size" onmousedown="event.stopPropagation()" onchange="fmtSize(this.value)" title="Tamaño de texto" style="background:var(--panel-surface);border:1px solid var(--panel-border);color:var(--ui-text);border-radius:5px;padding:2px 4px;font-size:12px;cursor:pointer;font-family:inherit">
+    <option value="1">8px</option><option value="2">10px</option><option value="3" selected>12px</option><option value="4">14px</option><option value="5">18px</option><option value="6">24px</option><option value="7">36px</option>
+  </select>
+  <div style="width:1px;height:18px;background:var(--panel-border);margin:0 4px;flex-shrink:0"></div>
+  <label title="Color de texto" style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:12px;color:var(--ui-text-muted);font-family:inherit">A<input type="color" id="fmt-color" value="#000000" onmousedown="event.stopPropagation()" onchange="fmtColor(this.value)" style="width:22px;height:22px;border:none;padding:0;background:none;cursor:pointer"></label>
+</div>
+
 <script>
 // Fuerza recarga si la página viene del bfcache (pulsar Atrás) para evitar estado congelado
 window.addEventListener('pageshow', function(e) { if (e.persisted) window.location.reload(); });
@@ -1227,15 +1240,32 @@ function updateStats() {
   el.textContent = `${blocks} bloq · ${words} pal · ${pages} pág`;
 }
 
+function isLightColor(hex) {
+  const c = hex.replace('#','');
+  const r = parseInt(c.substring(0,2),16);
+  const g = parseInt(c.substring(2,4),16);
+  const b = parseInt(c.substring(4,6),16);
+  return (r*299 + g*587 + b*114) / 1000 > 128;
+}
+
 function applyBlockColors() {
   STATE.blocks.forEach(b => {
     if (!b.blockBorderColor && !b.blockBgColor) return;
     const inner = document.querySelector(`[data-id="${b.id}"] .block-inner`);
     if (!inner) return;
-    if (b.blockBgColor) inner.style.backgroundColor = b.blockBgColor;
-    if (b.blockBorderColor) {
+    if (b.blockBgColor) {
+      inner.style.backgroundColor = b.blockBgColor;
+      if (b.type === 'titulo') {
+        inner.style.borderLeft = 'none';
+        const light = isLightColor(b.blockBgColor);
+        inner.style.color = light ? '#1a1a1a' : '#ffffff';
+        const sub = inner.querySelector('.subtitulo');
+        if (sub) sub.style.color = light ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
+      }
+    }
+    if (b.blockBorderColor && b.type !== 'titulo') {
       const cls = inner.className;
-      if (cls.includes('b-titulo') || cls.includes('b-alerta') || cls.includes('b-callout')) {
+      if (cls.includes('b-alerta') || cls.includes('b-callout')) {
         inner.style.borderLeftColor = b.blockBorderColor;
       }
       inner.style.borderColor = b.blockBorderColor;
@@ -1935,7 +1965,13 @@ function renderBlockForExport(b, pasoN) {
   const borderAccent = b.blockBorderColor || color;
 
   switch(b.type) {
-    case 'titulo': return `<div style="padding:20px 24px 16px;background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border-left:4px solid ${borderAccent};margin-bottom:12px"><div style="font-size:28px;margin-bottom:6px">${b.emoji||'📋'}</div><h2 style="font-size:22px;font-weight:700;margin:0">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="color:#64748b;margin-top:4px">${esc(b.subtitulo)}</p>`:''}</div>`;
+    case 'titulo': {
+      const _bgC = b.blockBgColor || '';
+      const _txtC = _bgC ? (isLightColor(_bgC) ? '#1a1a1a' : '#ffffff') : '';
+      const _subC = _bgC ? (isLightColor(_bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)') : '#64748b';
+      const _brd = _bgC ? '' : `border-left:4px solid ${borderAccent};`;
+      return `<div style="padding:20px 24px 16px;background:${_bgC||'#fff'};${_brd}border-radius:8px;margin-bottom:12px;${_txtC?`color:${_txtC};`:''}"><div style="font-size:28px;margin-bottom:6px">${b.emoji||'📋'}</div><h2 style="font-size:22px;font-weight:700;margin:0;${_txtC?`color:${_txtC};`:''}">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="color:${_subC};margin-top:4px">${esc(b.subtitulo)}</p>`:''}</div>`;
+    }
     case 'alerta': {
       const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
       const icons={info:'ℹ️',advertencia:'⚠️',peligro:'🚨',exito:'✅'};
@@ -3644,6 +3680,51 @@ async function init() {
   } else {
     init();
   }
+})();
+
+// ── Format toolbar (FIX 4.2) ──────────────────────────────────────────────
+function showFormatToolbar(ce) {
+  const tb = document.getElementById('format-toolbar');
+  if (!tb) return;
+  const rect = (ce.closest('.block-wrap') || ce).getBoundingClientRect();
+  const tbH = 46;
+  let top = rect.top - tbH - 8 + window.scrollY;
+  if (top < 56) top = rect.bottom + 8 + window.scrollY;
+  tb.style.top = top + 'px';
+  tb.style.left = Math.max(8, Math.min(rect.left + window.scrollX, window.innerWidth - 240)) + 'px';
+  tb.style.display = 'flex';
+  updateFmtStates();
+}
+function hideFormatToolbar() {
+  const tb = document.getElementById('format-toolbar');
+  if (tb) tb.style.display = 'none';
+}
+function fmt(cmd) { document.execCommand(cmd, false, null); updateFmtStates(); }
+function fmtSize(val) { document.execCommand('fontSize', false, val); updateFmtStates(); }
+function fmtColor(val) { document.execCommand('foreColor', false, val); updateFmtStates(); }
+function updateFmtStates() {
+  ['bold','italic','underline'].forEach(cmd => {
+    const btn = document.querySelector(`#format-toolbar [data-cmd="${cmd}"]`);
+    if (btn) btn.style.background = document.queryCommandState(cmd) ? 'rgba(255,255,255,.18)' : 'none';
+  });
+}
+(function initFormatToolbar() {
+  const canvas = document.getElementById('canvas');
+  if (!canvas) return;
+  canvas.addEventListener('focusin', function(e) {
+    if (!e.target.matches('[contenteditable="true"]')) return;
+    showFormatToolbar(e.target);
+  });
+  canvas.addEventListener('focusout', function() {
+    setTimeout(function() {
+      const tb = document.getElementById('format-toolbar');
+      if (!tb || tb.style.display === 'none') return;
+      const cvs = document.getElementById('canvas');
+      if (!cvs.contains(document.activeElement) && !tb.contains(document.activeElement)) {
+        hideFormatToolbar();
+      }
+    }, 150);
+  });
 })();
 </script>
 </body>
