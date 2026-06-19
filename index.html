@@ -113,11 +113,13 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .block-wrap.drag-over-bottom{border-bottom:2px solid var(--primary)}
 
 /* block: titulo */
-.b-titulo{padding:20px 24px 16px;background:var(--surface);border-radius:var(--radius);border-left:4px solid var(--primary);box-shadow:var(--shadow-sm)}
-.b-titulo .emoji-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.b-titulo .b-emoji{font-size:28px;cursor:pointer}
-.b-titulo h2{font-size:22px;font-weight:700;line-height:1.2}
-.b-titulo .subtitulo{font-size:14px;color:var(--text-muted);margin-top:4px}
+.b-titulo{padding:20px 24px 16px;background:#4a4a4a;border-radius:var(--radius);text-align:center;box-shadow:var(--shadow-sm);color:#fff}
+.b-titulo .b-emoji{font-size:28px;cursor:pointer;display:block;margin-bottom:6px}
+.b-titulo .b-titulo-t{font-size:22px;font-weight:700;line-height:1.2}
+.b-titulo .subtitulo{font-size:14px;margin-top:4px}
+.titulo-color-picker{display:flex;gap:6px;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.15);justify-content:center;flex-wrap:wrap}
+.titulo-color-swatch{display:inline-block;flex-shrink:0;border-radius:50%;cursor:pointer;transition:transform .1s,box-shadow .1s}
+.titulo-color-swatch:hover{transform:scale(1.18);box-shadow:0 0 0 3px rgba(255,255,255,.3)}
 
 /* block: alerta */
 .b-alerta{padding:12px 16px;border-radius:var(--radius);display:flex;gap:10px;align-items:flex-start;box-shadow:var(--shadow-sm)}
@@ -683,7 +685,15 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <option value="1">8px</option><option value="2">10px</option><option value="3" selected>12px</option><option value="4">14px</option><option value="5">18px</option><option value="6">24px</option><option value="7">36px</option>
   </select>
   <div style="width:1px;height:18px;background:var(--panel-border);margin:0 4px;flex-shrink:0"></div>
-  <label title="Color de texto" style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:12px;color:var(--ui-text-muted);font-family:inherit">A<input type="color" id="fmt-color" value="#000000" onmousedown="event.stopPropagation()" onchange="fmtColor(this.value)" style="width:22px;height:22px;border:none;padding:0;background:none;cursor:pointer"></label>
+  <span class="fmt-color-swatch" data-color="#000000" onmousedown="event.preventDefault();fmtColor('#000000')" title="Negro" style="background:#000;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.4);flex-shrink:0;display:inline-block"></span>
+  <span class="fmt-color-swatch" data-color="#ffffff" onmousedown="event.preventDefault();fmtColor('#ffffff')" title="Blanco" style="background:#fff;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.4);flex-shrink:0;display:inline-block"></span>
+  <span class="fmt-color-swatch" data-color="#EA580C" onmousedown="event.preventDefault();fmtColor('#EA580C')" title="Naranja" style="background:#EA580C;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;display:inline-block"></span>
+  <span class="fmt-color-swatch" data-color="#DC2626" onmousedown="event.preventDefault();fmtColor('#DC2626')" title="Rojo" style="background:#DC2626;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;display:inline-block"></span>
+  <span class="fmt-color-swatch" data-color="#2563EB" onmousedown="event.preventDefault();fmtColor('#2563EB')" title="Azul" style="background:#2563EB;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;display:inline-block"></span>
+  <span class="fmt-color-swatch" data-color="#16A34A" onmousedown="event.preventDefault();fmtColor('#16A34A')" title="Verde" style="background:#16A34A;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;display:inline-block"></span>
+  <span class="fmt-color-swatch" data-color="#7C3AED" onmousedown="event.preventDefault();fmtColor('#7C3AED')" title="Morado" style="background:#7C3AED;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;display:inline-block"></span>
+  <span id="fmtColorDot" title="Color personalizado" style="background:#000000;width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.5);flex-shrink:0;display:inline-block;margin-left:2px"></span>
+  <input type="color" id="fmtColorCustom" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none">
 </div>
 
 <script>
@@ -743,14 +753,25 @@ const BLOCK_TYPES = {
     label: 'Título de sección',
     defaultData: () => ({ emoji:'📋', titulo:'Nueva sección', subtitulo:'' }),
     render(b) {
-      return `<div class="b-titulo block-inner" style="border-left-color:var(--primary)">
-        <div class="emoji-row">
-          <span class="b-emoji" onclick="openEmojiPicker('${b.id}')" title="Cambiar emoji">${b.emoji||'📋'}</span>
-          <div style="flex:1">
-            <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
-          </div>
+      const bgC = b.blockBgColor || '#4a4a4a';
+      const textC = isLightColor(bgC) ? '#1a1a1a' : '#ffffff';
+      const subC = isLightColor(bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
+      const SWATCHES = ['#EA580C','#2563EB','#16A34A','#DC2626','#7C3AED','#0891B2','#374151','#1a1a1a'];
+      const swatchHTML = SWATCHES.map(c => {
+        const active = c === bgC;
+        return `<span class="titulo-color-swatch" data-color="${c}" style="background:${c};width:22px;height:22px;border:${active?'2px solid white':'2px solid transparent'}" title="${c}"></span>`;
+      }).join('');
+      return `<div class="b-titulo block-inner" style="background:${bgC};border-left:none;text-align:center;color:${textC}">
+        <span class="b-emoji" onclick="openEmojiPicker('${b.id}')" title="Cambiar emoji">${b.emoji||'📋'}</span>
+        <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${esc(b.titulo||'')}</div>
+        <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)" style="color:${subC}">${esc(b.subtitulo||'')}</div>
+        <div class="titulo-color-picker">
+          ${swatchHTML}
+          <label style="position:relative;cursor:pointer;width:22px;height:22px;display:inline-block;flex-shrink:0" title="Color personalizado">
+            <span class="titulo-cprev" style="width:22px;height:22px;border-radius:50%;background:${bgC};display:block;border:2px solid rgba(255,255,255,.5)"></span>
+            <input type="color" class="titulo-color-custom" value="${bgC}" style="position:absolute;opacity:0;width:0;height:0">
+          </label>
         </div>
-        <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.subtitulo||'')}</div>
       </div>`;
     },
     toTeamsText(b) { return `${b.emoji||'📋'} **${b.titulo||''}**\n${b.subtitulo ? b.subtitulo+'\n' : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`; }
@@ -1278,6 +1299,7 @@ function openBlockColorPicker(blockId, ev) {
   document.querySelectorAll('.block-color-popup').forEach(p=>p.remove());
   const block = STATE.blocks.find(b=>b.id===blockId);
   if (!block) return;
+  if (block.type === 'titulo') return; // titulo uses inline swatches
   const btn = ev.currentTarget;
   const popup = document.createElement('div');
   popup.className = 'block-color-popup';
@@ -1966,11 +1988,10 @@ function renderBlockForExport(b, pasoN) {
 
   switch(b.type) {
     case 'titulo': {
-      const _bgC = b.blockBgColor || '';
-      const _txtC = _bgC ? (isLightColor(_bgC) ? '#1a1a1a' : '#ffffff') : '';
-      const _subC = _bgC ? (isLightColor(_bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)') : '#64748b';
-      const _brd = _bgC ? '' : `border-left:4px solid ${borderAccent};`;
-      return `<div style="padding:20px 24px 16px;background:${_bgC||'#fff'};${_brd}border-radius:8px;margin-bottom:12px;${_txtC?`color:${_txtC};`:''}"><div style="font-size:28px;margin-bottom:6px">${b.emoji||'📋'}</div><h2 style="font-size:22px;font-weight:700;margin:0;${_txtC?`color:${_txtC};`:''}">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="color:${_subC};margin-top:4px">${esc(b.subtitulo)}</p>`:''}</div>`;
+      const _bgC = b.blockBgColor || '#4a4a4a';
+      const _txtC = isLightColor(_bgC) ? '#1a1a1a' : '#ffffff';
+      const _subC = isLightColor(_bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
+      return `<div style="padding:20px 24px 16px;background:${_bgC};border-left:none;border-radius:8px;margin-bottom:12px;text-align:center;color:${_txtC}"><h2 style="font-size:22px;font-weight:700;margin:0;text-align:center;color:${_txtC}">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="margin-top:4px;text-align:center;color:${_subC}">${esc(b.subtitulo)}</p>`:''}</div>`;
     }
     case 'alerta': {
       const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
@@ -3724,6 +3745,89 @@ function updateFmtStates() {
         hideFormatToolbar();
       }
     }, 150);
+  });
+  // Save selection on mouseup so fmtColorDot can restore it
+  canvas.addEventListener('mouseup', function() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) _fmtSavedSel = sel.getRangeAt(0).cloneRange();
+  });
+})();
+
+// ── Titulo inline color swatches ──────────────────────────────────────────
+(function initTituloSwatches() {
+  const canvas = document.getElementById('canvas');
+  if (!canvas) return;
+  canvas.addEventListener('click', function(e) {
+    const swatch = e.target.closest('.titulo-color-swatch');
+    if (!swatch) return;
+    const wrap = swatch.closest('.block-wrap');
+    if (!wrap) return;
+    const block = STATE.blocks.find(b => b.id === wrap.dataset.id);
+    if (!block || block.type !== 'titulo') return;
+    block.blockBgColor = swatch.dataset.color;
+    applyBlockColors();
+    // Update swatch highlights
+    wrap.querySelectorAll('.titulo-color-swatch').forEach(s => s.style.border = '2px solid transparent');
+    swatch.style.border = '2px solid white';
+    const cprev = wrap.querySelector('.titulo-cprev');
+    if (cprev) cprev.style.background = swatch.dataset.color;
+    const cinput = wrap.querySelector('.titulo-color-custom');
+    if (cinput) cinput.value = swatch.dataset.color;
+    scheduleLocalSave();
+  });
+  canvas.addEventListener('input', function(e) {
+    if (!e.target.matches('.titulo-color-custom')) return;
+    const wrap = e.target.closest('.block-wrap');
+    if (!wrap) return;
+    const block = STATE.blocks.find(b => b.id === wrap.dataset.id);
+    if (!block || block.type !== 'titulo') return;
+    block.blockBgColor = e.target.value;
+    applyBlockColors();
+    wrap.querySelectorAll('.titulo-color-swatch').forEach(s => s.style.border = '2px solid transparent');
+    const cprev = wrap.querySelector('.titulo-cprev');
+    if (cprev) cprev.style.background = e.target.value;
+    scheduleLocalSave();
+  });
+})();
+
+// ── Format toolbar saved-selection + custom color picker ──────────────────
+let _fmtSavedSel = null;
+function _saveFmtSel() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) _fmtSavedSel = sel.getRangeAt(0).cloneRange();
+}
+function _restoreFmtSel() {
+  if (!_fmtSavedSel) return;
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(_fmtSavedSel);
+}
+function _rgbToHex(rgb) {
+  const m = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+  if (!m) return null;
+  return '#' + [m[1],m[2],m[3]].map(x=>parseInt(x).toString(16).padStart(2,'0')).join('');
+}
+(function initFmtColorPicker() {
+  const dot = document.getElementById('fmtColorDot');
+  const customInput = document.getElementById('fmtColorCustom');
+  if (!dot || !customInput) return;
+  dot.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    _saveFmtSel();
+    customInput.click();
+  });
+  customInput.addEventListener('input', function(e) {
+    _restoreFmtSel();
+    document.execCommand('foreColor', false, e.target.value);
+    dot.style.background = e.target.value;
+    _fmtSavedSel = window.getSelection().rangeCount > 0 ? window.getSelection().getRangeAt(0).cloneRange() : _fmtSavedSel;
+  });
+  document.addEventListener('selectionchange', function() {
+    const rawColor = document.queryCommandValue('foreColor');
+    if (rawColor && rawColor !== 'false' && rawColor !== '') {
+      const hex = _rgbToHex(rawColor);
+      if (hex) dot.style.background = hex;
+    }
   });
 })();
 </script>
