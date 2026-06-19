@@ -2753,10 +2753,13 @@ async function parseDOCXtoBlocks(ab) {
 }
 
 async function parsePDFtoBlocks(ab) {
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+  if (!window.pdfjsLib) {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  }
+  const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+  if (!pdfjsLib) throw new Error('No se pudo cargar PDF.js. Verifica tu conexión a internet.');
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(ab) }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(ab.slice(0)) }).promise;
   const allBlocks = [];
   for (let pn = 1; pn <= pdf.numPages; pn++) {
     const page = await pdf.getPage(pn);
