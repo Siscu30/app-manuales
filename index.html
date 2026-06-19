@@ -753,7 +753,7 @@ const BLOCK_TYPES = {
     label: 'Título de sección',
     defaultData: () => ({ emoji:'📋', titulo:'Nueva sección', subtitulo:'' }),
     render(b) {
-      const bgC = b.blockBgColor || '#4a4a4a';
+      const bgC = normalizeHex(b.blockBgColor || '#4a4a4a');
       const textC = isLightColor(bgC) ? '#1a1a1a' : '#ffffff';
       const subC = isLightColor(bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
       const SWATCHES = ['#EA580C','#2563EB','#16A34A','#DC2626','#7C3AED','#0891B2','#374151','#1a1a1a'];
@@ -1262,11 +1262,16 @@ function updateStats() {
 }
 
 function isLightColor(hex) {
-  const c = hex.replace('#','');
+  const c = String(hex||'').replace('#','');
   const r = parseInt(c.substring(0,2),16);
   const g = parseInt(c.substring(2,4),16);
   const b = parseInt(c.substring(4,6),16);
   return (r*299 + g*587 + b*114) / 1000 > 128;
+}
+function normalizeHex(color) {
+  if (!color) return '';
+  const c = String(color).trim();
+  return c.startsWith('#') ? c : '#' + c;
 }
 
 function applyBlockColors() {
@@ -1275,7 +1280,7 @@ function applyBlockColors() {
     const inner = document.querySelector(`[data-id="${b.id}"] .block-inner`);
     if (!inner) return;
     if (b.blockBgColor) {
-      inner.style.backgroundColor = b.blockBgColor;
+      inner.style.backgroundColor = normalizeHex(b.blockBgColor);
       if (b.type === 'titulo') {
         inner.style.borderLeft = 'none';
         const light = isLightColor(b.blockBgColor);
@@ -1988,7 +1993,7 @@ function renderBlockForExport(b, pasoN) {
 
   switch(b.type) {
     case 'titulo': {
-      const _bgC = b.blockBgColor || '#4a4a4a';
+      const _bgC = normalizeHex(b.blockBgColor || '#4a4a4a');
       const _txtC = isLightColor(_bgC) ? '#1a1a1a' : '#ffffff';
       const _subC = isLightColor(_bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
       return `<div style="padding:20px 24px 16px;background:${_bgC};border-left:none;border-radius:8px;margin-bottom:12px;text-align:center;color:${_txtC}"><h2 style="font-size:22px;font-weight:700;margin:0;text-align:center;color:${_txtC}">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="margin-top:4px;text-align:center;color:${_subC}">${esc(b.subtitulo)}</p>`:''}</div>`;
