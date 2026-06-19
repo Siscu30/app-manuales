@@ -157,8 +157,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .ann-color-dot:hover{transform:scale(1.1)}
 .ann-lw-btn{background:#2d2d2d;color:#e8e8e8;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;transition:background .12s}
 .ann-lw-btn.active{background:#2563EB}
+.ann-act-btn{background:#2d2d2d;color:#e8e8e8;border:none;border-radius:6px;padding:6px 11px;cursor:pointer;font-size:15px;transition:background .12s;line-height:1}
+.ann-act-btn:hover{background:#3a3a3a}
 .ann-canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px}
-.ann-text-input{position:fixed;background:transparent;border:none;outline:none;font-size:16px;font-weight:600;color:#FF0000;min-width:60px;caret-color:#fff;display:none;z-index:10000}
+.ann-text-input{position:absolute;background:rgba(0,0,0,.08);border:none;border-bottom:2px solid currentColor;outline:none;font-size:16px;font-weight:600;color:#FF0000;min-width:80px;caret-color:currentColor;display:none;z-index:10000;padding:0 3px;line-height:1.3}
 
 /* block: imagen */
 .b-imagen{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;text-align:center;box-shadow:var(--shadow-sm)}
@@ -819,10 +821,18 @@ const BLOCK_TYPES = {
     label: 'Paso numerado',
     defaultData: () => ({ titulo:'Título del paso', descripcion:'Describe el paso...', storagePath:null, caption:'' }),
     render(b, pasoN) {
-      const imgHTML = b.src ? `<div class="b-paso-img-wrap"><img src="${b.src}" class="b-paso-img" style="width:100%;display:block" alt="${esc(b.caption||'')}"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div></div>` : b.storagePath ?
+      const _annBtn = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}')" style="background:#2563EB;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6" title="Anotar imagen">✏️</button>`;
+      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 16px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}</div>`;
+      // b.src takes priority (annotated image), then storagePath (lazy-loaded), then upload prompt
+      const imgHTML = b.src
+        ? `<div class="b-paso-img-wrap">
+             <img src="${b.src}" class="b-paso-img" alt="${esc(b.caption||'')}">
+             ${_capRow}
+           </div>`
+        : b.storagePath
         ? `<div class="b-paso-img-wrap">
              <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" alt="${esc(b.caption||'')}">
-             <div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div>
+             ${_capRow}
            </div>`
         : `<label class="paso-upload-btn" title="Añadir imagen">
              📷 <span>Añadir imagen</span>
@@ -840,7 +850,7 @@ const BLOCK_TYPES = {
       </div>`;
     },
     toTeamsText(b, pasoN) {
-      return `${pasoN}. **${b.titulo||''}**\n   ${b.descripcion||''}${b.storagePath ? `\n   📷 [Imagen: ${b.caption||''}]` : ''}`;
+      return `${pasoN}. **${b.titulo||''}**\n   ${b.descripcion||''}${(b.storagePath||b.src) ? `\n   📷 [Imagen: ${b.caption||''}]` : ''}`;
     }
   },
   imagen: {
@@ -1252,7 +1262,7 @@ function render() {
         <button title="Subir" onclick="moveBlock(${i},-1,event)">↑</button>
         <button title="Bajar" onclick="moveBlock(${i},1,event)">↓</button>
         <button title="Color personalizado" onclick="openBlockColorPicker('${b.id}',event)" style="position:relative">🎨</button>
-        <button title="Anotar" onclick="openAnnotationEditor('${b.id}',event)" style="color:#2563EB">✏️</button><button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
+        <button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
         <button class="del" title="Eliminar" onclick="deleteBlock('${b.id}',event)">🗑</button>
       </div>
     </div>`;
@@ -2788,11 +2798,6 @@ function deletePage(id) {
   renderPagesPanel();
   scheduleLocalSave();
 }
-  let _pageDragId=null;
-  function onPageDragStart(e,id){_pageDragId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
-  function onPageDragLeave(e){e.currentTarget.style.borderTop='';e.currentTarget.style.opacity='';}
-  function onPageDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.style.borderTop='2px solid var(--accent)';}
-  function onPageDrop(e,targetId){e.preventDefault();e.currentTarget.style.borderTop='';e.currentTarget.style.opacity='';if(!_pageDragId||_pageDragId===targetId){_pageDragId=null;return;}const from=STATE.pages.findIndex(p=>p.id===_pageDragId);const to=STATE.pages.findIndex(p=>p.id===targetId);if(from<0||to<0){_pageDragId=null;return;}const moved=STATE.pages.splice(from,1)[0];STATE.pages.splice(to,0,moved);_pageDragId=null;renderPagesPanel();scheduleLocalSave();}
 
 function switchPage(id) {
   if (STATE.activePage === id) return;
@@ -2826,8 +2831,8 @@ function renderPagesPanel() {
     return;
   }
   wrap.innerHTML = STATE.pages.map(p => `
-    <div class="page-item ${p.id === STATE.activePage ? 'active' : ''}" data-pageid="${p.id}" draggable="true" ondragstart="onPageDragStart(event,'${p.id}')" ondragover="onPageDragOver(event)" ondrop="onPageDrop(event,'${p.id}')" ondragleave="onPageDragLeave(event)" onclick="switchPage('${p.id}')">
-      <span class="page-drag-handle" title="Arrastrar para reordenar" style="cursor:grab;opacity:.5;font-size:14px;margin-right:2px;user-select:none">☰</span><span class="page-item-icon">📄</span>
+    <div class="page-item ${p.id === STATE.activePage ? 'active' : ''}" data-pageid="${p.id}" onclick="switchPage('${p.id}')">
+      <span class="page-item-icon">📄</span>
       <span class="page-item-title" contenteditable="true"
         onclick="event.stopPropagation()"
         onblur="renamePage('${p.id}',this.textContent.trim())"
@@ -3347,7 +3352,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 .mp-nav li:hover{background:rgba(255,255,255,.08);color:#fff}
 .mp-nav li.active{background:rgba(255,255,255,.13);color:#fff;font-weight:500}
 .mp-content{flex:1;padding:32px 28px;display:flex;flex-direction:column;align-items:center}
-.mp-page{width:100%;max-width:760px;margin:0 auto;display:none};max-width:760px;display:none}
+.mp-page{width:100%;max-width:760px;display:none}
 .mp-page.active{display:block}
 /* hamburger for mobile nav */
 .mp-nav-toggle{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:2px 6px;margin-right:4px}
@@ -3860,19 +3865,72 @@ function _rgbToHex(rgb) {
 })();
 
 // ══ MÓDULO ANOTACIONES EN IMÁGENES ═══════════════════════════════════════
-function openAnnotationEditor(blockId) {
+
+// Step 1: resolve image src — block.src > DOM lazy-loaded img > fresh signed URL
+async function _resolveAnnotationSrc(block) {
+  if (block.src) return block.src;
+  // DOM img already lazy-loaded?
+  const imgEl = document.querySelector(`[data-id="${block.id}"] img`);
+  if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.src && !imgEl.src.endsWith('/') && imgEl.src !== window.location.href) {
+    return imgEl.src;
+  }
+  // Generate a fresh signed URL from storagePath
+  if (block.storagePath && window.sb) {
+    try {
+      const { data } = await sb.storage.from('manual-images').createSignedUrl(block.storagePath, 3600);
+      if (data && data.signedUrl) return data.signedUrl;
+    } catch(_) {}
+  }
+  return null;
+}
+
+// Step 2: load image onto canvas via fetch+blob (avoids CORS taint on signed URLs)
+function _loadImageToCanvas(src, canvas, ctx) {
+  return new Promise((resolve, reject) => {
+    function drawImg(imgSrc, useCrossOrigin) {
+      const img = new Image();
+      if (useCrossOrigin) img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        ctx.drawImage(img, 0, 0);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = imgSrc;
+    }
+    // Data URLs are same-origin — draw directly, no taint risk
+    if (src.startsWith('data:')) { drawImg(src, false); return; }
+    // Remote URLs: fetch+blob is the most reliable CORS-free strategy
+    fetch(src)
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(blobUrl);
+          resolve();
+        };
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('blob img load failed')); };
+        img.src = blobUrl;
+      })
+      .catch(() => {
+        // Last resort: crossOrigin direct load
+        drawImg(src, true);
+      });
+  });
+}
+
+async function openAnnotationEditor(blockId) {
   const block = STATE.blocks.find(b => b.id === blockId);
   if (!block) return;
 
-  // Resolve image source from DOM if storagePath was lazy-loaded
-  let imgSrc = block.src || null;
-  if (!imgSrc && block.storagePath) {
-    const imgEl = document.querySelector(`[data-id="${blockId}"] img`);
-    if (imgEl && imgEl.src && imgEl.src !== window.location.href) imgSrc = imgEl.src;
-  }
+  const imgSrc = await _resolveAnnotationSrc(block);
   if (!imgSrc) { notify('⚠️ No hay imagen cargada para anotar'); return; }
 
-  // Remove any existing modal
   const existing = document.getElementById('annotationModal');
   if (existing) existing.remove();
 
@@ -3880,7 +3938,7 @@ function openAnnotationEditor(blockId) {
   const ANN = { tool:'arrow', color:'#FF0000', lw:3, drawing:false, startX:0, startY:0, snapshots:[] };
 
   const colorDotsHTML = COLORS.map(c =>
-    `<div class="ann-color-dot${c===ANN.color?' active':''}" data-ann-color="${c}" style="background:${c}${c==='#FFFFFF'?';border-color:#999!important':''}" title="${c}"></div>`
+    `<div class="ann-color-dot${c===ANN.color?' active':''}" data-ann-color="${c}" style="background:${c}${c==='#FFFFFF'?';outline:2px solid #888':''}" title="${c}"></div>`
   ).join('');
 
   const modal = document.createElement('div');
@@ -3891,7 +3949,7 @@ function openAnnotationEditor(blockId) {
       <button class="ann-tool-btn" data-ann-tool="rect" title="Rectángulo">⬜</button>
       <button class="ann-tool-btn" data-ann-tool="circle" title="Círculo">⭕</button>
       <button class="ann-tool-btn" data-ann-tool="line" title="Línea">↗️</button>
-      <button class="ann-tool-btn" data-ann-tool="text" title="Texto libre" style="font-weight:700;font-family:serif">T</button>
+      <button class="ann-tool-btn" data-ann-tool="text" title="Texto libre" style="font-weight:700;font-family:serif;font-size:17px">T</button>
       <div class="ann-divider"></div>
       ${colorDotsHTML}
       <div class="ann-divider"></div>
@@ -3899,57 +3957,49 @@ function openAnnotationEditor(blockId) {
       <button class="ann-lw-btn" data-ann-lw="4" title="Medio">━</button>
       <button class="ann-lw-btn" data-ann-lw="8" title="Grueso">▬</button>
       <div class="ann-divider"></div>
-      <button class="ann-tool-btn" id="ann-undo" title="Deshacer (Ctrl+Z)">↩️</button>
-      <button class="ann-tool-btn" id="ann-clear" title="Limpiar todo">🗑️</button>
+      <button class="ann-act-btn" id="ann-undo" title="Deshacer (Ctrl+Z)">↩️</button>
+      <button class="ann-act-btn" id="ann-clear" title="Limpiar todo">🗑️</button>
       <div style="flex:1;min-width:8px"></div>
       <button id="ann-cancel" style="background:#444;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px">Cancelar</button>
       <button id="ann-apply" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:600;margin-left:6px">✅ Aplicar</button>
     </div>
-    <div class="ann-canvas-wrap" id="annCanvasWrap">
-      <canvas id="annCanvas" style="cursor:crosshair;max-width:100%;max-height:calc(100vh - 70px);display:block;box-shadow:0 0 40px rgba(0,0,0,.6)"></canvas>
+    <div class="ann-canvas-wrap">
+      <div id="annCanvasContainer" style="position:relative;line-height:0;display:inline-block">
+        <canvas id="annCanvas" style="cursor:crosshair;max-width:calc(100vw - 32px);max-height:calc(100vh - 80px);display:block;box-shadow:0 0 40px rgba(0,0,0,.6)"></canvas>
+        <input id="annTextInput" class="ann-text-input" type="text" placeholder="Escribe y Enter…">
+      </div>
     </div>
-    <input id="annTextInput" class="ann-text-input" type="text" placeholder="Escribe y presiona Enter…">
   `;
   document.body.appendChild(modal);
 
   const canvas = document.getElementById('annCanvas');
   const ctx = canvas.getContext('2d');
   const txtInput = document.getElementById('annTextInput');
+  const canvasCont = document.getElementById('annCanvasContainer');
 
-  // Load image onto canvas
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img, 0, 0);
+  try {
+    await _loadImageToCanvas(imgSrc, canvas, ctx);
     ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-  };
-        img.onerror = () => {
-            // Fallback: fetch as blob to bypass CORS canvas taint
-            fetch(imgSrc)
-                .then(r => r.blob())
-                .then(b => {
-                    const blobUrl = URL.createObjectURL(b);
-                    const img2 = new Image();
-                    img2.onload = () => {
-                        canvas.width = img2.width;
-                        canvas.height = img2.height;
-                        ctx.drawImage(img2, 0, 0);
-                        ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-                        URL.revokeObjectURL(blobUrl);
-                    };
-                    img2.src = blobUrl;
-                })
-                .catch(() => { notify('\u26a0\ufe0f No se pudo cargar la imagen para anotar'); modal.remove(); });
-        };
-        img.src = imgSrc;
+  } catch(err) {
+    modal.remove();
+    notify('⚠️ No se pudo cargar la imagen: ' + (err.message || err));
+    return;
+  }
+
+  function closeModal() {
+    document.removeEventListener('keydown', _annKeydown);
+    modal.remove();
+  }
+
+  // Scale-aware coordinate mapping
   function getPos(e) {
     const r = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / r.width;
-    const scaleY = canvas.height / r.height;
-    const src = (e.touches && e.touches[0]) ? e.touches[0] : e;
-    return { x: (src.clientX - r.left) * scaleX, y: (src.clientY - r.top) * scaleY };
+    const sx = canvas.width / r.width;
+    const sy = canvas.height / r.height;
+    const src = (e.touches && e.touches.length > 0) ? e.touches[0]
+              : (e.changedTouches && e.changedTouches.length > 0) ? e.changedTouches[0]
+              : e;
+    return { x: (src.clientX - r.left) * sx, y: (src.clientY - r.top) * sy };
   }
 
   function applyStyle() {
@@ -3963,7 +4013,7 @@ function openAnnotationEditor(blockId) {
   function drawArrowShape(x1, y1, x2, y2) {
     const angle = Math.atan2(y2 - y1, x2 - x1);
     const len = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
-    const headLen = Math.max(14, Math.min(28, len * 0.32));
+    const headLen = Math.max(14, Math.min(32, len * 0.32));
     ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(x2, y2);
@@ -3982,9 +4032,8 @@ function openAnnotationEditor(blockId) {
     } else if (ANN.tool === 'rect') {
       ctx.strokeRect(ANN.startX, ANN.startY, dx, dy);
     } else if (ANN.tool === 'circle') {
-      const rx = Math.abs(dx)/2, ry = Math.abs(dy)/2;
       ctx.beginPath();
-      ctx.ellipse(ANN.startX + dx/2, ANN.startY + dy/2, Math.max(1,rx), Math.max(1,ry), 0, 0, Math.PI*2);
+      ctx.ellipse(ANN.startX + dx/2, ANN.startY + dy/2, Math.max(1,Math.abs(dx)/2), Math.max(1,Math.abs(dy)/2), 0, 0, Math.PI*2);
       ctx.stroke();
     } else if (ANN.tool === 'line') {
       ctx.beginPath(); ctx.moveTo(ANN.startX, ANN.startY); ctx.lineTo(x, y); ctx.stroke();
@@ -3995,6 +4044,7 @@ function openAnnotationEditor(blockId) {
     ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
   }
 
+  // ── Mouse events ──
   canvas.addEventListener('mousedown', e => {
     if (ANN.tool === 'text') return;
     ANN.drawing = true;
@@ -4010,8 +4060,11 @@ function openAnnotationEditor(blockId) {
     ANN.drawing = false;
     const p = getPos(e); previewDraw(p.x, p.y); commitDraw();
   });
-  canvas.addEventListener('mouseleave', () => { if (ANN.drawing) { ANN.drawing = false; commitDraw(); } });
+  canvas.addEventListener('mouseleave', () => {
+    if (ANN.drawing) { ANN.drawing = false; commitDraw(); }
+  });
 
+  // ── Touch events ──
   canvas.addEventListener('touchstart', e => {
     if (ANN.tool === 'text') return;
     ANN.drawing = true;
@@ -4020,18 +4073,29 @@ function openAnnotationEditor(blockId) {
   }, { passive:false });
   canvas.addEventListener('touchmove', e => {
     if (!ANN.drawing) return;
-    const p = getPos(e); previewDraw(p.x, p.y); e.preventDefault();
+    const p = getPos(e); previewDraw(p.x, p.y);
+    e.preventDefault();
   }, { passive:false });
-  canvas.addEventListener('touchend', () => { if (ANN.drawing) { ANN.drawing = false; commitDraw(); } });
+  canvas.addEventListener('touchend', e => {
+    if (!ANN.drawing) return;
+    ANN.drawing = false;
+    commitDraw();
+    e.preventDefault();
+  }, { passive:false });
 
+  // ── Text tool ──
   canvas.addEventListener('click', e => {
     if (ANN.tool !== 'text') return;
     const r = canvas.getBoundingClientRect();
+    const cr = canvasCont.getBoundingClientRect();
+    const fontSize = Math.max(16, ANN.lw * 5);
+    // Input is absolute inside canvasCont; position at click point
     txtInput.style.display = 'block';
-    txtInput.style.left = (e.clientX + 2) + 'px';
-    txtInput.style.top = (e.clientY - 20) + 'px';
+    txtInput.style.left = (e.clientX - cr.left) + 'px';
+    txtInput.style.top = (e.clientY - cr.top - fontSize) + 'px';
     txtInput.style.color = ANN.color;
-    txtInput.style.fontSize = Math.max(16, ANN.lw * 5) + 'px';
+    txtInput.style.fontSize = fontSize + 'px';
+    // Store canvas coords for drawing
     txtInput.dataset.px = String((e.clientX - r.left) * canvas.width / r.width);
     txtInput.dataset.py = String((e.clientY - r.top) * canvas.height / r.height);
     txtInput.value = '';
@@ -4043,7 +4107,8 @@ function openAnnotationEditor(blockId) {
       const text = txtInput.value.trim();
       if (text) {
         applyStyle();
-        ctx.font = `600 ${Math.max(16, ANN.lw * 5)}px Inter, Arial, sans-serif`;
+        const fontSize = Math.max(16, ANN.lw * 5);
+        ctx.font = `600 ${fontSize}px Inter, Arial, sans-serif`;
         ctx.fillText(text, parseFloat(txtInput.dataset.px), parseFloat(txtInput.dataset.py));
         commitDraw();
       }
@@ -4053,7 +4118,7 @@ function openAnnotationEditor(blockId) {
     e.stopPropagation();
   });
 
-  // Toolbar interactions
+  // ── Toolbar event delegation ──
   modal.addEventListener('click', e => {
     const toolBtn = e.target.closest('[data-ann-tool]');
     if (toolBtn) {
@@ -4068,6 +4133,7 @@ function openAnnotationEditor(blockId) {
       modal.querySelectorAll('[data-ann-color]').forEach(d => d.classList.remove('active'));
       colorDot.classList.add('active');
       ANN.color = colorDot.dataset.annColor;
+      if (txtInput.style.display !== 'none') txtInput.style.color = ANN.color;
       return;
     }
     const lwBtn = e.target.closest('[data-ann-lw]');
@@ -4085,27 +4151,32 @@ function openAnnotationEditor(blockId) {
   document.getElementById('ann-clear').addEventListener('click', () => {
     if (ANN.snapshots.length > 0) { ctx.putImageData(ANN.snapshots[0], 0, 0); ANN.snapshots = [ANN.snapshots[0]]; }
   });
-  document.getElementById('ann-cancel').addEventListener('click', () => { modal.remove(); });
+  document.getElementById('ann-cancel').addEventListener('click', closeModal);
   document.getElementById('ann-apply').addEventListener('click', () => {
-    const dataUrl = canvas.toDataURL('image/png');
+    let dataUrl;
+    try { dataUrl = canvas.toDataURL('image/png'); }
+    catch(err) { notify('⚠️ No se puede exportar: canvas tainted (' + err.message + ')'); return; }
     block.src = dataUrl;
-    if(block.type!=='paso')delete block.storagePath;
-    modal.remove();
-    if(block.type==='paso'){const _imgEl=document.querySelector('[data-id="'+block.id+'"] .b-paso-img');if(_imgEl){_imgEl.src=dataUrl;_imgEl.removeAttribute('data-path');_imgEl.classList.remove('lazy-img');}}else{render();}
+    // Keep storagePath for reference; render() checks block.src first
+    closeModal();
+    render();
     scheduleLocalSave();
     notify('✅ Anotación aplicada');
   });
 
-  // Keyboard shortcut: Escape = cancel, Ctrl+Z = undo
-  function onKeydown(e) {
-    if (e.key === 'Escape' && txtInput.style.display === 'none') { modal.remove(); document.removeEventListener('keydown', onKeydown); }
+  // ── Global keyboard ──
+  function _annKeydown(e) {
+    if (e.key === 'Escape') {
+      if (txtInput.style.display !== 'none') { txtInput.style.display = 'none'; txtInput.value = ''; }
+      else closeModal();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
       if (ANN.snapshots.length > 1) { ANN.snapshots.pop(); ctx.putImageData(ANN.snapshots[ANN.snapshots.length-1], 0, 0); }
       e.preventDefault();
     }
   }
-  document.addEventListener('keydown', onKeydown);
-  modal.addEventListener('remove', () => document.removeEventListener('keydown', onKeydown));
+  document.addEventListener('keydown', _annKeydown);
 }
 </script>
 </body>
