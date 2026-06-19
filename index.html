@@ -1252,7 +1252,7 @@ function render() {
         <button title="Subir" onclick="moveBlock(${i},-1,event)">↑</button>
         <button title="Bajar" onclick="moveBlock(${i},1,event)">↓</button>
         <button title="Color personalizado" onclick="openBlockColorPicker('${b.id}',event)" style="position:relative">🎨</button>
-        <button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
+        <button title="Anotar" onclick="openAnnotationEditor('${b.id}',event)" style="color:#2563EB">✏️</button><button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
         <button class="del" title="Eliminar" onclick="deleteBlock('${b.id}',event)">🗑</button>
       </div>
     </div>`;
@@ -2788,6 +2788,11 @@ function deletePage(id) {
   renderPagesPanel();
   scheduleLocalSave();
 }
+  let _pageDragId=null;
+  function onPageDragStart(e,id){_pageDragId=id;e.dataTransfer.effectAllowed='move';e.currentTarget.style.opacity='0.4';}
+  function onPageDragLeave(e){e.currentTarget.style.borderTop='';e.currentTarget.style.opacity='';}
+  function onPageDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.style.borderTop='2px solid var(--accent)';}
+  function onPageDrop(e,targetId){e.preventDefault();e.currentTarget.style.borderTop='';e.currentTarget.style.opacity='';if(!_pageDragId||_pageDragId===targetId){_pageDragId=null;return;}const from=STATE.pages.findIndex(p=>p.id===_pageDragId);const to=STATE.pages.findIndex(p=>p.id===targetId);if(from<0||to<0){_pageDragId=null;return;}const moved=STATE.pages.splice(from,1)[0];STATE.pages.splice(to,0,moved);_pageDragId=null;renderPagesPanel();scheduleLocalSave();}
 
 function switchPage(id) {
   if (STATE.activePage === id) return;
@@ -2821,8 +2826,8 @@ function renderPagesPanel() {
     return;
   }
   wrap.innerHTML = STATE.pages.map(p => `
-    <div class="page-item ${p.id === STATE.activePage ? 'active' : ''}" data-pageid="${p.id}" onclick="switchPage('${p.id}')">
-      <span class="page-item-icon">📄</span>
+    <div class="page-item ${p.id === STATE.activePage ? 'active' : ''}" data-pageid="${p.id}" draggable="true" ondragstart="onPageDragStart(event,'${p.id}')" ondragover="onPageDragOver(event)" ondrop="onPageDrop(event,'${p.id}')" ondragleave="onPageDragLeave(event)" onclick="switchPage('${p.id}')">
+      <span class="page-drag-handle" title="Arrastrar para reordenar" style="cursor:grab;opacity:.5;font-size:14px;margin-right:2px;user-select:none">☰</span><span class="page-item-icon">📄</span>
       <span class="page-item-title" contenteditable="true"
         onclick="event.stopPropagation()"
         onblur="renamePage('${p.id}',this.textContent.trim())"
