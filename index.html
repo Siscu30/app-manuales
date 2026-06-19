@@ -3342,7 +3342,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 .mp-nav li:hover{background:rgba(255,255,255,.08);color:#fff}
 .mp-nav li.active{background:rgba(255,255,255,.13);color:#fff;font-weight:500}
 .mp-content{flex:1;padding:32px 28px;display:flex;flex-direction:column;align-items:center}
-.mp-page{width:100%;max-width:760px;display:none}
+.mp-page{width:100%;max-width:760px;margin:0 auto;display:none};max-width:760px;display:none}
 .mp-page.active{display:block}
 /* hamburger for mobile nav */
 .mp-nav-toggle{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:2px 6px;margin-right:4px}
@@ -3920,19 +3920,25 @@ function openAnnotationEditor(blockId) {
     ctx.drawImage(img, 0, 0);
     ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
   };
-  img.onerror = () => {
-    // Try without crossOrigin (same-origin images)
-    const img2 = new Image();
-    img2.onload = () => {
-      canvas.width = img2.width;
-      canvas.height = img2.height;
-      ctx.drawImage(img2, 0, 0);
-      ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
-    };
-    img2.src = imgSrc;
-  };
-  img.src = imgSrc;
-
+        img.onerror = () => {
+            // Fallback: fetch as blob to bypass CORS canvas taint
+            fetch(imgSrc)
+                .then(r => r.blob())
+                .then(b => {
+                    const blobUrl = URL.createObjectURL(b);
+                    const img2 = new Image();
+                    img2.onload = () => {
+                        canvas.width = img2.width;
+                        canvas.height = img2.height;
+                        ctx.drawImage(img2, 0, 0);
+                        ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+                        URL.revokeObjectURL(blobUrl);
+                    };
+                    img2.src = blobUrl;
+                })
+                .catch(() => { notify('\u26a0\ufe0f No se pudo cargar la imagen para anotar'); modal.remove(); });
+        };
+        img.src = imgSrc;
   function getPos(e) {
     const r = canvas.getBoundingClientRect();
     const scaleX = canvas.width / r.width;
