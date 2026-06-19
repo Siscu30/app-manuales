@@ -4089,9 +4089,9 @@ function openAnnotationEditor(blockId) {
   document.getElementById('ann-apply').addEventListener('click', () => {
     const dataUrl = canvas.toDataURL('image/png');
     block.src = dataUrl;
-    delete block.storagePath;
+    if(block.type!=='paso')delete block.storagePath;
     modal.remove();
-    render();
+    if(block.type==='paso'){const _imgEl=document.querySelector('[data-id="'+block.id+'"] .b-paso-img');if(_imgEl){_imgEl.src=dataUrl;_imgEl.removeAttribute('data-path');_imgEl.classList.remove('lazy-img');}}else{render();}
     scheduleLocalSave();
     notify('✅ Anotación aplicada');
   });
