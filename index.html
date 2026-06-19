@@ -1262,6 +1262,7 @@ function render() {
         <button title="Subir" onclick="moveBlock(${i},-1,event)">↑</button>
         <button title="Bajar" onclick="moveBlock(${i},1,event)">↓</button>
         <button title="Color personalizado" onclick="openBlockColorPicker('${b.id}',event)" style="position:relative">🎨</button>
+        ${(b.type==='imagen'||b.type==='paso')&&(b.src||b.storagePath)?`<button title="Anotar imagen" onclick="openAnnotationEditor('${b.id}');event.stopPropagation()" style="color:#2563EB">✏️</button>`:''}
         <button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
         <button class="del" title="Eliminar" onclick="deleteBlock('${b.id}',event)">🗑</button>
       </div>
