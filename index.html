@@ -145,6 +145,21 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .paso-upload-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
 .img-uploading{opacity:.5;pointer-events:none}
 
+/* annotation modal */
+#annotationModal{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#1a1a1a;display:flex;flex-direction:column;overflow:hidden}
+.ann-toolbar{display:flex;align-items:center;gap:6px;padding:10px 14px;background:#242424;border-bottom:1px solid #3a3a3a;flex-wrap:wrap;flex-shrink:0}
+.ann-tool-btn{background:#2d2d2d;color:#e8e8e8;border:none;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:15px;transition:background .12s;line-height:1}
+.ann-tool-btn.active{background:#EA580C}
+.ann-tool-btn:hover:not(.active){background:#3a3a3a}
+.ann-divider{width:1px;height:26px;background:#444;flex-shrink:0;margin:0 2px}
+.ann-color-dot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0;transition:transform .1s}
+.ann-color-dot.active{border-color:#fff;transform:scale(1.15)}
+.ann-color-dot:hover{transform:scale(1.1)}
+.ann-lw-btn{background:#2d2d2d;color:#e8e8e8;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:13px;transition:background .12s}
+.ann-lw-btn.active{background:#2563EB}
+.ann-canvas-wrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:16px}
+.ann-text-input{position:fixed;background:transparent;border:none;outline:none;font-size:16px;font-weight:600;color:#FF0000;min-width:60px;caret-color:#fff;display:none;z-index:10000}
+
 /* block: imagen */
 .b-imagen{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;text-align:center;box-shadow:var(--shadow-sm)}
 .img-placeholder{padding:40px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;color:var(--text-muted);transition:all .15s}
@@ -832,16 +847,18 @@ const BLOCK_TYPES = {
     label: 'Imagen',
     defaultData: () => ({ storagePath:null, caption:'', width:'100%' }),
     render(b) {
+      const _annBtn = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}')" style="background:#2563EB;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✏️ Anotar</button>`;
+      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-top:1px solid var(--border);background:#fafafa"><div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}</div>`;
       if (b.src) {
         return `<div class="b-imagen block-inner">
           <img src="${b.src}" style="width:${b.width||'100%'};display:block" alt="${esc(b.alt||b.caption||'')}">
-          <div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div>
+          ${_capRow}
         </div>`;
       }
       if (b.storagePath) {
         return `<div class="b-imagen block-inner">
           <img src="" data-path="${b.storagePath}" class="lazy-img" style="width:${b.width||'100%'}" alt="${esc(b.caption||'')}">
-          <div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div>
+          ${_capRow}
         </div>`;
       }
       return `<div class="b-imagen block-inner">
@@ -3324,8 +3341,8 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 .mp-nav li{padding:9px 18px;font-size:13px;color:rgba(255,255,255,.65);cursor:pointer;border-radius:6px;margin:1px 8px;transition:all .15s}
 .mp-nav li:hover{background:rgba(255,255,255,.08);color:#fff}
 .mp-nav li.active{background:rgba(255,255,255,.13);color:#fff;font-weight:500}
-.mp-content{flex:1;padding:32px 28px}
-.mp-page{max-width:760px;margin:0 auto;display:none}
+.mp-content{flex:1;padding:32px 28px;display:flex;flex-direction:column;align-items:center}
+.mp-page{width:100%;max-width:760px;display:none}
 .mp-page.active{display:block}
 /* hamburger for mobile nav */
 .mp-nav-toggle{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:2px 6px;margin-right:4px}
@@ -3333,6 +3350,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
   .mp-nav{position:fixed;left:-260px;top:0;bottom:0;z-index:300;transition:left .25s;height:100vh}
   .mp-nav.open{left:0;box-shadow:4px 0 20px rgba(0,0,0,.3)}
   .mp-content{padding:20px 16px}
+  .mp-page{max-width:100%}
   .mp-nav-toggle{display:inline-block}
   #searchInput{width:140px}
   .mp-layout{flex-direction:column}
@@ -3835,6 +3853,249 @@ function _rgbToHex(rgb) {
     }
   });
 })();
+
+// ══ MÓDULO ANOTACIONES EN IMÁGENES ═══════════════════════════════════════
+function openAnnotationEditor(blockId) {
+  const block = STATE.blocks.find(b => b.id === blockId);
+  if (!block) return;
+
+  // Resolve image source from DOM if storagePath was lazy-loaded
+  let imgSrc = block.src || null;
+  if (!imgSrc && block.storagePath) {
+    const imgEl = document.querySelector(`[data-id="${blockId}"] img`);
+    if (imgEl && imgEl.src && imgEl.src !== window.location.href) imgSrc = imgEl.src;
+  }
+  if (!imgSrc) { notify('⚠️ No hay imagen cargada para anotar'); return; }
+
+  // Remove any existing modal
+  const existing = document.getElementById('annotationModal');
+  if (existing) existing.remove();
+
+  const COLORS = ['#FF0000','#FF8C00','#FFFF00','#00CC44','#2563EB','#7C3AED','#FFFFFF','#1a1a1a'];
+  const ANN = { tool:'arrow', color:'#FF0000', lw:3, drawing:false, startX:0, startY:0, snapshots:[] };
+
+  const colorDotsHTML = COLORS.map(c =>
+    `<div class="ann-color-dot${c===ANN.color?' active':''}" data-ann-color="${c}" style="background:${c}${c==='#FFFFFF'?';border-color:#999!important':''}" title="${c}"></div>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'annotationModal';
+  modal.innerHTML = `
+    <div class="ann-toolbar">
+      <button class="ann-tool-btn active" data-ann-tool="arrow" title="Flecha">➡️</button>
+      <button class="ann-tool-btn" data-ann-tool="rect" title="Rectángulo">⬜</button>
+      <button class="ann-tool-btn" data-ann-tool="circle" title="Círculo">⭕</button>
+      <button class="ann-tool-btn" data-ann-tool="line" title="Línea">↗️</button>
+      <button class="ann-tool-btn" data-ann-tool="text" title="Texto libre" style="font-weight:700;font-family:serif">T</button>
+      <div class="ann-divider"></div>
+      ${colorDotsHTML}
+      <div class="ann-divider"></div>
+      <button class="ann-lw-btn active" data-ann-lw="2" title="Fino">—</button>
+      <button class="ann-lw-btn" data-ann-lw="4" title="Medio">━</button>
+      <button class="ann-lw-btn" data-ann-lw="8" title="Grueso">▬</button>
+      <div class="ann-divider"></div>
+      <button class="ann-tool-btn" id="ann-undo" title="Deshacer (Ctrl+Z)">↩️</button>
+      <button class="ann-tool-btn" id="ann-clear" title="Limpiar todo">🗑️</button>
+      <div style="flex:1;min-width:8px"></div>
+      <button id="ann-cancel" style="background:#444;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px">Cancelar</button>
+      <button id="ann-apply" style="background:#16A34A;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:600;margin-left:6px">✅ Aplicar</button>
+    </div>
+    <div class="ann-canvas-wrap" id="annCanvasWrap">
+      <canvas id="annCanvas" style="cursor:crosshair;max-width:100%;max-height:calc(100vh - 70px);display:block;box-shadow:0 0 40px rgba(0,0,0,.6)"></canvas>
+    </div>
+    <input id="annTextInput" class="ann-text-input" type="text" placeholder="Escribe y presiona Enter…">
+  `;
+  document.body.appendChild(modal);
+
+  const canvas = document.getElementById('annCanvas');
+  const ctx = canvas.getContext('2d');
+  const txtInput = document.getElementById('annTextInput');
+
+  // Load image onto canvas
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  };
+  img.onerror = () => {
+    // Try without crossOrigin (same-origin images)
+    const img2 = new Image();
+    img2.onload = () => {
+      canvas.width = img2.width;
+      canvas.height = img2.height;
+      ctx.drawImage(img2, 0, 0);
+      ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    };
+    img2.src = imgSrc;
+  };
+  img.src = imgSrc;
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    const src = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    return { x: (src.clientX - r.left) * scaleX, y: (src.clientY - r.top) * scaleY };
+  }
+
+  function applyStyle() {
+    ctx.strokeStyle = ANN.color;
+    ctx.fillStyle = ANN.color;
+    ctx.lineWidth = ANN.lw;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+  }
+
+  function drawArrowShape(x1, y1, x2, y2) {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const len = Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+    const headLen = Math.max(14, Math.min(28, len * 0.32));
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - headLen * Math.cos(angle - 0.42), y2 - headLen * Math.sin(angle - 0.42));
+    ctx.lineTo(x2 - headLen * Math.cos(angle + 0.42), y2 - headLen * Math.sin(angle + 0.42));
+    ctx.closePath(); ctx.fill();
+  }
+
+  function previewDraw(x, y) {
+    if (!ANN.snapshots.length) return;
+    ctx.putImageData(ANN.snapshots[ANN.snapshots.length - 1], 0, 0);
+    applyStyle();
+    const dx = x - ANN.startX, dy = y - ANN.startY;
+    if (ANN.tool === 'arrow') {
+      drawArrowShape(ANN.startX, ANN.startY, x, y);
+    } else if (ANN.tool === 'rect') {
+      ctx.strokeRect(ANN.startX, ANN.startY, dx, dy);
+    } else if (ANN.tool === 'circle') {
+      const rx = Math.abs(dx)/2, ry = Math.abs(dy)/2;
+      ctx.beginPath();
+      ctx.ellipse(ANN.startX + dx/2, ANN.startY + dy/2, Math.max(1,rx), Math.max(1,ry), 0, 0, Math.PI*2);
+      ctx.stroke();
+    } else if (ANN.tool === 'line') {
+      ctx.beginPath(); ctx.moveTo(ANN.startX, ANN.startY); ctx.lineTo(x, y); ctx.stroke();
+    }
+  }
+
+  function commitDraw() {
+    ANN.snapshots.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  }
+
+  canvas.addEventListener('mousedown', e => {
+    if (ANN.tool === 'text') return;
+    ANN.drawing = true;
+    const p = getPos(e); ANN.startX = p.x; ANN.startY = p.y;
+    e.preventDefault();
+  });
+  canvas.addEventListener('mousemove', e => {
+    if (!ANN.drawing) return;
+    const p = getPos(e); previewDraw(p.x, p.y);
+  });
+  canvas.addEventListener('mouseup', e => {
+    if (!ANN.drawing) return;
+    ANN.drawing = false;
+    const p = getPos(e); previewDraw(p.x, p.y); commitDraw();
+  });
+  canvas.addEventListener('mouseleave', () => { if (ANN.drawing) { ANN.drawing = false; commitDraw(); } });
+
+  canvas.addEventListener('touchstart', e => {
+    if (ANN.tool === 'text') return;
+    ANN.drawing = true;
+    const p = getPos(e); ANN.startX = p.x; ANN.startY = p.y;
+    e.preventDefault();
+  }, { passive:false });
+  canvas.addEventListener('touchmove', e => {
+    if (!ANN.drawing) return;
+    const p = getPos(e); previewDraw(p.x, p.y); e.preventDefault();
+  }, { passive:false });
+  canvas.addEventListener('touchend', () => { if (ANN.drawing) { ANN.drawing = false; commitDraw(); } });
+
+  canvas.addEventListener('click', e => {
+    if (ANN.tool !== 'text') return;
+    const r = canvas.getBoundingClientRect();
+    txtInput.style.display = 'block';
+    txtInput.style.left = (e.clientX + 2) + 'px';
+    txtInput.style.top = (e.clientY - 20) + 'px';
+    txtInput.style.color = ANN.color;
+    txtInput.style.fontSize = Math.max(16, ANN.lw * 5) + 'px';
+    txtInput.dataset.px = String((e.clientX - r.left) * canvas.width / r.width);
+    txtInput.dataset.py = String((e.clientY - r.top) * canvas.height / r.height);
+    txtInput.value = '';
+    setTimeout(() => txtInput.focus(), 10);
+  });
+
+  txtInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const text = txtInput.value.trim();
+      if (text) {
+        applyStyle();
+        ctx.font = `600 ${Math.max(16, ANN.lw * 5)}px Inter, Arial, sans-serif`;
+        ctx.fillText(text, parseFloat(txtInput.dataset.px), parseFloat(txtInput.dataset.py));
+        commitDraw();
+      }
+      txtInput.style.display = 'none'; txtInput.value = '';
+    }
+    if (e.key === 'Escape') { txtInput.style.display = 'none'; txtInput.value = ''; }
+    e.stopPropagation();
+  });
+
+  // Toolbar interactions
+  modal.addEventListener('click', e => {
+    const toolBtn = e.target.closest('[data-ann-tool]');
+    if (toolBtn) {
+      modal.querySelectorAll('[data-ann-tool]').forEach(b => b.classList.remove('active'));
+      toolBtn.classList.add('active');
+      ANN.tool = toolBtn.dataset.annTool;
+      canvas.style.cursor = ANN.tool === 'text' ? 'text' : 'crosshair';
+      return;
+    }
+    const colorDot = e.target.closest('[data-ann-color]');
+    if (colorDot) {
+      modal.querySelectorAll('[data-ann-color]').forEach(d => d.classList.remove('active'));
+      colorDot.classList.add('active');
+      ANN.color = colorDot.dataset.annColor;
+      return;
+    }
+    const lwBtn = e.target.closest('[data-ann-lw]');
+    if (lwBtn) {
+      modal.querySelectorAll('[data-ann-lw]').forEach(b => b.classList.remove('active'));
+      lwBtn.classList.add('active');
+      ANN.lw = parseInt(lwBtn.dataset.annLw);
+      return;
+    }
+  });
+
+  document.getElementById('ann-undo').addEventListener('click', () => {
+    if (ANN.snapshots.length > 1) { ANN.snapshots.pop(); ctx.putImageData(ANN.snapshots[ANN.snapshots.length-1], 0, 0); }
+  });
+  document.getElementById('ann-clear').addEventListener('click', () => {
+    if (ANN.snapshots.length > 0) { ctx.putImageData(ANN.snapshots[0], 0, 0); ANN.snapshots = [ANN.snapshots[0]]; }
+  });
+  document.getElementById('ann-cancel').addEventListener('click', () => { modal.remove(); });
+  document.getElementById('ann-apply').addEventListener('click', () => {
+    const dataUrl = canvas.toDataURL('image/png');
+    block.src = dataUrl;
+    delete block.storagePath;
+    modal.remove();
+    render();
+    scheduleLocalSave();
+    notify('✅ Anotación aplicada');
+  });
+
+  // Keyboard shortcut: Escape = cancel, Ctrl+Z = undo
+  function onKeydown(e) {
+    if (e.key === 'Escape' && txtInput.style.display === 'none') { modal.remove(); document.removeEventListener('keydown', onKeydown); }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      if (ANN.snapshots.length > 1) { ANN.snapshots.pop(); ctx.putImageData(ANN.snapshots[ANN.snapshots.length-1], 0, 0); }
+      e.preventDefault();
+    }
+  }
+  document.addEventListener('keydown', onKeydown);
+  modal.addEventListener('remove', () => document.removeEventListener('keydown', onKeydown));
+}
 </script>
 </body>
 </html>
