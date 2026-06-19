@@ -351,6 +351,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 /* ── IMPORT MODAL ── */
 .import-row:hover{background:rgba(255,255,255,.06)}
 .import-row:last-child{border-bottom:none!important}
+/* unified import tabs */
+.import-tab{background:transparent;border:none;border-bottom:2px solid transparent;padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;color:var(--ui-text-muted);transition:all .15s;margin-bottom:-2px;font-family:inherit}
+.import-tab.active,.import-tab:hover{color:var(--ui-text);border-bottom-color:var(--primary)}
+.import-tab.active{font-weight:600;color:var(--ui-text)}
 </style>
 </head>
 <body>
@@ -392,6 +396,17 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <span class="sid-brand">Manuales</span>
   </div>
 
+  <div class="sb-section">Manuales</div>
+  <div class="sid-chips">
+    <button class="block-btn" onclick="nuevoManual()"><span class="icon">📄</span>Nuevo</button>
+    <button class="block-btn" onclick="guardar()"><span class="icon">💾</span>Guardar</button>
+    <button class="block-btn" onclick="openMisManuals()"><span class="icon">📂</span>Manuales</button>
+    <button class="block-btn" onclick="openUnifiedImportModal()"><span class="icon">📥</span>Importar</button>
+    <button class="block-btn" onclick="openTemplatesModal()"><span class="icon">📋</span>Plantillas</button>
+    <button class="block-btn" onclick="openVersionHistory()"><span class="icon">🕐</span>Historial</button>
+  </div>
+
+  <hr class="sid-divider">
   <div class="sb-section">Bloques</div>
   <div class="sid-chips">
     <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><span class="icon">📑</span>Título</button>
@@ -408,16 +423,6 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><span class="icon">🔗</span>Enlace</button>
     <button class="block-btn" onclick="addBlock('codigo')" draggable="true" data-type="codigo"><span class="icon">💻</span>Código</button>
   </div>
-
-  <hr class="sid-divider">
-  <div class="sb-section">Manuales</div>
-  <button class="sid-action" onclick="nuevoManual()"><span class="icon">＋</span>Nuevo manual</button>
-  <button class="sid-action" onclick="guardar()"><span class="icon">💾</span>Guardar</button>
-  <button class="sid-action" onclick="openMisManuals()"><span class="icon">📂</span>Mis manuales</button>
-  <button class="sid-action" onclick="triggerImportHTML()"><span class="icon">📥</span>Importar HTML</button>
-  <button class="sid-action" onclick="openImportModal()"><span class="icon">📄</span>Importar PDF/Word</button>
-  <button class="sid-action" onclick="openTemplatesModal()"><span class="icon">📋</span>Plantillas</button>
-  <button class="sid-action" onclick="openVersionHistory()"><span class="icon">📜</span>Historial</button>
 
   <hr class="sid-divider">
   <div class="sb-pages-header" onclick="togglePagesPanel()">
@@ -607,6 +612,52 @@ input,textarea,select{font-family:inherit;font-size:14px}
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-templates')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Unified Import Modal -->
+<div class="modal-backdrop hidden" id="modal-import-unified">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>📥 Importar manual</h3>
+      <button class="modal-close" onclick="closeModal('modal-import-unified')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--panel-border)">
+        <button id="uitab-pdf" class="import-tab active" onclick="switchImportTab('pdf')">📄 PDF</button>
+        <button id="uitab-docx" class="import-tab" onclick="switchImportTab('docx')">📝 Word</button>
+        <button id="uitab-html" class="import-tab" onclick="switchImportTab('html')">🌐 HTML</button>
+      </div>
+      <div id="uisec-pdf">
+        <div class="form-group">
+          <label class="form-label">Selecciona un archivo PDF</label>
+          <input type="file" id="ui-import-file-pdf" accept=".pdf" class="form-input" onchange="handleUnifiedFileSelect(this,'pdf')" style="padding:6px">
+          <p style="font-size:12px;color:var(--ui-text-muted);margin-top:4px" id="ui-import-name-pdf">Selecciona un archivo .pdf</p>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:var(--ui-text)">
+          <input type="checkbox" id="ui-import-pages"> Importar como páginas separadas (H1 = nueva página)
+        </label>
+      </div>
+      <div id="uisec-docx" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Selecciona un archivo Word</label>
+          <input type="file" id="ui-import-file-docx" accept=".docx" class="form-input" onchange="handleUnifiedFileSelect(this,'docx')" style="padding:6px">
+          <p style="font-size:12px;color:var(--ui-text-muted);margin-top:4px" id="ui-import-name-docx">Selecciona un archivo .docx</p>
+        </div>
+      </div>
+      <div id="uisec-html" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Selecciona un archivo HTML</label>
+          <input type="file" id="ui-import-file-html" accept=".html,.htm" class="form-input" onchange="handleUnifiedFileSelect(this,'html')" style="padding:6px">
+          <p style="font-size:12px;color:var(--ui-text-muted);margin-top:4px" id="ui-import-name-html">Selecciona un archivo .html</p>
+        </div>
+      </div>
+      <div id="ui-import-preview" style="margin-top:16px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="ui-import-confirm" onclick="confirmUnifiedImport()" style="display:none">✅ Confirmar importación</button>
+      <button class="btn" onclick="closeModal('modal-import-unified')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -3019,6 +3070,103 @@ function importAsPages(blocks) {
   render();
   scheduleLocalSave();
   notify(`✅ Importado como ${pages.length} página(s)`);
+}
+
+// ─── UNIFIED IMPORT MODAL ───────────────────────────────
+let _unifiedImportBlocks = [];
+
+function openUnifiedImportModal() {
+  document.getElementById('modal-import-unified').classList.remove('hidden');
+  _unifiedImportBlocks = [];
+  switchImportTab('pdf');
+  ['pdf','docx','html'].forEach(t => {
+    const inp = document.getElementById('ui-import-file-' + t);
+    if (inp) inp.value = '';
+    const nm = document.getElementById('ui-import-name-' + t);
+    if (nm) nm.textContent = 'Selecciona un archivo .' + t;
+  });
+  const prev = document.getElementById('ui-import-preview');
+  if (prev) prev.innerHTML = '';
+  const btn = document.getElementById('ui-import-confirm');
+  if (btn) btn.style.display = 'none';
+  const pagesCheck = document.getElementById('ui-import-pages');
+  if (pagesCheck) pagesCheck.checked = false;
+}
+
+function switchImportTab(type) {
+  ['pdf','docx','html'].forEach(t => {
+    const sec = document.getElementById('uisec-' + t);
+    const tab = document.getElementById('uitab-' + t);
+    if (sec) sec.style.display = t === type ? 'block' : 'none';
+    if (tab) tab.className = 'import-tab' + (t === type ? ' active' : '');
+  });
+  const prev = document.getElementById('ui-import-preview');
+  if (prev) prev.innerHTML = '';
+  const btn = document.getElementById('ui-import-confirm');
+  if (btn) btn.style.display = 'none';
+  _unifiedImportBlocks = [];
+}
+
+async function handleUnifiedFileSelect(input, type) {
+  const file = input.files[0];
+  if (!file) return;
+  const nm = document.getElementById('ui-import-name-' + type);
+  if (nm) nm.textContent = file.name;
+  const prev = document.getElementById('ui-import-preview');
+  const btn = document.getElementById('ui-import-confirm');
+  prev.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ui-text-muted)"><div class="spinner" style="margin:0 auto 10px;border-top-color:var(--primary)"></div>Procesando…</div>';
+  btn.style.display = 'none';
+  _unifiedImportBlocks = [];
+  try {
+    const ab = await file.arrayBuffer();
+    if (type === 'pdf') {
+      _unifiedImportBlocks = await parsePDFtoBlocks(ab);
+    } else if (type === 'docx') {
+      _unifiedImportBlocks = await parseDOCXtoBlocks(ab);
+    } else {
+      const text = await file.text();
+      _unifiedImportBlocks = htmlToImportBlocks(text);
+    }
+    showUnifiedPreview(_unifiedImportBlocks);
+  } catch(e) {
+    prev.innerHTML = `<div style="color:#f87171;padding:12px;background:rgba(239,68,68,.1);border-radius:8px">❌ Error: ${esc(e.message||String(e))}</div>`;
+  }
+}
+
+function showUnifiedPreview(blocks) {
+  const prev = document.getElementById('ui-import-preview');
+  const btn = document.getElementById('ui-import-confirm');
+  if (!blocks.length) {
+    prev.innerHTML = '<div style="color:var(--ui-text-muted);padding:12px;text-align:center">No se encontraron bloques en el archivo.</div>';
+    btn.style.display = 'none';
+    return;
+  }
+  const typeNames = {titulo:'Título',paso:'Paso',texto:'Texto',callout:'Callout',alerta:'Alerta',lista:'Lista',tabla:'Tabla',imagen:'Imagen',separador:'Sep.',flujos:'Flujos',video:'Vídeo',enlace:'Enlace',codigo:'Código'};
+  const counts = {};
+  blocks.forEach(b => { counts[b.type] = (counts[b.type]||0)+1; });
+  const tags = Object.entries(counts).map(([t,n]) => `<span style="background:rgba(255,255,255,.1);padding:3px 10px;border-radius:12px;font-size:12px">${typeNames[t]||t} ×${n}</span>`).join('');
+  prev.innerHTML = `<div style="background:rgba(255,255,255,.05);border:1px solid var(--panel-border);border-radius:8px;padding:14px 16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--ui-text)">✅ ${blocks.length} bloques detectados</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${tags}</div>
+  </div>`;
+  btn.style.display = '';
+}
+
+function confirmUnifiedImport() {
+  const blocks = _unifiedImportBlocks;
+  if (!blocks.length) { notify('No hay bloques para importar'); return; }
+  const asPages = document.getElementById('ui-import-pages')?.checked;
+  pushHistory();
+  const clean = blocks.map((b,i)=>({...b, id:uid(), order:STATE.blocks.length+i}));
+  if (asPages) {
+    importAsPages(clean);
+  } else {
+    STATE.blocks.push(...clean);
+    render();
+    scheduleLocalSave();
+    notify(`✅ Importados ${clean.length} bloques`);
+  }
+  closeModal('modal-import-unified');
 }
 
 // ═══════════════════════════════════════════════════════
