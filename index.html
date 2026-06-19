@@ -819,7 +819,7 @@ const BLOCK_TYPES = {
     label: 'Paso numerado',
     defaultData: () => ({ titulo:'Título del paso', descripcion:'Describe el paso...', storagePath:null, caption:'' }),
     render(b, pasoN) {
-      const imgHTML = b.storagePath
+      const imgHTML = b.src ? `<div class="b-paso-img-wrap"><img src="${b.src}" class="b-paso-img" style="width:100%;display:block" alt="${esc(b.caption||'')}"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div></div>` : b.storagePath ?
         ? `<div class="b-paso-img-wrap">
              <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" alt="${esc(b.caption||'')}">
              <div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)">${esc(b.caption||'')}</div>
