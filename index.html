@@ -1834,6 +1834,7 @@ function localSave() {
     empresa: q('#manual-empresa').value
   };
   try { localStorage.setItem('manual_draft_' + (STATE.manual.id||'guest'), JSON.stringify(data)); } catch(e){}
+  if (STATE.manual.id) { try { localStorage.setItem('last_manual_id', STATE.manual.id); } catch(e){} }
 }
 function loadLocalDraft(id) {
   try {
@@ -1896,6 +1897,7 @@ async function guardar() {
 
     STATE.manual.id = result.data.id;
     STATE.manual.estado = result.data.estado;
+    try { localStorage.setItem('last_manual_id', STATE.manual.id); } catch(e){}
     localSave();
     setSaveStatus('✓ Guardado');
     STATE.isDirty = false;
@@ -1921,13 +1923,21 @@ async function openMisManuals() {
     const { data, error } = await query;
     if (error) throw error;
     if (!data.length) { list.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:20px">No hay manuales guardados</p>'; return; }
-    list.innerHTML = data.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px;cursor:pointer" onclick="loadManual('${m.id}')">
-      <div>
-        <div style="font-weight:600;font-size:14px">${esc(m.titulo||'Sin título')}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${esc(m.empresa||'')} · ${new Date(m.updated_at).toLocaleDateString('es')}</div>
-      </div>
-      <span class="badge ${m.estado||'borrador'}">${m.estado||'borrador'}</span>
-    </div>`).join('');
+    list.innerHTML = data.map(m=>{
+      const isActive = STATE.manual.id === m.id;
+      const dateStr = new Date(m.updated_at).toLocaleString('es',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      return `<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid ${isActive?'var(--primary)':'var(--border)'};border-radius:6px;margin-bottom:8px;background:${isActive?'rgba(37,99,235,.05)':''}">
+        <div style="flex:1;min-width:0;cursor:pointer" onclick="loadManual('${m.id}')">
+          <div style="font-weight:600;font-size:14px;${isActive?'color:var(--primary)':''}">
+            ${isActive?'▶ ':''}${esc(m.titulo||'Sin título')}
+          </div>
+          <div style="font-size:12px;color:var(--text-muted)">${esc(m.empresa||'')} · ${dateStr}</div>
+        </div>
+        <span class="badge ${m.estado||'borrador'}" style="flex-shrink:0">${m.estado||'borrador'}</span>
+        <button class="btn" style="font-size:11px;padding:3px 8px;flex-shrink:0" title="Historial de versiones" onclick="openVersionHistoryFor('${m.id}');event.stopPropagation()">🕐</button>
+        <button class="btn" style="font-size:11px;padding:3px 8px;flex-shrink:0;color:#dc2626" title="Eliminar manual" onclick="deleteManual('${m.id}','${esc(m.titulo||'Sin título')}');event.stopPropagation()">🗑</button>
+      </div>`;
+    }).join('');
   } catch(e) { list.innerHTML=`<p style="color:#dc2626;padding:20px">Error: ${e.message}</p>`; }
 }
 
@@ -1974,6 +1984,7 @@ async function nuevoManual() {
   STATE.history = [];
   STATE.historyIdx = -1;
   STATE.isDirty = false;
+  try { localStorage.removeItem('last_manual_id'); } catch(e){}
   q('#manual-titulo').value = 'Nuevo manual';
   q('#manual-empresa').value = '';
   setColor('#2563EB');
@@ -2102,7 +2113,7 @@ function blobToBase64(blob) {
 
 function renderBlockForExport(b, pasoN) {
   const color = STATE.manual.color || '#2563EB';
-  const imgTag = src => src ? `<img src="${src}" style="width:100%;display:block" alt="">` : '';
+  const imgTag = src => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:100%;display:block" alt="">` : '';
   const blockStyle = (b.blockBorderColor || b.blockBgColor)
     ? ` data-custom-colors="1"` : '';
   const wrapStyle = b.blockBgColor ? `background:${b.blockBgColor};` : '';
@@ -2249,6 +2260,31 @@ function switchVideoTab(t) {
   if (vtype) vtype.value = t;
 }
 
+function _lbCSS() {
+  return `.lb-img{cursor:zoom-in;display:block;width:100%}
+.lb-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;align-items:center;justify-content:center;overflow:auto;padding:16px;box-sizing:border-box;cursor:zoom-out}
+.lb-ov.open{display:flex}
+.lb-ov.zoomed{align-items:flex-start;cursor:default}
+.lb-full{max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);object-fit:contain;border-radius:4px;cursor:zoom-in;flex-shrink:0;box-shadow:0 8px 48px rgba(0,0,0,.7);transition:none}
+.lb-full.zoomed{max-width:none;max-height:none;width:auto;height:auto;cursor:zoom-out}
+.lb-cls{position:fixed;top:14px;right:18px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer;z-index:1}
+.lb-cls:hover{background:rgba(255,255,255,.35)}
+.lb-hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.55);font-size:12px;pointer-events:none;white-space:nowrap}`;
+}
+function _lbHTML() {
+  return `<div class="lb-ov" id="lb-ov" onclick="if(event.target===this)_lbClose()">
+  <button class="lb-cls" onclick="_lbClose()">×</button>
+  <img class="lb-full" id="lb-img" src="" onclick="_lbZoom()" alt="">
+  <div class="lb-hint" id="lb-hint">Clic para ampliar · Esc para cerrar</div>
+</div>`;
+}
+function _lbJS() {
+  return `function _lbOpen(src){document.getElementById('lb-ov').classList.add('open');document.getElementById('lb-img').src=src;document.getElementById('lb-img').classList.remove('zoomed');document.getElementById('lb-ov').classList.remove('zoomed');document.addEventListener('keydown',_lbKey);}
+function _lbClose(){document.getElementById('lb-ov').classList.remove('open','zoomed');document.getElementById('lb-img').classList.remove('zoomed');document.removeEventListener('keydown',_lbKey);}
+function _lbZoom(){const z=document.getElementById('lb-img').classList.toggle('zoomed');document.getElementById('lb-ov').classList.toggle('zoomed',z);document.getElementById('lb-hint').textContent=z?'Clic para reducir · Esc para cerrar':'Clic para ampliar · Esc para cerrar';}
+function _lbKey(e){if(e.key==='Escape')_lbClose();}`;
+}
+
 function buildExportHTML(titulo, empresa, color, body) {
   return `<!DOCTYPE html>
 <html lang="es">
@@ -2265,6 +2301,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;padding:0}
 .header .empresa{opacity:.85;margin-top:4px}
 .content{max-width:800px;margin:0 auto;padding:32px 24px}
 @media print{body{background:#fff}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+${_lbCSS()}
 </style>
 </head>
 <body>
@@ -2276,6 +2313,8 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;padding:0}
 <div class="content">
 ${body}
 </div>
+${_lbHTML()}
+<script>${_lbJS()}<\/script>
 </body>
 </html>`;
 }
@@ -3509,6 +3548,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 }
 /* block styles (same as single-page export) */
 @media print{.mp-header,.mp-nav,.mp-nav-toggle{display:none!important}.mp-content{padding:0}.mp-page{display:block!important}}
+${_lbCSS()}
 </style>
 </head>
 <body>
@@ -3619,7 +3659,9 @@ function goToResult(i) {
     setTimeout(() => { el.style.outline = orig; el.style.borderRadius = ''; }, 2000);
   } catch(e) {}
 }
+${_lbJS()}
 <\/script>
+${_lbHTML()}
 </body>
 </html>`;
 }
@@ -3653,7 +3695,8 @@ async function handleSession(session) {
     applyRoleUI(STATE.role);
 
     // Load local draft for the current manual if any
-    const draft = loadLocalDraft(STATE.manual.id || 'guest');
+    const lastId = localStorage.getItem('last_manual_id');
+    const draft = loadLocalDraft(lastId || STATE.manual.id || 'guest');
     if (draft && !STATE.blocks.length) {
       STATE.blocks = draft.blocks || [];
       STATE.pages = draft.pages || [];
@@ -3752,6 +3795,35 @@ async function restoreVersion(id) {
     closeModal('modal-versions');
     notify('✅ Versión restaurada');
   } catch(e) { notify('❌ Error al restaurar: ' + (e.message||e)); }
+}
+
+async function openVersionHistoryFor(manualId) {
+  if (!STATE.user) return;
+  if (manualId !== STATE.manual.id) {
+    await loadManual(manualId);
+    setTimeout(() => openVersionHistory(), 150);
+  } else {
+    openVersionHistory();
+  }
+}
+
+async function deleteManual(id, titulo) {
+  if (!confirm(`¿Eliminar el manual "${titulo}"?\nEsta acción no se puede deshacer.`)) return;
+  try {
+    const { error } = await sb.from('manuales').delete().eq('id', id);
+    if (error) throw error;
+    if (STATE.manual.id === id) {
+      STATE.manual = { id:null, titulo:'Nuevo manual', empresa:'', color:'#2563EB', estado:'borrador' };
+      STATE.blocks = []; STATE.pages = []; STATE.activePage = null; STATE.isDirty = false;
+      try { localStorage.removeItem('last_manual_id'); } catch(e){}
+      q('#manual-titulo').value = 'Nuevo manual';
+      q('#manual-empresa').value = '';
+      setColor('#2563EB');
+      render(); renderPagesPanel(); setSaveStatus('');
+    }
+    notify('🗑 Manual eliminado');
+    openMisManuals();
+  } catch(e) { notify('❌ Error al eliminar: ' + (e.message||e), 4000); }
 }
 
 function openTemplatesModal() { openModal('modal-templates'); }
