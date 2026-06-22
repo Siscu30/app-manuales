@@ -1583,12 +1583,12 @@ async function uploadBlockImage(input, blockId) {
     const blob = await resizeImage(file);
     const safeBlob = blob || file;
 
-    // Step 2: ALWAYS convert to data URL — image shows immediately, no signed URL needed
+    // Step 2: ALWAYS convert to data URL from original file — guarantees correct MIME type
     const dataUrl = await new Promise((resolve, reject) => {
       const fr = new FileReader();
       fr.onload = e => resolve(e.target.result);
       fr.onerror = () => reject(new Error('No se pudo leer el archivo'));
-      fr.readAsDataURL(safeBlob);
+      fr.readAsDataURL(file);
     });
 
     // Step 3: show image right now
@@ -1601,7 +1601,7 @@ async function uploadBlockImage(input, blockId) {
 
     // Step 4: also upload to Supabase Storage silently (for cross-device sync)
     try {
-      const ext = safeBlob.type === 'image/png' ? 'png' : 'jpg';
+      const ext = file.type === 'image/png' ? 'png' : 'jpg';
       const manualId = STATE.manual.id || 'guest';
       const storagePath = `${STATE.user.id}/${manualId}/${blockId}/${Date.now()}.${ext}`;
       const { error: upErr } = await sb.storage.from('manual-images').upload(storagePath, safeBlob, { contentType: safeBlob.type, upsert: true });
