@@ -1574,18 +1574,19 @@ async function uploadBlockImage(input, blockId) {
   if (!STATE.user) { notify('⚠️ Guarda el manual primero para subir imágenes'); return; }
   const block = STATE.blocks.find(b=>b.id===blockId); if (!block) return;
 
-  // Show uploading state
   const wrap = document.querySelector(`[data-id="${blockId}"]`);
   if (wrap) wrap.classList.add('img-uploading');
   setSaveStatus('Subiendo imagen...');
 
+  let safeBlob;
   try {
     const blob = await resizeImage(file);
-    const ext = blob.type==='image/png'?'png':'jpg';
+    safeBlob = blob || file;  // canvas.toBlob can return null for some PNGs
+    const ext = safeBlob.type === 'image/png' ? 'png' : 'jpg';
     const manualId = STATE.manual.id || 'guest';
     const storagePath = `${STATE.user.id}/${manualId}/${blockId}/${Date.now()}.${ext}`;
 
-    const { error } = await sb.storage.from('manual-images').upload(storagePath, blob, { contentType: blob.type, upsert: true });
+    const { error } = await sb.storage.from('manual-images').upload(storagePath, safeBlob, { contentType: safeBlob.type, upsert: true });
     if (error) throw error;
 
     block.storagePath = storagePath;
@@ -1594,9 +1595,24 @@ async function uploadBlockImage(input, blockId) {
     setSaveStatus('');
     notify('✅ Imagen subida');
   } catch(e) {
-    setSaveStatus('');
-    notify('❌ Error al subir imagen: ' + (e.message||e));
-    if (wrap) wrap.classList.remove('img-uploading');
+    // Fallback: store image as inline data URL so it always shows
+    const fb = safeBlob || file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      block.src = ev.target.result;
+      if (wrap) wrap.classList.remove('img-uploading');
+      render();
+      scheduleLocalSave();
+      setSaveStatus('');
+      notify('✅ Imagen añadida');
+    };
+    reader.onerror = () => {
+      if (wrap) wrap.classList.remove('img-uploading');
+      setSaveStatus('');
+      render();
+      notify('❌ Error al cargar imagen');
+    };
+    reader.readAsDataURL(fb);
   }
 }
 
