@@ -1576,43 +1576,43 @@ async function uploadBlockImage(input, blockId) {
 
   const wrap = document.querySelector(`[data-id="${blockId}"]`);
   if (wrap) wrap.classList.add('img-uploading');
-  setSaveStatus('Subiendo imagen...');
+  setSaveStatus('Procesando imagen...');
 
-  let safeBlob;
   try {
+    // Step 1: resize
     const blob = await resizeImage(file);
-    safeBlob = blob || file;  // canvas.toBlob can return null for some PNGs
-    const ext = safeBlob.type === 'image/png' ? 'png' : 'jpg';
-    const manualId = STATE.manual.id || 'guest';
-    const storagePath = `${STATE.user.id}/${manualId}/${blockId}/${Date.now()}.${ext}`;
+    const safeBlob = blob || file;
 
-    const { error } = await sb.storage.from('manual-images').upload(storagePath, safeBlob, { contentType: safeBlob.type, upsert: true });
-    if (error) throw error;
+    // Step 2: ALWAYS convert to data URL — image shows immediately, no signed URL needed
+    const dataUrl = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = e => resolve(e.target.result);
+      fr.onerror = () => reject(new Error('No se pudo leer el archivo'));
+      fr.readAsDataURL(safeBlob);
+    });
 
-    block.storagePath = storagePath;
+    // Step 3: show image right now
+    block.src = dataUrl;
+    if (wrap) wrap.classList.remove('img-uploading');
     render();
     scheduleLocalSave();
     setSaveStatus('');
-    notify('✅ Imagen subida');
+    notify('✅ Imagen añadida');
+
+    // Step 4: also upload to Supabase Storage silently (for cross-device sync)
+    try {
+      const ext = safeBlob.type === 'image/png' ? 'png' : 'jpg';
+      const manualId = STATE.manual.id || 'guest';
+      const storagePath = `${STATE.user.id}/${manualId}/${blockId}/${Date.now()}.${ext}`;
+      const { error: upErr } = await sb.storage.from('manual-images').upload(storagePath, safeBlob, { contentType: safeBlob.type, upsert: true });
+      if (!upErr) { block.storagePath = storagePath; scheduleLocalSave(); }
+    } catch(_) {}
+
   } catch(e) {
-    // Fallback: store image as inline data URL so it always shows
-    const fb = safeBlob || file;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      block.src = ev.target.result;
-      if (wrap) wrap.classList.remove('img-uploading');
-      render();
-      scheduleLocalSave();
-      setSaveStatus('');
-      notify('✅ Imagen añadida');
-    };
-    reader.onerror = () => {
-      if (wrap) wrap.classList.remove('img-uploading');
-      setSaveStatus('');
-      render();
-      notify('❌ Error al cargar imagen');
-    };
-    reader.readAsDataURL(fb);
+    if (wrap) wrap.classList.remove('img-uploading');
+    setSaveStatus('');
+    render();
+    notify('❌ Error al cargar imagen: ' + (e.message || e));
   }
 }
 
