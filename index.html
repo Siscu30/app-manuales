@@ -139,7 +139,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .paso-desc{font-size:14px;color:#374151;line-height:1.5}
 .b-paso-img{width:100%;display:block}
 .b-paso-img-wrap{position:relative}
-.b-paso-img-wrap img{width:100%;display:block;border-top:1px solid var(--border)}
+.b-paso-img-wrap img{width:100%;display:block;border-top:1px solid var(--border);cursor:zoom-in}
 .paso-caption{font-size:12px;color:var(--text-muted);padding:6px 16px;border-top:1px solid var(--border);background:#fafafa}
 .paso-upload-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 16px 16px;padding:10px;border:2px dashed var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-muted);transition:all .15s}
 .paso-upload-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
@@ -167,8 +167,16 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .img-placeholder{padding:40px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;color:var(--text-muted);transition:all .15s}
 .img-placeholder:hover{background:var(--primary-light);color:var(--primary)}
 .img-placeholder svg{width:32px;height:32px;opacity:.5}
-.b-imagen img{width:100%;display:block}
+.b-imagen img{width:100%;display:block;cursor:zoom-in}
 .img-caption{font-size:12px;color:var(--text-muted);padding:6px 12px;border-top:1px solid var(--border);background:#fafafa}
+#lightbox-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:9999;align-items:center;justify-content:center;overflow:auto;padding:16px;box-sizing:border-box;cursor:zoom-out}
+#lightbox-overlay.active{display:flex}
+#lightbox-overlay.lb-zoomed{align-items:flex-start;cursor:default}
+#lightbox-img{max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);object-fit:contain;border-radius:4px;cursor:zoom-in;flex-shrink:0;box-shadow:0 8px 48px rgba(0,0,0,.7)}
+#lightbox-img.lb-zoomed{max-width:none;max-height:none;width:auto;height:auto;cursor:zoom-out}
+#lightbox-close{position:fixed;top:14px;right:18px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;transition:background .15s}
+#lightbox-close:hover{background:rgba(255,255,255,.35)}
+#lightbox-hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:12px;pointer-events:none;white-space:nowrap}
 
 /* block: tabla */
 .b-tabla{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm)}
@@ -822,16 +830,17 @@ const BLOCK_TYPES = {
     defaultData: () => ({ titulo:'Título del paso', descripcion:'Describe el paso...', storagePath:null, caption:'' }),
     render(b, pasoN) {
       const _annBtn = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}')" style="background:#2563EB;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6" title="Anotar imagen">✏️</button>`;
-      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 16px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}</div>`;
+      const _delBtn = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕</button>`;
+      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 16px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}${_delBtn}</div>`;
       // b.src takes priority (annotated image), then storagePath (lazy-loaded), then upload prompt
       const imgHTML = b.src
         ? `<div class="b-paso-img-wrap">
-             <img src="${b.src}" class="b-paso-img" alt="${esc(b.caption||'')}">
+             <img src="${b.src}" class="b-paso-img" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
              ${_capRow}
            </div>`
         : b.storagePath
         ? `<div class="b-paso-img-wrap">
-             <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" alt="${esc(b.caption||'')}">
+             <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
              ${_capRow}
            </div>`
         : `<label class="paso-upload-btn" title="Añadir imagen">
@@ -858,16 +867,17 @@ const BLOCK_TYPES = {
     defaultData: () => ({ storagePath:null, caption:'', width:'100%' }),
     render(b) {
       const _annBtn = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}')" style="background:#2563EB;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✏️ Anotar</button>`;
-      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-top:1px solid var(--border);background:#fafafa"><div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}</div>`;
+      const _delBtn = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕ Quitar</button>`;
+      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-top:1px solid var(--border);background:#fafafa"><div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}${_delBtn}</div>`;
       if (b.src) {
         return `<div class="b-imagen block-inner">
-          <img src="${b.src}" style="width:${b.width||'100%'};display:block" alt="${esc(b.alt||b.caption||'')}">
+          <img src="${b.src}" style="width:${b.width||'100%'};display:block" alt="${esc(b.alt||b.caption||'')}" onclick="openLightbox(this)">
           ${_capRow}
         </div>`;
       }
       if (b.storagePath) {
         return `<div class="b-imagen block-inner">
-          <img src="" data-path="${b.storagePath}" class="lazy-img" style="width:${b.width||'100%'}" alt="${esc(b.caption||'')}">
+          <img src="" data-path="${b.storagePath}" class="lazy-img" style="width:${b.width||'100%'}" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
           ${_capRow}
         </div>`;
       }
@@ -1614,6 +1624,46 @@ async function uploadBlockImage(input, blockId) {
     render();
     notify('❌ Error al cargar imagen: ' + (e.message || e));
   }
+}
+
+function openLightbox(imgEl) {
+  const src = imgEl.src || imgEl.getAttribute('data-src');
+  if (!src || src === window.location.href) return;
+  const ov = document.getElementById('lightbox-overlay');
+  const li = document.getElementById('lightbox-img');
+  li.src = src;
+  li.classList.remove('lb-zoomed');
+  ov.classList.remove('lb-zoomed');
+  ov.classList.add('active');
+  document.addEventListener('keydown', _lightboxKey);
+}
+function closeLightbox() {
+  const ov = document.getElementById('lightbox-overlay');
+  ov.classList.remove('active', 'lb-zoomed');
+  const li = document.getElementById('lightbox-img');
+  li.classList.remove('lb-zoomed');
+  li.src = '';
+  document.removeEventListener('keydown', _lightboxKey);
+}
+function toggleLightboxZoom(e) {
+  e.stopPropagation();
+  const ov = document.getElementById('lightbox-overlay');
+  const li = document.getElementById('lightbox-img');
+  const zooming = !li.classList.contains('lb-zoomed');
+  li.classList.toggle('lb-zoomed');
+  ov.classList.toggle('lb-zoomed');
+  if (zooming) { ov.scrollTop = 0; ov.scrollLeft = 0; }
+  const hint = document.getElementById('lightbox-hint');
+  if (hint) hint.style.display = zooming ? 'none' : '';
+}
+function _lightboxKey(e) { if (e.key === 'Escape') closeLightbox(); }
+function removeBlockImage(blockId) {
+  const block = STATE.blocks.find(b => b.id === blockId);
+  if (!block) return;
+  delete block.src;
+  block.storagePath = null;
+  render();
+  scheduleLocalSave();
 }
 
 // drop images onto canvas
@@ -4196,5 +4246,10 @@ async function openAnnotationEditor(blockId) {
   document.addEventListener('keydown', _annKeydown);
 }
 </script>
+<div id="lightbox-overlay" onclick="closeLightbox()">
+  <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
+  <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>
+  <div id="lightbox-hint">Clic en la imagen para ampliar · Esc para cerrar</div>
+</div>
 </body>
 </html>
