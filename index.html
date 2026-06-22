@@ -411,11 +411,11 @@ input,textarea,select{font-family:inherit;font-size:14px}
     </div>
     <button class="btn btn-primary" id="auth-btn" style="width:100%;justify-content:center;padding:10px" onclick="loginWithPassword()">Entrar</button>
     <p style="margin-top:10px;font-size:12px;color:var(--text-muted);text-align:center">
-      <a href="#" onclick="showMagicLinkForm();return false" style="color:var(--primary)">¿Olvidaste la contraseña? Acceder por email</a>
+      <a href="#" onclick="showMagicLinkForm();return false" style="color:var(--primary)">¿Olvidaste la contraseña?</a>
     </p>
     <div id="magic-link-form" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Recibirás un enlace de acceso en tu email</p>
-      <button class="btn" style="width:100%;justify-content:center" onclick="sendMagicLink()">📧 Enviar enlace de acceso</button>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:8px" onclick="sendPasswordReset()">🔑 Restablecer contraseña</button>
+      <button class="btn" style="width:100%;justify-content:center" onclick="sendMagicLink()">📧 Acceder sin contraseña (enlace)</button>
     </div>
     <p id="auth-msg" style="margin-top:14px;font-size:13px;color:var(--text-muted)"></p>
   </div>
@@ -497,6 +497,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
     </div>
   </div>
   <button class="tb-btn primary" id="btn-guardar" onclick="guardar()">💾 Guardar</button>
+  <button class="tb-btn" id="btn-cambiar-pass" onclick="showSetPasswordModal(false)" title="Cambiar contraseña" style="display:none">🔑</button>
   <button class="tb-btn danger" onclick="logout()" id="btn-logout" title="Cerrar sesión" style="display:none">⎋ Salir</button>
 </div>
 <input type="file" id="import-html-input" accept=".html,.htm" style="display:none" onchange="importHTMLFile(this)">
@@ -2359,14 +2360,44 @@ async function sendMagicLink() {
     email,
     options: { emailRedirectTo: window.location.origin + window.location.pathname }
   });
-  if (error) { q('#auth-msg').textContent = '❌ ' + error.message; return; }
+  if (error) {
+    const msg = error.message || '';
+    if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('exceeded')) {
+      q('#auth-msg').textContent = '⏳ Demasiados intentos. Espera ~1 hora antes de reintentar. Prueba a usar "Restablecer contraseña" en su lugar.';
+    } else {
+      q('#auth-msg').textContent = '❌ ' + msg;
+    }
+    return;
+  }
   q('#auth-msg').textContent = '✅ Enlace enviado a ' + email + '. Revisa tu bandeja (y spam).';
 }
 
+async function sendPasswordReset() {
+  const email = q('#auth-email').value.trim();
+  if (!email) { q('#auth-msg').textContent = 'Introduce tu email primero'; return; }
+  q('#auth-msg').textContent = 'Enviando email de restablecimiento...';
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+  if (error) {
+    const msg = error.message || '';
+    if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('exceeded')) {
+      q('#auth-msg').textContent = '⏳ Límite de emails alcanzado. Espera ~1 hora e inténtalo de nuevo.';
+    } else {
+      q('#auth-msg').textContent = '❌ ' + msg;
+    }
+    return;
+  }
+  q('#auth-msg').textContent = '✅ Email de restablecimiento enviado a ' + email + '. Revisa tu bandeja y spam, y haz clic en el enlace.';
+}
+
 async function logout() {
+  if (STATE.isDirty && STATE.user && STATE.blocks.length) await guardar();
+  if (!confirm('¿Cerrar sesión?')) return;
   await sb.auth.signOut();
   STATE.user = null; STATE.role = null;
   q('#btn-logout').style.display = 'none';
+  q('#btn-cambiar-pass').style.display = 'none';
   q('#role-btns').innerHTML = '';
   q('#sidebar').style.display = '';
   q('#canvas-wrap').style.marginLeft = '';
@@ -2399,6 +2430,7 @@ function applyRoleUI(role) {
   const btns = q('#role-btns');
   btns.innerHTML = '';
   q('#btn-logout').style.display = 'flex';
+  q('#btn-cambiar-pass').style.display = 'flex';
 
   if (role === 'admin') {
     btns.innerHTML = `<button class="tb-btn" onclick="openModal('modal-users')">👥 Usuarios</button><a href="admin.html" class="tb-btn" style="text-decoration:none">⚙️ Admin</a>`;
@@ -3637,6 +3669,7 @@ async function handleSession(session) {
   } else {
     STATE.user = null; STATE.role = null;
     q('#btn-logout').style.display = 'none';
+    q('#btn-cambiar-pass').style.display = 'none';
     q('#role-btns').innerHTML = '';
     q('#sidebar').style.display = '';
     q('#canvas-wrap').style.marginLeft = '';
