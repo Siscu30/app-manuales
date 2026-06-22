@@ -137,6 +137,8 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .paso-body{flex:1}
 .paso-titulo{font-weight:600;font-size:15px;margin-bottom:4px}
 .paso-desc{font-size:14px;color:#374151;line-height:1.5}
+.paso-desc-ul{list-style:disc;padding-left:18px;margin-top:4px;font-size:14px;color:#374151;line-height:1.5;outline:none;min-height:1.2em}
+.paso-desc-ul li{padding:1px 0}
 .b-paso-img{width:100%;display:block}
 .b-paso-img-wrap{position:relative}
 .b-paso-img-wrap img{width:100%;display:block;border-top:1px solid var(--border);cursor:zoom-in}
@@ -361,6 +363,9 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .sb-pages-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px;cursor:pointer;user-select:none}
 .sb-pages-header:hover{background:rgba(255,255,255,.05)}
 .sb-pages-toggle{font-size:10px;color:rgba(255,255,255,.4)}
+.sb-section-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 5px;cursor:pointer;user-select:none;font-size:10px;font-weight:600;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.07em}
+.sb-section-hdr:hover{background:rgba(255,255,255,.05)}
+.sb-toggle{font-size:10px;color:rgba(255,255,255,.4);transition:transform .2s;display:inline-block}
 #pages-list{padding:2px 8px 6px}
 .page-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .12s;color:rgba(255,255,255,.65);font-size:12px;margin-bottom:1px}
 .page-item:hover{background:rgba(255,255,255,.08);color:#fff}
@@ -423,8 +428,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <span class="sid-brand">Manuales</span>
   </div>
 
-  <div class="sb-section">Manuales</div>
-  <div class="sid-chips">
+  <div class="sb-section-hdr" onclick="toggleSidSection('sid-chips-manuales','arrow-manuales')">
+    <span>Manuales</span><span class="sb-toggle" id="arrow-manuales">▼</span>
+  </div>
+  <div class="sid-chips" id="sid-chips-manuales">
     <button class="block-btn" onclick="nuevoManual()"><span class="icon">📄</span>Nuevo</button>
     <button class="block-btn" onclick="guardar()"><span class="icon">💾</span>Guardar</button>
     <button class="block-btn" onclick="openMisManuals()"><span class="icon">📂</span>Manuales</button>
@@ -434,8 +441,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
   </div>
 
   <hr class="sid-divider">
-  <div class="sb-section">Bloques</div>
-  <div class="sid-chips">
+  <div class="sb-section-hdr" onclick="toggleSidSection('sid-chips-bloques','arrow-bloques')">
+    <span>Bloques</span><span class="sb-toggle" id="arrow-bloques">▼</span>
+  </div>
+  <div class="sid-chips" id="sid-chips-bloques">
     <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><span class="icon">📑</span>Título</button>
     <button class="block-btn" onclick="addBlock('alerta')" draggable="true" data-type="alerta"><span class="icon">⚠️</span>Alerta</button>
     <button class="block-btn" onclick="addBlock('paso')" draggable="true" data-type="paso"><span class="icon">🔢</span>Paso</button>
@@ -847,12 +856,13 @@ const BLOCK_TYPES = {
              📷 <span>Añadir imagen</span>
              <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
            </label>`;
+      const _descItems = (b.descripcion||'').split('\n').map(l=>`<li>${esc(l)}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
           <div class="paso-num">${pasoN}</div>
           <div class="paso-body">
             <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
-            <div contenteditable="true" class="paso-desc" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." onblur="saveInlineEdit(this)">${esc(b.descripcion||'')}</div>
+            <ul contenteditable="true" class="paso-desc-ul" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." spellcheck="false" onblur="saveInlineEdit(this)">${_descItems}</ul>
           </div>
         </div>
         ${imgHTML}
@@ -1454,7 +1464,11 @@ function saveInlineEdit(el) {
   if (!id || !field) return;
   const block = STATE.blocks.find(b=>b.id===id);
   if (!block) return;
-  block[field] = field === 'html' ? el.innerHTML : el.textContent;
+  if (el.tagName === 'UL' || el.tagName === 'OL') {
+    block[field] = [...el.querySelectorAll('li')].map(li => li.textContent.trim()).filter(Boolean).join('\n');
+  } else {
+    block[field] = field === 'html' ? el.innerHTML : el.textContent;
+  }
   scheduleLocalSave();
 }
 
@@ -2029,7 +2043,8 @@ async function exportHTML() {
 
   const prog = q('#export-progress'); prog.classList.add('show');
   const bar = q('#export-bar'); const msg = q('#export-msg');
-  const imgBlocks = STATE.blocks.filter(b=>b.storagePath);
+  // Only fetch from storage blocks that have no local src (annotated images already in block.src)
+  const imgBlocks = STATE.blocks.filter(b=>b.storagePath && !b.src);
   let done = 0;
 
   const imgCache = {};
@@ -2057,9 +2072,9 @@ async function exportHTML() {
     const def = BLOCK_TYPES[b.type];
     if (!def) return '';
     if (b.type==='paso') pasoN++;
-    // Substitute images
     const bCopy = {...b};
-    if (bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+    // Only use storage download if no local src (preserves annotations)
+    if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
     return renderBlockForExport(bCopy, pasoN);
   }).join('\n');
 
@@ -2104,7 +2119,13 @@ function renderBlockForExport(b, pasoN) {
       const icons={info:'ℹ️',advertencia:'⚠️',peligro:'🚨',exito:'✅'};
       return `<div style="padding:12px 16px;border-radius:8px;display:flex;gap:10px;${styles[b.tipo||'info']||styles.info};margin-bottom:12px"><span style="font-size:18px">${icons[b.tipo||'info']}</span><div>${esc(b.texto||'')}</div></div>`;
     }
-    case 'paso': return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div><div style="font-weight:600;font-size:15px">${esc(b.titulo||'')}</div><div style="color:#374151;margin-top:4px">${esc(b.descripcion||'')}</div></div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
+    case 'paso': {
+      const _dLines = (b.descripcion||'').split('\n').filter(l=>l.trim());
+      const _dHtml = _dLines.length > 1
+        ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${esc(l)}</li>`).join('')}</ul>`
+        : `<div style="color:#374151;margin-top:4px;font-size:14px">${esc(b.descripcion||'')}</div>`;
+      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${esc(b.titulo||'')}</div>`}${_dHtml}</div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
+    }
     case 'imagen': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
       const headers=(b.columnas||[]).map(c=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">${esc(c)}</th>`).join('');
@@ -2153,7 +2174,8 @@ async function exportPDF() {
     msg.textContent = 'Cargando librerías...'; bar.style.width = '10%';
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-    const imgBlocks = STATE.blocks.filter(b => b.storagePath);
+    // Only fetch storage images without a local src (preserves annotations)
+    const imgBlocks = STATE.blocks.filter(b => b.storagePath && !b.src);
     const imgCache = {};
     let done = 0;
     for (const block of imgBlocks) {
@@ -2168,7 +2190,7 @@ async function exportPDF() {
     let pasoN = 0;
     const body = STATE.blocks.map(b => {
       const bCopy = {...b};
-      if (bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+      if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
       if (b.type === 'paso') pasoN++;
       return renderBlockForExport(bCopy, pasoN);
     }).join('\n');
@@ -2179,21 +2201,27 @@ async function exportPDF() {
     container.style.cssText = `position:fixed;top:0;left:-9999px;width:794px;background:#f8fafc;padding:32px;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;color:#1e293b`;
     container.innerHTML = `<div style="margin-bottom:20px;padding:20px;background:${color};border-radius:8px;color:#fff"><h1 style="margin:0;font-size:24px">${esc(titulo)}</h1></div>` + body;
     document.body.appendChild(container);
-    const canvas = await window.html2canvas(container, { scale: 1.5, useCORS: true, allowTaint: true, backgroundColor: '#f8fafc' });
+    const canvas = await window.html2canvas(container, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#f8fafc' });
     document.body.removeChild(container);
     msg.textContent = 'Generando PDF...'; bar.style.width = '80%';
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const totalPages = Math.max(1, Math.ceil((canvas.height * pageW / canvas.width) / pageH));
-    const sliceH = Math.floor(canvas.height / totalPages);
+    // Pixels per mm based on canvas width vs A4 width
+    const pxPerMm = canvas.width / pageW;
+    const pageHeightPx = Math.floor(pageH * pxPerMm);
+    const totalPages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
     for (let i = 0; i < totalPages; i++) {
       if (i > 0) pdf.addPage();
+      const srcY = i * pageHeightPx;
+      const srcH = Math.min(pageHeightPx, canvas.height - srcY);
       const sc = document.createElement('canvas');
-      sc.width = canvas.width; sc.height = sliceH;
-      sc.getContext('2d').drawImage(canvas, 0, i * sliceH, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-      pdf.addImage(sc.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, pageH);
+      sc.width = canvas.width; sc.height = srcH;
+      sc.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+      // Last page may be shorter — use actual height in mm to avoid stretching
+      const actualHeightMm = srcH / pxPerMm;
+      pdf.addImage(sc.toDataURL('image/jpeg', 0.93), 'JPEG', 0, 0, pageW, actualHeightMm);
     }
     bar.style.width = '100%';
     pdf.save((titulo.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g,'').trim() || 'manual') + '.pdf');
@@ -2848,6 +2876,14 @@ function togglePagesPanel() {
   panel.style.display = isOpen ? 'none' : 'block';
   if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
 }
+function toggleSidSection(id, arrowId) {
+  const panel = document.getElementById(id);
+  const arrow = document.getElementById(arrowId);
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : '';
+  if (arrow) { arrow.textContent = isOpen ? '▶' : '▼'; arrow.style.transform = isOpen ? 'rotate(-90deg)' : ''; }
+}
 
 function addPage() {
   const id = uid();
@@ -3340,10 +3376,10 @@ async function exportHTMLMultipage() {
   const empresa = q('#manual-empresa').value || '';
   const color = STATE.manual.color || '#2563EB';
 
-  // Collect all image paths across all pages
+  // Collect only blocks without local src (annotated images stay in block.src)
   const allImageBlocks = [];
   for (const pg of STATE.pages) {
-    for (const b of (pg.blocks||[])) { if (b.storagePath) allImageBlocks.push(b); }
+    for (const b of (pg.blocks||[])) { if (b.storagePath && !b.src) allImageBlocks.push(b); }
   }
 
   const prog = q('#export-progress'); prog.classList.add('show');
@@ -3368,7 +3404,7 @@ async function exportHTMLMultipage() {
     const blocksHTML = (pg.blocks||[]).map(b => {
       if (b.type==='paso') pasoN++;
       const bCopy = {...b};
-      if (bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+      if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
       return renderBlockForExport(bCopy, pasoN);
     }).join('\n');
     return { id: pg.id, title: pg.title, html: blocksHTML };
