@@ -2104,11 +2104,12 @@ function removeBlockImage(blockId) {
   const block = STATE.blocks.find(b => b.id === blockId);
   if (!block) return;
   delete block.src;
-function toggleResetStep(id) { const b = STATE.blocks.find(x => x.id === id); if (!b) return; b.resetStep = !b.resetStep; pushHistory(); render(); localSave(); }
   block.storagePath = null;
   render();
   scheduleLocalSave();
 }
+// Reinicia la numeración de pasos desde este bloque (clic en el número). Debe ser global para el onclick inline.
+function toggleResetStep(id) { const b = STATE.blocks.find(x => x.id === id); if (!b) return; b.resetStep = !b.resetStep; pushHistory(); render(); localSave(); }
 
 // drop images onto canvas
 document.addEventListener('dragover', e=>{ if(e.dataTransfer.types.includes('Files')) e.preventDefault(); });
