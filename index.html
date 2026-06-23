@@ -406,6 +406,37 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .mp2-card-sub{font-size:12px;color:var(--text-muted);margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .mp2-card-actions{display:flex;gap:6px;flex-shrink:0}
 .mp2-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:15px}
+/* ── Sidebar Format Panel ── */
+.sid-fmt-panel{padding:0 10px 8px}
+.fmt-hint{font-size:10px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0 6px;font-style:italic}
+.fmt-row{display:flex;gap:3px;margin-bottom:3px}
+.fmt-btn{flex:1;display:flex;align-items:center;justify-content:center;min-height:29px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.65);font-size:13px;cursor:pointer;transition:all .12s;font-family:inherit;padding:0}
+.fmt-btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);color:#fff}
+.fmt-btn.active{background:rgba(37,99,235,.5);border-color:rgba(37,99,235,.9);color:#fff}
+.fmt-sep{height:1px;background:rgba(255,255,255,.07);margin:4px 0}
+.fmt-label{font-size:9px;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.06em;padding:3px 0 1px}
+.fmt-color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin:4px 0}
+.fmt-cswatch{display:block;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .12s,border-color .12s;aspect-ratio:1;width:100%}
+.fmt-cswatch:hover{transform:scale(1.2);border-color:rgba(255,255,255,.7)}
+.b-icono{min-height:40px;display:flex;flex-direction:column;align-items:inherit;justify-content:center}
+/* Icon picker */
+#modal-icon-picker{display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);align-items:center;justify-content:center;padding:16px}
+#modal-icon-picker.open{display:flex}
+.ip-panel{background:var(--panel-bg);border-radius:12px;width:100%;max-width:580px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+.ip-head{padding:16px 20px 12px;border-bottom:1px solid var(--panel-border)}
+.ip-head h3{margin:0 0 10px;font-size:16px;font-weight:700}
+.ip-search{width:100%;padding:8px 12px;border:1px solid var(--panel-border);border-radius:6px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--ui-text);box-sizing:border-box}
+.ip-cats{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.ip-cat{padding:3px 10px;border-radius:12px;border:1px solid var(--panel-border);background:none;cursor:pointer;font-size:12px;font-family:inherit;color:var(--text-muted);transition:background .1s,color .1s}
+.ip-cat.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.ip-body{flex:1;overflow-y:auto;padding:14px 16px}
+.ip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));gap:5px}
+.ip-icon{display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 4px;border-radius:7px;border:2px solid transparent;cursor:pointer;transition:background .1s,border-color .1s}
+.ip-icon:hover{background:var(--surface)}
+.ip-icon.sel{border-color:var(--primary);background:rgba(37,99,235,.08)}
+.ip-icon svg{flex-shrink:0;stroke:var(--ui-text)}
+.ip-icon span{font-size:9px;color:var(--text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%;padding:0 2px}
+.ip-foot{padding:12px 16px;border-top:1px solid var(--panel-border);display:flex;justify-content:flex-end;gap:8px}
 </style>
 </head>
 <body>
@@ -477,6 +508,57 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <button class="block-btn" onclick="addBlock('video')" draggable="true" data-type="video"><span class="icon">🎬</span>Vídeo</button>
     <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><span class="icon">🔗</span>Enlace</button>
     <button class="block-btn" onclick="addBlock('codigo')" draggable="true" data-type="codigo"><span class="icon">💻</span>Código</button>
+    <button class="block-btn" onclick="addBlock('icono')" draggable="true" data-type="icono"><span class="icon">⭐</span>Icono</button>
+  </div>
+
+  <hr class="sid-divider">
+  <div class="sb-section-hdr" onclick="toggleSidSection('sid-fmt-panel','arrow-fmt')">
+    <span>Formato</span><span class="sb-toggle" id="arrow-fmt">▼</span>
+  </div>
+  <div class="sid-fmt-panel" id="sid-fmt-panel">
+    <span class="fmt-hint" id="fmt-hint">Haz clic en texto para editar</span>
+    <div class="fmt-row">
+      <button class="fmt-btn" id="fmts-bold" data-cmd="bold" title="Negrita (Ctrl+B)" onmousedown="event.preventDefault();fmt('bold')"><b>B</b></button>
+      <button class="fmt-btn" id="fmts-italic" data-cmd="italic" title="Cursiva (Ctrl+I)" onmousedown="event.preventDefault();fmt('italic')"><i style="font-style:italic">I</i></button>
+      <button class="fmt-btn" id="fmts-underline" data-cmd="underline" title="Subrayado (Ctrl+U)" onmousedown="event.preventDefault();fmt('underline')"><u>U</u></button>
+      <button class="fmt-btn" id="fmts-strikeThrough" data-cmd="strikeThrough" title="Tachado" onmousedown="event.preventDefault();fmt('strikeThrough')"><s>S</s></button>
+    </div>
+    <div class="fmt-row">
+      <button class="fmt-btn" id="fmts-justifyLeft" data-cmd="justifyLeft" title="Alinear izquierda" onmousedown="event.preventDefault();fmt('justifyLeft')" style="font-size:15px">&#8676;</button>
+      <button class="fmt-btn" id="fmts-justifyCenter" data-cmd="justifyCenter" title="Centrar" onmousedown="event.preventDefault();fmt('justifyCenter')" style="font-size:15px">&#9643;</button>
+      <button class="fmt-btn" id="fmts-justifyRight" data-cmd="justifyRight" title="Alinear derecha" onmousedown="event.preventDefault();fmt('justifyRight')" style="font-size:15px">&#8677;</button>
+      <button class="fmt-btn" id="fmts-removeFormat" data-cmd="removeFormat" title="Limpiar formato" onmousedown="event.preventDefault();fmt('removeFormat')" style="font-size:11px">&#10006;</button>
+    </div>
+    <div class="fmt-sep"></div>
+    <div class="fmt-row">
+      <button class="fmt-btn" id="fmts-insertUnorderedList" data-cmd="insertUnorderedList" title="Lista viñetas" onmousedown="event.preventDefault();fmt('insertUnorderedList')" style="font-size:11px">&#8226; Lista</button>
+      <button class="fmt-btn" id="fmts-insertOrderedList" data-cmd="insertOrderedList" title="Lista numerada" onmousedown="event.preventDefault();fmt('insertOrderedList')" style="font-size:11px">1. Lista</button>
+    </div>
+    <div class="fmt-sep"></div>
+    <div class="fmt-label">Tamaño</div>
+    <div class="fmt-row">
+      <button class="fmt-btn" onmousedown="event.preventDefault();fmtSize(2)" title="Pequeño" style="font-size:10px">S</button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();fmtSize(3)" title="Normal" style="font-size:12px">M</button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();fmtSize(5)" title="Grande" style="font-size:15px">L</button>
+      <button class="fmt-btn" onmousedown="event.preventDefault();fmtSize(7)" title="Muy grande" style="font-size:18px">XL</button>
+    </div>
+    <div class="fmt-sep"></div>
+    <div class="fmt-label">Color de texto</div>
+    <div class="fmt-color-grid">
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#000000')" style="background:#000000" title="Negro"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#374151')" style="background:#374151" title="Gris oscuro"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#DC2626')" style="background:#DC2626" title="Rojo"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#EA580C')" style="background:#EA580C" title="Naranja"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#D97706')" style="background:#D97706" title="Ámbar"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#16A34A')" style="background:#16A34A" title="Verde"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#2563EB')" style="background:#2563EB" title="Azul"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#7C3AED')" style="background:#7C3AED" title="Morado"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#EC4899')" style="background:#EC4899" title="Rosa"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#64748B')" style="background:#64748B" title="Slate"></span>
+      <span class="fmt-cswatch" onmousedown="event.preventDefault();fmtColor('#ffffff')" style="background:#fff;border-color:rgba(255,255,255,.25)" title="Blanco"></span>
+      <span class="fmt-cswatch" id="fmt-sid-custom-dot" onmousedown="event.preventDefault();_saveFmtSel();document.getElementById('fmt-sid-custom-inp').click()" style="background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red)" title="Personalizado"></span>
+    </div>
+    <input type="color" id="fmt-sid-custom-inp" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" oninput="_restoreFmtSel();document.execCommand('foreColor',false,this.value)">
   </div>
 
   <hr class="sid-divider">
@@ -734,6 +816,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
   <button data-cmd="bold" title="Negrita (Ctrl+B)" onmousedown="event.preventDefault();fmt('bold')" style="width:28px;height:28px;border-radius:5px;background:none;border:none;color:var(--ui-text);font-weight:700;font-size:14px;cursor:pointer;font-family:inherit">B</button>
   <button data-cmd="italic" title="Cursiva (Ctrl+I)" onmousedown="event.preventDefault();fmt('italic')" style="width:28px;height:28px;border-radius:5px;background:none;border:none;color:var(--ui-text);font-style:italic;font-size:14px;cursor:pointer;font-family:inherit">I</button>
   <button data-cmd="underline" title="Subrayado (Ctrl+U)" onmousedown="event.preventDefault();fmt('underline')" style="width:28px;height:28px;border-radius:5px;background:none;border:none;color:var(--ui-text);text-decoration:underline;font-size:14px;cursor:pointer;font-family:inherit">U</button>
+  <button data-cmd="insertUnorderedList" title="Lista con viñetas" onmousedown="event.preventDefault();fmt('insertUnorderedList')" style="width:28px;height:28px;border-radius:5px;background:none;border:none;color:var(--ui-text);font-size:14px;cursor:pointer;font-family:inherit">•≡</button>
   <div style="width:1px;height:18px;background:var(--panel-border);margin:0 4px;flex-shrink:0"></div>
   <select id="fmt-size" onmousedown="event.stopPropagation()" onchange="fmtSize(this.value)" title="Tamaño de texto" style="background:var(--panel-surface);border:1px solid var(--panel-border);color:var(--ui-text);border-radius:5px;padding:2px 4px;font-size:12px;cursor:pointer;font-family:inherit">
     <option value="1">8px</option><option value="2">10px</option><option value="3" selected>12px</option><option value="4">14px</option><option value="5">18px</option><option value="6">24px</option><option value="7">36px</option>
@@ -762,6 +845,33 @@ input,textarea,select{font-family:inherit;font-size:14px}
       <button class="mp2-tab" id="mp2-tab-papelera" onclick="switchManualesTab('papelera')">🗑 Papelera</button>
     </div>
     <div id="mp2-list"></div>
+  </div>
+</div>
+
+<div id="modal-icon-picker">
+  <div class="ip-panel">
+    <div class="ip-head">
+      <h3>Galería de iconos</h3>
+      <input class="ip-search" type="text" id="ip-search" placeholder="Buscar icono..." oninput="_ipFilter()" autocomplete="off">
+      <div class="ip-cats">
+        <button class="ip-cat active" onclick="_ipCat('all',this)">Todos</button>
+        <button class="ip-cat" onclick="_ipCat('estado',this)">Estado</button>
+        <button class="ip-cat" onclick="_ipCat('accion',this)">Acción</button>
+        <button class="ip-cat" onclick="_ipCat('persona',this)">Personas</button>
+        <button class="ip-cat" onclick="_ipCat('doc',this)">Documentos</button>
+        <button class="ip-cat" onclick="_ipCat('sistema',this)">Sistema</button>
+        <button class="ip-cat" onclick="_ipCat('negocio',this)">Negocio</button>
+        <button class="ip-cat" onclick="_ipCat('especial',this)">Especial</button>
+      </div>
+    </div>
+    <div class="ip-body">
+      <div class="ip-grid" id="ip-grid"></div>
+    </div>
+    <div class="ip-foot">
+      <input type="hidden" id="ip-selected" value="">
+      <button class="tb-btn" onclick="closeIconPicker()">Cancelar</button>
+      <button class="tb-btn primary" onclick="_ipConfirm()">Seleccionar</button>
+    </div>
   </div>
 </div>
 
@@ -815,6 +925,217 @@ let STATE = {
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36); }
 
 // ═══════════════════════════════════════════════════════
+// ICON LIBRARY (Feather/Lucide, MIT license, inline SVG)
+// Format: [key, name, category, svgInnerHTML]
+// ═══════════════════════════════════════════════════════
+const ICON_LIB = [
+  ['check','Correcto','estado','<polyline points="20 6 9 17 4 12"/>'],
+  ['check-circle','OK / Completado','estado','<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11"/>'],
+  ['x-circle','Error / No','estado','<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'],
+  ['alert-triangle','Advertencia','estado','<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'],
+  ['alert-circle','Alerta','estado','<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'],
+  ['info','Información','estado','<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'],
+  ['help-circle','Ayuda / FAQ','estado','<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>'],
+  ['star','Destacado','estado','<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'],
+  ['thumbs-up','Positivo','estado','<path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>'],
+  ['check-square','Tarea hecha','estado','<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'],
+  ['arrow-right','Flecha derecha','accion','<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>'],
+  ['arrow-left','Flecha izquierda','accion','<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>'],
+  ['arrow-up','Flecha arriba','accion','<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>'],
+  ['arrow-down','Flecha abajo','accion','<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>'],
+  ['chevron-right','Siguiente','accion','<polyline points="9 18 15 12 9 6"/>'],
+  ['chevron-down','Desplegar','accion','<polyline points="6 9 12 15 18 9"/>'],
+  ['plus','Añadir','accion','<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'],
+  ['minus','Quitar','accion','<line x1="5" y1="12" x2="19" y2="12"/>'],
+  ['search','Buscar','accion','<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'],
+  ['edit','Editar','accion','<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>'],
+  ['trash','Eliminar','accion','<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'],
+  ['download','Descargar','accion','<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'],
+  ['upload','Subir','accion','<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>'],
+  ['copy','Copiar','accion','<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'],
+  ['link','Enlace','accion','<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>'],
+  ['refresh-cw','Actualizar','accion','<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>'],
+  ['save','Guardar','accion','<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'],
+  ['play','Reproducir','accion','<polygon points="5 3 19 12 5 21 5 3"/>'],
+  ['user','Usuario','persona','<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'],
+  ['users','Grupo','persona','<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'],
+  ['phone','Teléfono','persona','<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>'],
+  ['mail','Correo electrónico','persona','<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>'],
+  ['message-square','Mensaje','persona','<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'],
+  ['bell','Notificación','persona','<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>'],
+  ['file-text','Documento','doc','<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'],
+  ['folder','Carpeta','doc','<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'],
+  ['book','Libro / Manual','doc','<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'],
+  ['clipboard','Portapapeles','doc','<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>'],
+  ['printer','Imprimir','doc','<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>'],
+  ['list','Lista','doc','<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>'],
+  ['settings','Configuración','sistema','<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>'],
+  ['lock','Seguridad','sistema','<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'],
+  ['shield','Protección','sistema','<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'],
+  ['database','Base de datos','sistema','<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>'],
+  ['wifi','WiFi / Red','sistema','<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>'],
+  ['key','Contraseña / Clave','sistema','<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>'],
+  ['eye','Visibilidad','sistema','<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'],
+  ['home','Inicio','negocio','<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'],
+  ['briefcase','Trabajo / Empresa','negocio','<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>'],
+  ['bar-chart','Gráfico barras','negocio','<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="22" y1="20" x2="2" y2="20"/>'],
+  ['trending-up','Tendencia alza','negocio','<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>'],
+  ['award','Premio / Logro','negocio','<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>'],
+  ['target','Objetivo','negocio','<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'],
+  ['globe','Internacional','negocio','<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'],
+  ['map-pin','Ubicación','negocio','<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'],
+  ['clock','Tiempo / Hora','negocio','<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'],
+  ['calendar','Fecha / Evento','negocio','<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'],
+  ['zap','Urgente / Rápido','especial','<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'],
+  ['layers','Proceso / Capas','especial','<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'],
+  ['flag','Bandera / Hito','especial','<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>'],
+  ['tag','Etiqueta','especial','<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>'],
+  ['package','Paquete','especial','<line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>'],
+  ['cpu','Procesador','especial','<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>'],
+  /* ── Estado adicional ── */
+  ['heart','Favorito','estado','<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'],
+  ['bookmark','Guardar / Marcar','estado','<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>'],
+  ['thumbs-down','Negativo','estado','<path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>'],
+  ['x-square','Error cuadrado','estado','<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/>'],
+  ['shield-check','Verificado','estado','<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>'],
+  /* ── Acción adicional ── */
+  ['external-link','Abrir externo','accion','<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>'],
+  ['share','Compartir','accion','<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>'],
+  ['filter','Filtrar','accion','<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>'],
+  ['send','Enviar','accion','<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'],
+  ['log-in','Entrar','accion','<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>'],
+  ['log-out','Salir','accion','<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'],
+  ['zoom-in','Ampliar','accion','<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>'],
+  ['zoom-out','Reducir','accion','<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/>'],
+  ['rotate-cw','Rotar derecha','accion','<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>'],
+  ['move','Mover','accion','<polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>'],
+  ['maximize','Maximizar','accion','<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>'],
+  /* ── Persona adicional ── */
+  ['user-plus','Añadir usuario','persona','<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/>'],
+  ['user-check','Usuario verificado','persona','<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>'],
+  ['at-sign','Mención / Email','persona','<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/>'],
+  /* ── Documento adicional ── */
+  ['file-plus','Nuevo archivo','doc','<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>'],
+  ['archive','Archivar','doc','<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>'],
+  ['code','Código HTML','doc','<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'],
+  ['terminal','Terminal','doc','<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>'],
+  ['sliders','Ajustes','doc','<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>'],
+  /* ── Sistema adicional ── */
+  ['monitor','Monitor','sistema','<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'],
+  ['smartphone','Móvil','sistema','<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>'],
+  ['hard-drive','Disco duro','sistema','<line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/>'],
+  ['server','Servidor','sistema','<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>'],
+  ['power','Encender','sistema','<path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>'],
+  ['cloud','Nube','sistema','<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>'],
+  ['toggle-right','Activado','sistema','<rect x="1" y="5" width="22" height="14" rx="7" ry="7"/><circle cx="16" cy="12" r="3"/>'],
+  ['toggle-left','Desactivado','sistema','<rect x="1" y="5" width="22" height="14" rx="7" ry="7"/><circle cx="8" cy="12" r="3"/>'],
+  /* ── Negocio adicional ── */
+  ['dollar-sign','Precio / Coste','negocio','<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'],
+  ['percent','Porcentaje','negocio','<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>'],
+  ['shopping-cart','Carrito','negocio','<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>'],
+  ['truck','Envío','negocio','<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>'],
+  ['activity','Actividad','negocio','<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'],
+  ['pie-chart','Gráfico circular','negocio','<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>'],
+  ['grid','Cuadrícula','negocio','<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'],
+  ['navigation','Navegación','negocio','<polygon points="3 11 22 2 13 21 11 13 3 11"/>'],
+  ['compass','Brújula','negocio','<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>'],
+  /* ── Especial adicional ── */
+  ['sun','Sol / Día','especial','<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>'],
+  ['moon','Luna / Noche','especial','<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'],
+  ['droplet','Agua / Fluido','especial','<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>'],
+  ['feather','Ligero / Suave','especial','<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>'],
+  ['columns','Columnas','especial','<path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7m0-18H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7m0-18v18"/>'],
+  ['life-buoy','Soporte','especial','<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>'],
+  ['umbrella','Protección clima','especial','<path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/>'],
+  ['paperclip','Adjunto','especial','<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>'],
+  ['mic','Micrófono','especial','<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>'],
+  ['music','Música','especial','<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'],
+  ['image','Imagen','especial','<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>'],
+  ['video','Vídeo','especial','<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>'],
+  ['headphones','Auriculares','especial','<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>'],
+];
+
+function iconSVG(key, size, color) {
+  const ic = ICON_LIB.find(i => i[0] === key);
+  if (!ic) return '';
+  const s = size || 20;
+  const c = color || 'currentColor';
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;flex-shrink:0">${ic[3]}</svg>`;
+}
+
+let _ipCurCat = 'all', _ipCurSearch = '', _ipCallback = null;
+
+function openIconPicker(cb) {
+  _ipCallback = cb;
+  _ipCurCat = 'all'; _ipCurSearch = '';
+  q('#ip-search').value = '';
+  document.querySelectorAll('.ip-cat').forEach(b=>b.classList.toggle('active', b.textContent==='Todos'));
+  q('#ip-selected').value = '';
+  _ipRender();
+  q('#modal-icon-picker').classList.add('open');
+}
+function openIconPickerForEditor() {
+  openIconPicker(function(key) {
+    const hi = q('#be-icon');
+    const prev = q('#be-icon-preview');
+    const colorEl = q('#be-color');
+    const color = colorEl ? colorEl.value : undefined;
+    const size = prev ? (prev.offsetWidth >= 40 ? 36 : 24) : 24;
+    if (hi) hi.value = key;
+    if (prev) prev.innerHTML = key ? iconSVG(key, size, color) : '<span style="color:var(--text-muted);font-size:18px">–</span>';
+  });
+}
+function clearEditorIcon() {
+  const hi = q('#be-icon'); const prev = q('#be-icon-preview');
+  if (hi) hi.value = '';
+  if (prev) prev.innerHTML = '<span style="color:var(--text-muted);font-size:18px">–</span>';
+}
+function closeIconPicker() {
+  q('#modal-icon-picker').classList.remove('open');
+  _ipCallback = null;
+}
+function _ipCat(cat, btn) {
+  _ipCurCat = cat;
+  document.querySelectorAll('.ip-cat').forEach(b=>b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _ipRender();
+}
+function _ipFilter() {
+  _ipCurSearch = q('#ip-search').value;
+  _ipRender();
+}
+function _ipRender() {
+  const sel = q('#ip-selected').value;
+  const list = ICON_LIB.filter(ic => {
+    const mc = _ipCurCat === 'all' || ic[2] === _ipCurCat;
+    const ms = !_ipCurSearch || ic[1].toLowerCase().includes(_ipCurSearch.toLowerCase()) || ic[0].includes(_ipCurSearch.toLowerCase());
+    return mc && ms;
+  });
+  q('#ip-grid').innerHTML = list.map(ic =>
+    `<div class="ip-icon${sel===ic[0]?' sel':''}" data-k="${ic[0]}" onclick="_ipSelect('${ic[0]}')" title="${ic[1]}">
+      ${iconSVG(ic[0],24)}
+      <span>${ic[1]}</span>
+    </div>`
+  ).join('') || '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--text-muted);font-size:13px">Sin resultados</div>';
+}
+function _ipSelect(key) {
+  q('#ip-selected').value = key;
+  document.querySelectorAll('#ip-grid .ip-icon').forEach(el=>el.classList.toggle('sel', el.dataset.k===key));
+}
+function _ipConfirm() {
+  const key = q('#ip-selected').value;
+  if (!key) { closeIconPicker(); return; }
+  if (_ipCallback) _ipCallback(key);
+  closeIconPicker();
+}
+function _icoPreviewColor(val) {
+  const cv = q('#be-color-val'); if (cv) cv.textContent = val;
+  const prev = q('#be-icon-preview');
+  const key = q('#be-icon'); if (!prev || !key || !key.value) return;
+  prev.innerHTML = iconSVG(key.value, 36, val);
+}
+
+// ═══════════════════════════════════════════════════════
 // BLOCK TYPES REGISTRY
 // ═══════════════════════════════════════════════════════
 const BLOCK_TYPES = {
@@ -850,20 +1171,34 @@ const BLOCK_TYPES = {
     defaultData: () => ({ tipo:'info', texto:'Texto de la alerta' }),
     render(b) {
       const icons = {info:'ℹ️', advertencia:'⚠️', peligro:'🚨', exito:'✅'};
+      const _aIcon = b.icon ? iconSVG(b.icon,18) : (icons[b.tipo||'info']||'ℹ️');
+      const _aLines = (b.texto||'').split('\n').filter(l=>l.trim());
+      const _aHtml = _aLines.length > 0
+        ? `<ul style="margin:0;padding-left:16px">${_aLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`
+        : '';
       return `<div class="b-alerta block-inner ${b.tipo||'info'}" ondblclick="openBlockEditor('${b.id}')">
-        <span class="alert-icon">${icons[b.tipo||'info']||'ℹ️'}</span>
-        <div class="alert-text">${esc(b.texto||'')}</div>
+        <span class="alert-icon">${_aIcon}</span>
+        <div class="alert-text">${_aHtml}</div>
       </div>`;
     },
     editorHTML(b) {
+      const _ip = b.icon ? iconSVG(b.icon,24) : '<span style="color:var(--text-muted);font-size:18px">–</span>';
       return `<div class="form-group"><label class="form-label">Tipo</label>
         <select class="form-select" id="be-tipo">
           ${['info','advertencia','peligro','exito'].map(t=>`<option value="${t}" ${b.tipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
         </select></div>
-        <div class="form-group"><label class="form-label">Texto</label>
+        <div class="form-group"><label class="form-label">Icono personalizado</label>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+          <div id="be-icon-preview" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${_ip}</div>
+          <button type="button" onmousedown="event.preventDefault();openIconPickerForEditor()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">Cambiar</button>
+          <button type="button" onmousedown="event.preventDefault();clearEditorIcon()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">× Quitar</button>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:4px">Sustituye al emoji del tipo</span>
+        </div>
+        <input type="hidden" id="be-icon" value="${b.icon||''}"></div>
+        <div class="form-group"><label class="form-label">Texto <span style="color:var(--text-muted);font-size:11px">(una línea = un punto · Enter para más)</span></label>
         <textarea class="form-textarea" id="be-texto">${esc(b.texto||'')}</textarea></div>`;
     },
-    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; },
+    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; b.icon=q('#be-icon').value||null; },
     toTeamsText(b) {
       const icons = {info:'ℹ️', advertencia:'⚠️', peligro:'🚨', exito:'✅'};
       return `${icons[b.tipo||'info']} ${b.texto||''}`;
@@ -891,7 +1226,7 @@ const BLOCK_TYPES = {
              📷 <span>Añadir imagen</span>
              <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
            </label>`;
-      const _descItems = (b.descripcion||'').split('\n').map(l=>`<li>${esc(l)}</li>`).join('');
+      const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
           <div class="paso-num">${pasoN}</div>
@@ -987,20 +1322,34 @@ const BLOCK_TYPES = {
     defaultData: () => ({ tipo:'tip', texto:'Texto del callout' }),
     render(b) {
       const icons = {tip:'💡', warning:'⚠️', important:'📌'};
+      const _cIcon = b.icon ? iconSVG(b.icon,18) : (icons[b.tipo||'tip']||'💡');
+      const _cLines = (b.texto||'').split('\n').filter(l=>l.trim());
+      const _cHtml = _cLines.length > 0
+        ? `<ul style="margin:0;padding-left:16px">${_cLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`
+        : '';
       return `<div class="b-callout block-inner ${b.tipo||'tip'}" ondblclick="openBlockEditor('${b.id}')">
-        <span class="callout-icon">${icons[b.tipo||'tip']||'💡'}</span>
-        <div class="callout-text">${esc(b.texto||'')}</div>
+        <span class="callout-icon">${_cIcon}</span>
+        <div class="callout-text">${_cHtml}</div>
       </div>`;
     },
     editorHTML(b) {
+      const _ip = b.icon ? iconSVG(b.icon,24) : '<span style="color:var(--text-muted);font-size:18px">–</span>';
       return `<div class="form-group"><label class="form-label">Tipo</label>
         <select class="form-select" id="be-tipo">
           ${['tip','warning','important'].map(t=>`<option value="${t}" ${b.tipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
         </select></div>
-        <div class="form-group"><label class="form-label">Texto</label>
+        <div class="form-group"><label class="form-label">Icono personalizado</label>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+          <div id="be-icon-preview" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${_ip}</div>
+          <button type="button" onmousedown="event.preventDefault();openIconPickerForEditor()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">Cambiar</button>
+          <button type="button" onmousedown="event.preventDefault();clearEditorIcon()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">× Quitar</button>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:4px">Sustituye al emoji del tipo</span>
+        </div>
+        <input type="hidden" id="be-icon" value="${b.icon||''}"></div>
+        <div class="form-group"><label class="form-label">Texto <span style="color:var(--text-muted);font-size:11px">(una línea = un punto · Enter para más)</span></label>
         <textarea class="form-textarea" id="be-texto">${esc(b.texto||'')}</textarea></div>`;
     },
-    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; },
+    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; b.icon=q('#be-icon').value||null; },
     toTeamsText(b) {
       const icons = {tip:'💡', warning:'⚠️', important:'📌'};
       return `${icons[b.tipo||'tip']} *${b.texto||''}*`;
@@ -1237,6 +1586,50 @@ const BLOCK_TYPES = {
     },
     saveEditor(b) { b.language = q('#be-lang').value; b.code = q('#be-code').value; },
     toTeamsText(b) { return '\`\`\`' + (b.language||'') + '\n' + (b.code||'') + '\n\`\`\`'; }
+  },
+  icono: {
+    label: 'Icono',
+    defaultData: () => ({ iconKey:'star', size:48, color:'#2563EB', label:'', align:'center' }),
+    render(b) {
+      if (!b.iconKey) return `<div class="b-icono block-inner" ondblclick="openBlockEditor('${b.id}')"><span style="color:var(--text-muted);font-size:13px">Sin icono — doble clic para configurar</span></div>`;
+      const svgEl = iconSVG(b.iconKey, b.size||48, b.color||'#2563EB');
+      const labelEl = b.label ? `<div style="margin-top:8px;font-size:13px;color:var(--text-muted)">${esc(b.label)}</div>` : '';
+      return `<div class="b-icono block-inner" ondblclick="openBlockEditor('${b.id}')" style="text-align:${b.align||'center'};padding:16px">${svgEl}${labelEl}</div>`;
+    },
+    editorHTML(b) {
+      const _ip = b.iconKey ? iconSVG(b.iconKey,36,b.color||'#2563EB') : '<span style="color:var(--text-muted);font-size:24px">–</span>';
+      return `<div class="form-group"><label class="form-label">Icono</label>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+          <div id="be-icon-preview" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${_ip}</div>
+          <button type="button" onmousedown="event.preventDefault();openIconPickerForEditor()" style="padding:6px 14px;font-size:13px;cursor:pointer;border:none;border-radius:6px;background:var(--primary);color:#fff;font-family:inherit;font-weight:600">Elegir icono</button>
+          <input type="hidden" id="be-icon" value="${b.iconKey||''}">
+        </div></div>
+        <div class="form-group"><label class="form-label">Color</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="color" id="be-color" value="${b.color||'#2563EB'}" style="width:44px;height:32px;padding:2px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:none" oninput="_icoPreviewColor(this.value)">
+            <span id="be-color-val" style="font-size:13px;color:var(--text-muted)">${b.color||'#2563EB'}</span>
+          </div></div>
+        <div class="form-group"><label class="form-label">Tamaño</label>
+          <select class="form-select" id="be-size">
+            ${[24,32,48,64,96,128].map(s=>`<option value="${s}" ${(b.size||48)===s?'selected':''}>${s}px</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="form-label">Etiqueta (opcional)</label>
+          <input class="form-input" id="be-label" value="${esc(b.label||'')}" placeholder="Texto bajo el icono..."></div>
+        <div class="form-group"><label class="form-label">Alineación</label>
+          <select class="form-select" id="be-align">
+            <option value="left" ${(b.align||'center')==='left'?'selected':''}>Izquierda</option>
+            <option value="center" ${(b.align||'center')==='center'?'selected':''}>Centro</option>
+            <option value="right" ${(b.align||'center')==='right'?'selected':''}>Derecha</option>
+          </select></div>`;
+    },
+    saveEditor(b) {
+      b.iconKey = q('#be-icon').value||null;
+      b.size = parseInt(q('#be-size').value)||48;
+      b.color = q('#be-color').value||'#2563EB';
+      b.label = q('#be-label').value||'';
+      b.align = q('#be-align').value||'center';
+    },
+    toTeamsText(b) { return `[Icono: ${b.iconKey||'?'}${b.label?' - '+b.label:''}]`; }
   }
 };
 
@@ -1500,7 +1893,7 @@ function saveInlineEdit(el) {
   const block = STATE.blocks.find(b=>b.id===id);
   if (!block) return;
   if (el.tagName === 'UL' || el.tagName === 'OL') {
-    block[field] = [...el.querySelectorAll('li')].map(li => li.textContent.trim()).filter(Boolean).join('\n');
+    block[field] = [...el.querySelectorAll('li')].map(li => li.innerHTML.trim()).filter(Boolean).join('\n');
   } else {
     block[field] = field === 'html' ? el.innerHTML : el.textContent;
   }
@@ -2248,12 +2641,17 @@ function renderBlockForExport(b, pasoN) {
     case 'alerta': {
       const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
       const icons={info:'ℹ️',advertencia:'⚠️',peligro:'🚨',exito:'✅'};
-      return `<div style="padding:12px 16px;border-radius:8px;display:flex;gap:10px;${styles[b.tipo||'info']||styles.info};margin-bottom:12px"><span style="font-size:18px">${icons[b.tipo||'info']}</span><div>${esc(b.texto||'')}</div></div>`;
+      const _aiIcon = b.icon ? iconSVG(b.icon,18,'#374151') : icons[b.tipo||'info'];
+      const _aiLines = (b.texto||'').split('\n').filter(l=>l.trim());
+      const _aiHtml = _aiLines.length > 0
+        ? `<ul style="margin:0;padding-left:16px">${_aiLines.map(l=>`<li style="font-size:14px;line-height:1.6">${esc(l)}</li>`).join('')}</ul>`
+        : '';
+      return `<div style="padding:12px 16px;border-radius:8px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'info']||styles.info};margin-bottom:12px"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_aiIcon}</span><div>${_aiHtml}</div></div>`;
     }
     case 'paso': {
       const _dLines = (b.descripcion||'').split('\n').filter(l=>l.trim());
       const _dHtml = _dLines.length > 0
-        ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${esc(l)}</li>`).join('')}</ul>`
+        ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
       return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${esc(b.titulo||'')}</div>`}${_dHtml}</div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
     }
@@ -2266,7 +2664,12 @@ function renderBlockForExport(b, pasoN) {
     case 'callout': {
       const styles={tip:'background:#f0fdf4;border:1px solid #bbf7d0',warning:'background:#fefce8;border:1px solid #fef08a',important:'background:#eff6ff;border:1px solid #bfdbfe'};
       const icons={tip:'💡',warning:'⚠️',important:'📌'};
-      return `<div style="padding:14px 16px;border-radius:8px;display:flex;gap:10px;${styles[b.tipo||'tip']||styles.tip};margin-bottom:12px"><span style="font-size:18px">${icons[b.tipo||'tip']}</span><div>${esc(b.texto||'')}</div></div>`;
+      const _caIcon = b.icon ? iconSVG(b.icon,18,'#374151') : icons[b.tipo||'tip'];
+      const _caLines = (b.texto||'').split('\n').filter(l=>l.trim());
+      const _caHtml = _caLines.length > 0
+        ? `<ul style="margin:0;padding-left:16px">${_caLines.map(l=>`<li style="font-size:14px;line-height:1.6">${esc(l)}</li>`).join('')}</ul>`
+        : '';
+      return `<div style="padding:14px 16px;border-radius:8px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'tip']||styles.tip};margin-bottom:12px"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_caIcon}</span><div>${_caHtml}</div></div>`;
     }
     case 'lista': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;margin-bottom:12px">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0"><span style="font-size:16px">${it.icono==='check'?'✅':'❌'}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
     case 'separador': return `<div style="padding:8px 0;margin-bottom:12px"><hr style="border:none;border-top:2px solid #e2e8f0"></div>`;
@@ -2291,6 +2694,12 @@ function renderBlockForExport(b, pasoN) {
       const lang = esc(b.language||'');
       const code = esc(b.code||'');
       return `<div style="border-radius:8px;overflow:hidden;margin-bottom:12px;font-family:'Fira Code',Consolas,monospace"><div style="background:#1e293b;padding:8px 14px;font-size:11px;color:#94a3b8;letter-spacing:.5px">${lang}</div><pre style="margin:0;padding:14px;background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre></div>`;
+    }
+    case 'icono': {
+      if (!b.iconKey) return '';
+      const svgEl = iconSVG(b.iconKey, b.size||48, b.color||'#2563EB');
+      const labelEl = b.label ? `<div style="margin-top:8px;font-size:13px;color:#64748b">${esc(b.label)}</div>` : '';
+      return `<div style="text-align:${b.align||'center'};padding:16px;background:#fff;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px">${svgEl}${labelEl}</div>`;
     }
     default: return '';
   }
@@ -3310,10 +3719,76 @@ async function parsePDFtoBlocks(ab) {
 
 function htmlToImportBlocks(html) {
   const parser = new DOMParser();
-  const doc = parser.parseFromString('<div class="content">' + html + '</div>', 'text/html');
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // ── App's own multi-page export: detect section.mp-page elements ──
+  const mpSections = doc.querySelectorAll('section.mp-page');
+  if (mpSections.length > 0) {
+    const navTitles = {};
+    doc.querySelectorAll('li[data-page]').forEach(li => {
+      navTitles[li.dataset.page] = li.textContent.trim();
+    });
+    const allBlocks = [];
+    mpSections.forEach((section, idx) => {
+      const title = navTitles[section.id] || `Página ${idx + 1}`;
+      allBlocks.push({ id: uid(), type: 'titulo', order: 0, emoji: '📄', titulo: title, subtitulo: '', _isH1: true });
+      for (const child of Array.from(section.children)) {
+        const b = _exportChildToBlock(child);
+        if (b) allBlocks.push(b);
+      }
+    });
+    return allBlocks;
+  }
+
+  // ── Generic HTML (DOCX / external pages) ──
+  const wrapper = parser.parseFromString('<div class="content">' + html + '</div>', 'text/html');
+  const content = wrapper.querySelector('.content') || wrapper.body;
+  return _genericChildrenToBlocks(Array.from(content.children));
+}
+
+function _exportChildToBlock(el) {
+  const text = el.textContent.trim();
+  if (!text && !el.querySelector('img')) return null;
+  if (el.querySelector('hr') && !text) return { id: uid(), type: 'separador', order: 0 };
+  const h2 = el.querySelector('h2');
+  if (h2) {
+    const titulo = h2.textContent.trim();
+    const p = el.querySelector('p');
+    return { id: uid(), type: 'titulo', order: 0, emoji: '📋', titulo, subtitulo: p ? p.textContent.trim() : '' };
+  }
+  const img = el.querySelector('img[src^="data:"]');
+  if (img) return { id: uid(), type: 'imagen', order: 0, src: img.src, storagePath: null, caption: '', width: '100%' };
+  if (el.children.length >= 2 && /^\d+$/.test(el.children[0].textContent.trim())) {
+    const body = el.children[1];
+    const strong = body?.querySelector('strong,b');
+    const titulo = strong?.textContent?.trim() || body?.firstElementChild?.textContent?.trim() || text.slice(0, 80);
+    const descEl = body?.querySelector('p,ul');
+    let descripcion = '';
+    if (descEl) descripcion = descEl.tagName === 'UL'
+      ? Array.from(descEl.querySelectorAll('li')).map(li => li.textContent.trim()).join('\n')
+      : descEl.textContent.trim();
+    return { id: uid(), type: 'paso', order: 0, titulo, descripcion, storagePath: null, caption: '' };
+  }
+  const listDivs = Array.from(el.querySelectorAll('div')).filter(d => /^[✅❌✓✗]/.test(d.textContent.trim()) && d.children.length <= 2);
+  if (listDivs.length >= 2) {
+    return { id: uid(), type: 'lista', order: 0, items: listDivs.map(d => {
+      const t = d.textContent.trim();
+      return { icono: /^[✅✓]/.test(t) ? 'check' : 'cross', texto: t.replace(/^[✓✗✅❌]\s*/, '') };
+    })};
+  }
+  const table = el.querySelector('table');
+  if (table) {
+    const headers = Array.from(table.querySelectorAll('thead th,thead td')).map(th => th.textContent.trim());
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr => Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim()));
+    const cols = headers.length ? headers : (rows[0]?.map((_, i) => `Col ${i + 1}`) || ['Col 1']);
+    return { id: uid(), type: 'tabla', order: 0, columnas: cols, filas: headers.length ? rows : rows.slice(1) };
+  }
+  return { id: uid(), type: 'texto', order: 0, html: el.innerHTML };
+}
+
+function _genericChildrenToBlocks(children) {
   const blocks = [];
-  const content = doc.querySelector('.content') || doc.body;
-  for (const el of Array.from(content.children)) {
+  for (const el of children) {
     const tag = el.tagName;
     const text = el.textContent.trim();
     if (!text && !el.querySelector('img')) continue;
@@ -3517,6 +3992,11 @@ async function handleUnifiedFileSelect(input, type) {
       _unifiedImportBlocks = htmlToImportBlocks(text);
     }
     showUnifiedPreview(_unifiedImportBlocks);
+    // Auto-activate "as pages" when importing app's own multi-page export
+    if (_unifiedImportBlocks.some(b => b._isH1)) {
+      const pagesCheck = document.getElementById('ui-import-pages');
+      if (pagesCheck) pagesCheck.checked = true;
+    }
   } catch(e) {
     prev.innerHTML = `<div style="color:#f87171;padding:12px;background:rgba(239,68,68,.1);border-radius:8px">❌ Error: ${esc(e.message||String(e))}</div>`;
   }
@@ -3827,6 +4307,15 @@ async function handleSession(session) {
       pushHistory();
       render();
       renderPagesPanel();
+    } else if (!draft && !STATE.blocks.length) {
+      // No local draft (e.g. localStorage cleared) — silently restore last manual from Supabase
+      const restoreId = lastId;
+      if (restoreId) {
+        loadManual(restoreId).catch(() => {});
+      } else {
+        sb.from('manuales').select('id').neq('estado','papelera').order('updated_at',{ascending:false}).limit(1)
+          .then(({ data }) => { if (data?.length) loadManual(data[0].id).catch(()=>{}); });
+      }
     }
   } else {
     STATE.user = null; STATE.role = null;
@@ -4056,53 +4545,64 @@ async function init() {
   }
 })();
 
-// ── Format toolbar (FIX 4.2) ──────────────────────────────────────────────
-function showFormatToolbar(ce) {
-  const tb = document.getElementById('format-toolbar');
-  if (!tb) return;
-  const rect = (ce.closest('.block-wrap') || ce).getBoundingClientRect();
-  const tbH = 46;
-  let top = rect.top - tbH - 8 + window.scrollY;
-  if (top < 56) top = rect.bottom + 8 + window.scrollY;
-  tb.style.top = top + 'px';
-  tb.style.left = Math.max(8, Math.min(rect.left + window.scrollX, window.innerWidth - 240)) + 'px';
-  tb.style.display = 'flex';
+// ── Format sidebar panel ──────────────────────────────────────────────────
+function showFormatToolbar() {} // replaced by sidebar panel
+function hideFormatToolbar() {}
+function fmt(cmd) {
+  document.execCommand(cmd, false, null);
   updateFmtStates();
 }
-function hideFormatToolbar() {
-  const tb = document.getElementById('format-toolbar');
-  if (tb) tb.style.display = 'none';
+function fmtSize(val) { document.execCommand('fontSize', false, val); }
+function fmtColor(val) {
+  if (_fmtSavedSel) { const s=window.getSelection(); s.removeAllRanges(); s.addRange(_fmtSavedSel); }
+  document.execCommand('foreColor', false, val);
+  updateFmtStates();
 }
-function fmt(cmd) { document.execCommand(cmd, false, null); updateFmtStates(); }
-function fmtSize(val) { document.execCommand('fontSize', false, val); updateFmtStates(); }
-function fmtColor(val) { document.execCommand('foreColor', false, val); updateFmtStates(); }
 function updateFmtStates() {
-  ['bold','italic','underline'].forEach(cmd => {
-    const btn = document.querySelector(`#format-toolbar [data-cmd="${cmd}"]`);
-    if (btn) btn.style.background = document.queryCommandState(cmd) ? 'rgba(255,255,255,.18)' : 'none';
+  const cmds = ['bold','italic','underline','strikeThrough','justifyLeft','justifyCenter','justifyRight',
+                 'insertUnorderedList','insertOrderedList'];
+  cmds.forEach(cmd => {
+    const btn = document.getElementById('fmts-' + cmd);
+    if (!btn) return;
+    try { btn.classList.toggle('active', document.queryCommandState(cmd)); } catch(e) {}
   });
 }
-(function initFormatToolbar() {
+(function initFormatPanel() {
   const canvas = document.getElementById('canvas');
   if (!canvas) return;
+  function setHint(show) {
+    const h = document.getElementById('fmt-hint');
+    if (h) h.style.display = show ? '' : 'none';
+  }
   canvas.addEventListener('focusin', function(e) {
     if (!e.target.matches('[contenteditable="true"]')) return;
-    showFormatToolbar(e.target);
+    setHint(false);
+    updateFmtStates();
   });
   canvas.addEventListener('focusout', function() {
     setTimeout(function() {
-      const tb = document.getElementById('format-toolbar');
-      if (!tb || tb.style.display === 'none') return;
       const cvs = document.getElementById('canvas');
-      if (!cvs.contains(document.activeElement) && !tb.contains(document.activeElement)) {
-        hideFormatToolbar();
+      const fp = document.getElementById('sid-fmt-panel');
+      if (cvs && fp && !cvs.contains(document.activeElement) && !fp.contains(document.activeElement)) {
+        setHint(true);
       }
-    }, 150);
+    }, 200);
   });
-  // Save selection on mouseup so fmtColorDot can restore it
   canvas.addEventListener('mouseup', function() {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) _fmtSavedSel = sel.getRangeAt(0).cloneRange();
+    updateFmtStates();
+  });
+  canvas.addEventListener('keyup', updateFmtStates);
+  document.addEventListener('selectionchange', function() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const cvs = document.getElementById('canvas');
+    if (cvs && cvs.contains(range.commonAncestorContainer)) {
+      _fmtSavedSel = range.cloneRange();
+      updateFmtStates();
+    }
   });
 })();
 
