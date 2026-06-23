@@ -1230,7 +1230,7 @@ const BLOCK_TYPES = {
       const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
-          <div class="if (b.type ===<div class="paso-num${b.resetStep?' paso-reset':''}" title="${b.resetStep?'Reinicia contador desde 1':'Click para reiniciar contador aqui'}" onclick="event.stopPropagation();toggleResetStep('${b.id}')" style="cursor:pointer;position:relative">${pasoN}${b.resetStep?'<span style="position:absolute;top:-7px;right:-7px;background:#f97316;color:#fff;font-size:8px;border-radius:3px;padding:1px 3px;line-height:1;pointer-events:none">R1</span>':''}</div> 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }/div>
+          <div class="paso-num${b.resetStep?' paso-reset':''}" title="${b.resetStep?'Reinicia contador desde 1':'Click para reiniciar contador aqui'}" onclick="event.stopPropagation();toggleResetStep('${b.id}')" style="cursor:pointer;position:relative">${pasoN}${b.resetStep?'<span style="position:absolute;top:-7px;right:-7px;background:#f97316;color:#fff;font-size:8px;border-radius:3px;padding:1px 3px;line-height:1;pointer-events:none">R1</span>':''}</div>
           <div class="paso-body">
             <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
             <ul contenteditable="true" class="paso-desc-ul" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." spellcheck="false" onblur="saveInlineEdit(this)">${_descItems}</ul>
@@ -2597,7 +2597,7 @@ async function exportHTML() {
   const body = STATE.blocks.map(b=>{
     const def = BLOCK_TYPES[b.type];
     if (!def) return '';
-    if (b.type==='paso') pasoN++;
+    if (b.type==='paso') { if (b.resetStep) pasoN = 0; pasoN++; }
     const bCopy = {...b};
     // Only use storage download if no local src (preserves annotations)
     if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
@@ -2857,7 +2857,7 @@ function openTeamsModal() {
   const lines = STATE.blocks.map(b=>{
     const def = BLOCK_TYPES[b.type];
     if (!def?.toTeamsText) return '';
-    if (b.type==='paso') pasoN++;
+    if (b.type==='paso') { if (b.resetStep) pasoN = 0; pasoN++; }
     return def.toTeamsText(b, pasoN);
   }).filter(Boolean);
 
@@ -3052,7 +3052,7 @@ async function viewManual(id) {
     const tempState = {...STATE};
     STATE.manual = {id:data.id, titulo:data.titulo, empresa:data.empresa||'', color:data.color||'#2563EB'};
     const bodyHTML = blocks.map(b=>{
-      if(b.type==='paso') pasoN++;
+      if(b.type==='paso') { if (b.resetStep) pasoN = 0; pasoN++; }
       return renderBlockForExport(b, pasoN);
     }).join('');
     view.innerHTML=`<button onclick="q('#viewer-list').style.display='';q('#manual-view').innerHTML=''" style="margin-bottom:20px" class="btn">← Volver</button>
@@ -4142,7 +4142,7 @@ async function exportHTMLMultipage() {
   const pagesHTML = STATE.pages.map(pg => {
     let pasoN = 0;
     const blocksHTML = (pg.blocks||[]).map(b => {
-      if (b.type==='paso') pasoN++;
+      if (b.type==='paso') { if (b.resetStep) pasoN = 0; pasoN++; }
       const bCopy = {...b};
       if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
       return renderBlockForExport(bCopy, pasoN);
