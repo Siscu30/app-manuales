@@ -134,6 +134,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .b-paso{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm)}
 .b-paso-header{display:flex;align-items:flex-start;gap:12px;padding:16px}
 .paso-num{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.paso-num-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0}
+.paso-reset-btn{width:26px;height:18px;border-radius:5px;border:1px solid var(--border);background:#fff;color:#94a3b8;font-size:10px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;transition:all .12s}
+.paso-reset-btn:hover{border-color:var(--primary);color:var(--primary)}
+.paso-reset-btn.active{background:var(--primary);border-color:var(--primary);color:#fff}
 .paso-body{flex:1}
 .paso-titulo{font-weight:600;font-size:15px;margin-bottom:4px}
 .paso-desc{font-size:14px;color:#374151;line-height:1.5}
@@ -146,7 +150,6 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .paso-upload-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 16px 16px;padding:10px;border:2px dashed var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-muted);transition:all .15s}
 .paso-upload-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
 .img-uploading{opacity:.5;pointer-events:none}
-  .paso-reset{background:#f97316!important;box-shadow:0 0 0 3px rgba(249,115,22,.3)}
 
 /* annotation modal */
 #annotationModal{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#1a1a1a;display:flex;flex-direction:column;overflow:hidden}
@@ -835,7 +838,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- ── MANUALES PANEL ── -->
-<div id="manuales-panel" style="display:none">
+<div id="manuales-panel">
   <div class="mp2-bar">
     <h2>📚 Mis Manuales</h2>
     <button class="mp2-close" onclick="closeManualesPanel()">✕ Cerrar</button>
@@ -1230,7 +1233,10 @@ const BLOCK_TYPES = {
       const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
-          <div class="if (b.type ===<div class="paso-num${b.resetStep?' paso-reset':''}" title="${b.resetStep?'Reinicia contador desde 1':'Click para reiniciar contador aqui'}" onclick="event.stopPropagation();toggleResetStep('${b.id}')" style="cursor:pointer;position:relative">${pasoN}${b.resetStep?'<span style="position:absolute;top:-7px;right:-7px;background:#f97316;color:#fff;font-size:8px;border-radius:3px;padding:1px 3px;line-height:1;pointer-events:none">R1</span>':''}</div> 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }/div>
+          <div class="paso-num-wrap">
+            <div class="paso-num">${pasoN}</div>
+            <button class="paso-reset-btn${b.resetCounter?' active':''}" onmousedown="event.stopPropagation()" onclick="event.stopPropagation();togglePasoReset('${b.id}')" title="${b.resetCounter?'Este paso reinicia la numeración (clic para desactivar)':'Reiniciar la numeración desde este paso'}">🔄</button>
+          </div>
           <div class="paso-body">
             <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
             <ul contenteditable="true" class="paso-desc-ul" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." spellcheck="false" onblur="saveInlineEdit(this)">${_descItems}</ul>
@@ -1695,7 +1701,7 @@ function render() {
   }
   let pasoN = 0;
   canvas.innerHTML = STATE.blocks.map((b,i) => {
-    if (b.type === 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }
+    if (b.type === 'paso') { if (b.resetCounter) pasoN = 0; pasoN++; }
     const def = BLOCK_TYPES[b.type];
     if (!def) return '';
     const blockHTML = def.render(b, pasoN);
@@ -1869,6 +1875,17 @@ function deleteBlock(id, ev) {
   if (STATE.selectedBlockId === id) STATE.selectedBlockId = null;
   render();
   scheduleLocalSave();
+}
+
+// Marca un paso para reiniciar la numeración (1,2,3 → reinicia → 1,2,3) sin afectar a los demás
+function togglePasoReset(id) {
+  const block = STATE.blocks.find(b => b.id === id);
+  if (!block || block.type !== 'paso') return;
+  pushHistory();
+  block.resetCounter = !block.resetCounter;
+  render();
+  scheduleLocalSave();
+  notify(block.resetCounter ? '🔄 La numeración se reinicia en este paso' : 'Numeración continua restaurada');
 }
 
 function moveBlock(idx, dir, ev) {
@@ -2104,7 +2121,6 @@ function removeBlockImage(blockId) {
   const block = STATE.blocks.find(b => b.id === blockId);
   if (!block) return;
   delete block.src;
-function toggleResetStep(id) { const b = STATE.blocks.find(x => x.id === id); if (!b) return; b.resetStep = !b.resetStep; pushHistory(); render(); localSave(); }
   block.storagePath = null;
   render();
   scheduleLocalSave();
@@ -2349,7 +2365,7 @@ async function openMisManuals() {
 
 function openManualesPanel() {
   if (!STATE.user) { openAuthModal('Accede para ver tus manuales guardados'); return; }
-  document.getElementById('manuales-panel').style.display = 'block';
+  document.getElementById('manuales-panel').style.display = '';
   document.body.style.overflow = 'hidden';
   loadManualesPanel('activos');
 }
@@ -2597,7 +2613,7 @@ async function exportHTML() {
   const body = STATE.blocks.map(b=>{
     const def = BLOCK_TYPES[b.type];
     if (!def) return '';
-    if (b.type==='paso') pasoN++;
+    if (b.type==='paso') { if (b.resetCounter) pasoN = 0; pasoN++; }
     const bCopy = {...b};
     // Only use storage download if no local src (preserves annotations)
     if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
@@ -2733,7 +2749,7 @@ async function exportPDF() {
     const body = STATE.blocks.map(b => {
       const bCopy = {...b};
       if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
-      if (b.type === 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }
+      if (b.type === 'paso') { if (b.resetCounter) pasoN = 0; pasoN++; }
       return renderBlockForExport(bCopy, pasoN);
     }).join('\n');
     const titulo = q('#manual-titulo').value || 'Manual';
@@ -2857,7 +2873,7 @@ function openTeamsModal() {
   const lines = STATE.blocks.map(b=>{
     const def = BLOCK_TYPES[b.type];
     if (!def?.toTeamsText) return '';
-    if (b.type==='paso') pasoN++;
+    if (b.type==='paso') { if (b.resetCounter) pasoN = 0; pasoN++; }
     return def.toTeamsText(b, pasoN);
   }).filter(Boolean);
 
@@ -3052,7 +3068,7 @@ async function viewManual(id) {
     const tempState = {...STATE};
     STATE.manual = {id:data.id, titulo:data.titulo, empresa:data.empresa||'', color:data.color||'#2563EB'};
     const bodyHTML = blocks.map(b=>{
-      if(b.type==='paso') pasoN++;
+      if(b.type==='paso') { if (b.resetCounter) pasoN = 0; pasoN++; }
       return renderBlockForExport(b, pasoN);
     }).join('');
     view.innerHTML=`<button onclick="q('#viewer-list').style.display='';q('#manual-view').innerHTML=''" style="margin-bottom:20px" class="btn">← Volver</button>
@@ -4142,7 +4158,7 @@ async function exportHTMLMultipage() {
   const pagesHTML = STATE.pages.map(pg => {
     let pasoN = 0;
     const blocksHTML = (pg.blocks||[]).map(b => {
-      if (b.type==='paso') pasoN++;
+      if (b.type==='paso') { if (b.resetCounter) pasoN = 0; pasoN++; }
       const bCopy = {...b};
       if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
       return renderBlockForExport(bCopy, pasoN);
@@ -4195,13 +4211,13 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 .sr-ctx{line-height:1.5;color:#374151}
 .sr-ctx mark{background:#fef08a;border-radius:2px;padding:0 2px}
 .sr-empty{padding:14px;text-align:center;color:#94a3b8;font-size:13px}
-.mp-layout{display:flex;min-height:calc(100vh - 52px);height:calc(100vh - 52px);overflow:hidden}
+.mp-layout{display:flex;min-height:calc(100vh - 52px)}
 .mp-nav{width:240px;flex-shrink:0;background:#0f1729;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;padding:12px 0}
 .mp-nav ul{list-style:none}
 .mp-nav li{padding:9px 18px;font-size:13px;color:rgba(255,255,255,.65);cursor:pointer;border-radius:6px;margin:1px 8px;transition:all .15s}
 .mp-nav li:hover{background:rgba(255,255,255,.08);color:#fff}
 .mp-nav li.active{background:rgba(255,255,255,.13);color:#fff;font-weight:500}
-.mp-content{flex:1;padding:32px 28px;display:flex;flex-direction:column;align-items:center;overflow-y:auto;min-height:0}
+.mp-content{flex:1;padding:32px 28px;display:flex;flex-direction:column;align-items:center}
 .mp-page{width:100%;max-width:760px;display:none}
 .mp-page.active{display:block}
 /* hamburger for mobile nav */
@@ -4246,7 +4262,7 @@ function showPage(id, liEl) {
   const pg = document.getElementById(id);
   if (pg) pg.classList.add('active');
   if (liEl) liEl.classList.add('active');
-  window.location.hash = id; const mc=document.querySelector('.mp-content');if(mc)mc.scrollTop=0;
+  window.location.hash = id;
   document.querySelector('.mp-nav')?.classList.remove('open');
 }
 function toggleMobileNav() {
@@ -4362,7 +4378,6 @@ async function handleSession(session) {
     if (!role) role = await loadUserRole(session.user.id);
     STATE.role = role || 'editor';
     applyRoleUI(STATE.role);
-            loadManualesPanel('activos');
 
     // Load local draft for the current manual if any
     const lastId = localStorage.getItem('last_manual_id');
@@ -4417,7 +4432,7 @@ async function handleSession(session) {
 
 // ── onAuthStateChange: sólo para cambios POSTERIORES al arranque ──────────────
 sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')         handleSession(session);
+  if (event === 'SIGNED_IN')         handleSession(session);
   if (event === 'SIGNED_OUT')        handleSession(null);
   if (event === 'PASSWORD_RECOVERY') {
     history.replaceState(null, '', window.location.pathname);
