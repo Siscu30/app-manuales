@@ -834,7 +834,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- ── MANUALES PANEL ── -->
-<div id="manuales-panel">
+<div id="manuales-panel" style="display:none">
   <div class="mp2-bar">
     <h2>📚 Mis Manuales</h2>
     <button class="mp2-close" onclick="closeManualesPanel()">✕ Cerrar</button>
@@ -2347,7 +2347,7 @@ async function openMisManuals() {
 
 function openManualesPanel() {
   if (!STATE.user) { openAuthModal('Accede para ver tus manuales guardados'); return; }
-  document.getElementById('manuales-panel').style.display = '';
+  document.getElementById('manuales-panel').style.display = 'block';
   document.body.style.overflow = 'hidden';
   loadManualesPanel('activos');
 }
