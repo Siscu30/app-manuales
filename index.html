@@ -1413,9 +1413,12 @@ const BLOCK_TYPES = {
     label: 'Vídeo',
     defaultData: () => ({ url:'', titulo:'', caption:'', videoType:'link', src:'' }),
     render(b) {
-      if (b.videoType === 'file' && b.src) {
+      if (b.videoType === 'file' && (b.src || b.storagePath)) {
+        const _vtag = b.src
+          ? `<video controls style="width:100%;border-radius:6px;display:block" src="${b.src}"></video>`
+          : `<video controls style="width:100%;border-radius:6px;display:block" class="lazy-video" data-vpath="${b.storagePath}"></video>`;
         return `<div class="b-video block-inner" ondblclick="openBlockEditor('${b.id}')">
-          <video controls style="width:100%;border-radius:6px;display:block" src="${b.src}"></video>
+          ${_vtag}
           ${b.titulo?`<div class="video-caption">${esc(b.titulo)}</div>`:''}
         </div>`;
       }
@@ -1464,8 +1467,10 @@ const BLOCK_TYPES = {
       </div>
       <div id="be-vsec-file" style="display:${vt==='file'?'block':'none'}">
         <div class="form-group"><label class="form-label">Archivo MP4</label>
-          ${b.src&&b.videoType==='file'?'<p style="color:#16a34a;font-size:12px;margin-bottom:8px">✓ Vídeo cargado</p>':''}
-          <input type="file" class="form-input" id="be-video-file" accept="video/mp4,video/*" onchange="(function(el){if(!el.files[0])return;var fr=new FileReader();fr.onload=function(e){document.getElementById('be-video-src').value=e.target.result};fr.readAsDataURL(el.files[0])})(this)">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Se sube a tu almacenamiento y se incrusta en el manual al exportar (se ve sin conexión). Máx. 50 MB — usa clips cortos a 720p.</p>
+          <div id="be-video-status" style="font-size:12px;margin-bottom:8px">${(b.storagePath&&b.videoType==='file')?'<span style="color:#16a34a">✓ Vídeo subido</span>':(b.src&&b.videoType==='file')?'<span style="color:#16a34a">✓ Vídeo cargado (formato anterior)</span>':''}</div>
+          <input type="file" class="form-input" id="be-video-file" accept="video/mp4,video/*" onchange="uploadVideoFile(this)">
+          <input type="hidden" id="be-video-storagepath" value="${esc(b.videoType==='file'?b.storagePath||'':'')}">
           <input type="hidden" id="be-video-src" value="${esc(b.videoType==='file'?b.src||'':'')}">
         </div>
         <div class="form-group"><label class="form-label">Título (opcional)</label>
@@ -1482,8 +1487,10 @@ const BLOCK_TYPES = {
       const vt = q('#be-vtype')?.value || 'link';
       b.videoType = vt;
       if (vt === 'file') {
+        const newPath = q('#be-video-storagepath')?.value;
         const newSrc = q('#be-video-src')?.value;
-        if (newSrc) b.src = newSrc;
+        if (newPath) { b.storagePath = newPath; b.src = ''; }
+        else if (newSrc) { b.src = newSrc; }
         b.titulo = q('#be-titulo-file')?.value.trim() || '';
         b.url = ''; b.caption = '';
       } else if (vt === 'pdf') {
@@ -1842,6 +1849,17 @@ async function loadLazyImages() {
       if (!error && data?.signedUrl) img.src = data.signedUrl;
     } catch(e) {}
   }
+  // Lazy-load de vídeos guardados en Storage (mismo bucket privado, vía URL firmada)
+  const vids = document.querySelectorAll('.lazy-video[data-vpath]');
+  for (const vid of vids) {
+    if (vid.src && vid.src !== window.location.href) continue;
+    const path = vid.getAttribute('data-vpath');
+    if (!path) continue;
+    try {
+      const { data, error } = await sb.storage.from('manual-images').createSignedUrl(path, 3600);
+      if (!error && data?.signedUrl) vid.src = data.signedUrl;
+    } catch(e) {}
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2066,6 +2084,33 @@ async function uploadBlockImage(input, blockId) {
     setSaveStatus('');
     render();
     notify('❌ Error al cargar imagen: ' + (e.message || e));
+  }
+}
+
+// Sube un MP4 a Supabase Storage (no base64 en la BD). Se incrusta en el HTML al exportar → se ve offline.
+async function uploadVideoFile(input) {
+  const file = input.files[0]; if (!file) return;
+  if (!STATE.user) { notify('⚠️ Inicia sesión para subir vídeos'); input.value = ''; return; }
+  const statusEl = document.getElementById('be-video-status');
+  const MAX = 50 * 1024 * 1024;
+  if (file.size > MAX) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626">El vídeo pesa ${(file.size/1048576).toFixed(0)} MB. Máximo 50 MB — comprímelo (720p, H.264).</span>`;
+    input.value = ''; return;
+  }
+  if (statusEl) statusEl.innerHTML = '<span style="color:var(--text-muted)">⏳ Subiendo vídeo… no cierres esta ventana</span>';
+  try {
+    const ext = (file.name.split('.').pop() || 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '') || 'mp4';
+    const manualId = STATE.manual.id || 'guest';
+    const blockId = _editingId || ('v' + Date.now());
+    const storagePath = `${STATE.user.id}/${manualId}/videos/${blockId}/${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from('manual-images').upload(storagePath, file, { contentType: file.type || 'video/mp4', upsert: true });
+    if (error) throw error;
+    const hp = document.getElementById('be-video-storagepath'); if (hp) hp.value = storagePath;
+    const hs = document.getElementById('be-video-src'); if (hs) hs.value = '';
+    if (statusEl) statusEl.innerHTML = `<span style="color:#16a34a">✓ Vídeo subido (${(file.size/1048576).toFixed(1)} MB). Pulsa Guardar para aplicar.</span>`;
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626">❌ Error al subir: ${esc(e.message || e)}</span>`;
+    input.value = '';
   }
 }
 
@@ -2683,6 +2728,7 @@ function renderBlockForExport(b, pasoN) {
     }
     case 'video': {
       if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
+      if (b.videoType === 'file' && b.storagePath) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls class="lazy-video" data-vpath="${b.storagePath}" style="width:100%;border-radius:6px"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
       if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#2563eb">${esc(b.url)}</a></div></div>`;
       const embed = getVideoEmbedUrl(b.url);
       if (embed) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
@@ -2718,7 +2764,7 @@ async function exportPDF() {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     // Only fetch storage images without a local src (preserves annotations)
-    const imgBlocks = STATE.blocks.filter(b => b.storagePath && !b.src);
+    const imgBlocks = STATE.blocks.filter(b => b.storagePath && !b.src && b.type !== 'video');
     const imgCache = {};
     let done = 0;
     for (const block of imgBlocks) {
