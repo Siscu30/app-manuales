@@ -4244,7 +4244,7 @@ function showPage(id, liEl) {
   const pg = document.getElementById(id);
   if (pg) pg.classList.add('active');
   if (liEl) liEl.classList.add('active');
-  window.location.hash = id;
+  window.location.hash = id; const mc=document.querySelector('.mp-content');if(mc)mc.scrollTop=0;
   document.querySelector('.mp-nav')?.classList.remove('open');
 }
 function toggleMobileNav() {
