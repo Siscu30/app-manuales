@@ -146,6 +146,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .paso-upload-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin:8px 16px 16px;padding:10px;border:2px dashed var(--border);border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-muted);transition:all .15s}
 .paso-upload-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
 .img-uploading{opacity:.5;pointer-events:none}
+  .paso-reset{background:#f97316!important;box-shadow:0 0 0 3px rgba(249,115,22,.3)}
 
 /* annotation modal */
 #annotationModal{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#1a1a1a;display:flex;flex-direction:column;overflow:hidden}
@@ -1229,7 +1230,7 @@ const BLOCK_TYPES = {
       const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
-          <div class="paso-num">${pasoN}</div>
+          <div class="if (b.type ===<div class="paso-num${b.resetStep?' paso-reset':''}" title="${b.resetStep?'Reinicia contador desde 1':'Click para reiniciar contador aqui'}" onclick="event.stopPropagation();toggleResetStep('${b.id}')" style="cursor:pointer;position:relative">${pasoN}${b.resetStep?'<span style="position:absolute;top:-7px;right:-7px;background:#f97316;color:#fff;font-size:8px;border-radius:3px;padding:1px 3px;line-height:1;pointer-events:none">R1</span>':''}</div> 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }/div>
           <div class="paso-body">
             <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
             <ul contenteditable="true" class="paso-desc-ul" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." spellcheck="false" onblur="saveInlineEdit(this)">${_descItems}</ul>
@@ -1694,7 +1695,7 @@ function render() {
   }
   let pasoN = 0;
   canvas.innerHTML = STATE.blocks.map((b,i) => {
-    if (b.type === 'paso') pasoN++;
+    if (b.type === 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }
     const def = BLOCK_TYPES[b.type];
     if (!def) return '';
     const blockHTML = def.render(b, pasoN);
@@ -2103,6 +2104,7 @@ function removeBlockImage(blockId) {
   const block = STATE.blocks.find(b => b.id === blockId);
   if (!block) return;
   delete block.src;
+function toggleResetStep(id) { const b = STATE.blocks.find(x => x.id === id); if (!b) return; b.resetStep = !b.resetStep; pushHistory(); render(); localSave(); }
   block.storagePath = null;
   render();
   scheduleLocalSave();
@@ -2731,7 +2733,7 @@ async function exportPDF() {
     const body = STATE.blocks.map(b => {
       const bCopy = {...b};
       if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
-      if (b.type === 'paso') pasoN++;
+      if (b.type === 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }
       return renderBlockForExport(bCopy, pasoN);
     }).join('\n');
     const titulo = q('#manual-titulo').value || 'Manual';
