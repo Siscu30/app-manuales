@@ -3730,12 +3730,20 @@ function htmlToImportBlocks(html) {
     });
     const allBlocks = [];
     mpSections.forEach((section, idx) => {
-      const title = navTitles[section.id] || `Página ${idx + 1}`;
-      allBlocks.push({ id: uid(), type: 'titulo', order: 0, emoji: '📄', titulo: title, subtitulo: '', _isH1: true });
+      const navTitle = navTitles[section.id] || `Página ${idx + 1}`;
+      const secBlocks = [];
       for (const child of Array.from(section.children)) {
         const b = _exportChildToBlock(child);
-        if (b) allBlocks.push(b);
+        if (b) secBlocks.push(b);
       }
+      // Page boundary marker for importAsPages: reuse the section's own título
+      // banner if it leads; otherwise synthesize one from the nav label.
+      if (secBlocks.length && secBlocks[0].type === 'titulo') {
+        secBlocks[0]._isH1 = true;
+      } else {
+        secBlocks.unshift({ id: uid(), type: 'titulo', order: 0, emoji: '📄', titulo: navTitle, subtitulo: '', _isH1: true });
+      }
+      allBlocks.push(...secBlocks);
     });
     return allBlocks;
   }
@@ -3747,42 +3755,102 @@ function htmlToImportBlocks(html) {
 }
 
 function _exportChildToBlock(el) {
+  const style = el.getAttribute('style') || '';
   const text = el.textContent.trim();
-  if (!text && !el.querySelector('img')) return null;
-  if (el.querySelector('hr') && !text) return { id: uid(), type: 'separador', order: 0 };
+  if (!text && !el.querySelector('img,hr,svg,video,iframe')) return null;
+
+  // separador — contains an <hr>
+  if (el.querySelector('hr')) return { id: uid(), type: 'separador', order: 0 };
+
+  // titulo — centered banner with an <h2>
   const h2 = el.querySelector('h2');
   if (h2) {
-    const titulo = h2.textContent.trim();
     const p = el.querySelector('p');
-    return { id: uid(), type: 'titulo', order: 0, emoji: '📋', titulo, subtitulo: p ? p.textContent.trim() : '' };
+    return { id: uid(), type: 'titulo', order: 0, emoji: '📋',
+             titulo: h2.textContent.trim(), subtitulo: p ? p.textContent.trim() : '' };
   }
+
+  // codigo — contains a <pre>
+  const pre = el.querySelector('pre');
+  if (pre) {
+    const head = el.querySelector('div');
+    const language = (head && !head.contains(pre) && head.textContent.trim().length < 24) ? head.textContent.trim() : '';
+    return { id: uid(), type: 'codigo', order: 0, language, code: pre.textContent };
+  }
+
+  // paso — has a circular numbered badge (border-radius:50% + numeric text)
+  const badge = Array.from(el.querySelectorAll('div')).find(d =>
+    /border-radius:50%/.test(d.getAttribute('style') || '') && /^\d+$/.test(d.textContent.trim()));
+  if (badge) {
+    const row = badge.parentElement;
+    const titleDiv = row && row.querySelector('div[style*="font-weight:600"]');
+    const ul = el.querySelector('ul');
+    const descripcion = ul
+      ? Array.from(ul.querySelectorAll('li')).map(li => li.textContent.trim()).filter(Boolean).join('\n')
+      : '';
+    const img = el.querySelector('img[src^="data:"]');
+    const cap = el.querySelector('div[style*="border-top"]');
+    const blk = { id: uid(), type: 'paso', order: 0,
+                  titulo: titleDiv ? titleDiv.textContent.trim() : text.slice(0, 80),
+                  descripcion, storagePath: null, caption: (img && cap) ? cap.textContent.trim() : '' };
+    if (img) blk.src = img.src;
+    return blk;
+  }
+
+  // imagen — embedded image not part of a step
   const img = el.querySelector('img[src^="data:"]');
-  if (img) return { id: uid(), type: 'imagen', order: 0, src: img.src, storagePath: null, caption: '', width: '100%' };
-  if (el.children.length >= 2 && /^\d+$/.test(el.children[0].textContent.trim())) {
-    const body = el.children[1];
-    const strong = body?.querySelector('strong,b');
-    const titulo = strong?.textContent?.trim() || body?.firstElementChild?.textContent?.trim() || text.slice(0, 80);
-    const descEl = body?.querySelector('p,ul');
-    let descripcion = '';
-    if (descEl) descripcion = descEl.tagName === 'UL'
-      ? Array.from(descEl.querySelectorAll('li')).map(li => li.textContent.trim()).join('\n')
-      : descEl.textContent.trim();
-    return { id: uid(), type: 'paso', order: 0, titulo, descripcion, storagePath: null, caption: '' };
+  if (img && !el.querySelector('ul')) {
+    const cap = el.querySelector('div[style*="border-top"]');
+    return { id: uid(), type: 'imagen', order: 0, src: img.src, storagePath: null,
+             caption: cap ? cap.textContent.trim() : '', width: '100%' };
   }
-  const listDivs = Array.from(el.querySelectorAll('div')).filter(d => /^[✅❌✓✗]/.test(d.textContent.trim()) && d.children.length <= 2);
-  if (listDivs.length >= 2) {
-    return { id: uid(), type: 'lista', order: 0, items: listDivs.map(d => {
-      const t = d.textContent.trim();
-      return { icono: /^[✅✓]/.test(t) ? 'check' : 'cross', texto: t.replace(/^[✓✗✅❌]\s*/, '') };
-    })};
-  }
+
+  // tabla / flujos — contains a <table>
   const table = el.querySelector('table');
   if (table) {
     const headers = Array.from(table.querySelectorAll('thead th,thead td')).map(th => th.textContent.trim());
-    const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr => Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim()));
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr =>
+      Array.from(tr.querySelectorAll('td,th')).map(td => td.textContent.trim()));
+    const lh = headers.map(h => h.toLowerCase());
+    if (headers.length === 2 && (lh[0].includes('condic') || lh[1].includes('acci') || lh[1].includes('result'))) {
+      return { id: uid(), type: 'flujos', order: 0, filas: rows.map(r => ({ condicion: r[0] || '', accion: r[1] || '' })) };
+    }
     const cols = headers.length ? headers : (rows[0]?.map((_, i) => `Col ${i + 1}`) || ['Col 1']);
     return { id: uid(), type: 'tabla', order: 0, columnas: cols, filas: headers.length ? rows : rows.slice(1) };
   }
+
+  // lista — every direct child div is a ✅ / ❌ item row
+  const directDivs = Array.from(el.children).filter(c => c.tagName === 'DIV');
+  const listRows = directDivs.filter(d => /^[✅❌✓✗]/.test(d.textContent.trim()));
+  if (listRows.length && listRows.length === directDivs.length) {
+    return { id: uid(), type: 'lista', order: 0, items: listRows.map(d => {
+      const t = d.textContent.trim();
+      return { icono: /^[✅✓]/.test(t) ? 'check' : 'cross', texto: t.replace(/^[✅❌✓✗]\s*/, '') };
+    })};
+  }
+
+  // alerta / callout — flex box led by an icon <span>
+  const span = el.querySelector(':scope > span');
+  if (span && /display:flex/.test(style)) {
+    const ul = el.querySelector('ul');
+    const body = el.querySelector(':scope > div');
+    const texto = ul
+      ? Array.from(ul.querySelectorAll('li')).map(li => li.textContent.trim()).filter(Boolean).join('\n')
+      : (body ? body.textContent.trim() : text);
+    if (/border-left:\s*4px/.test(style)) {
+      let tipo = 'info';
+      if (style.includes('#fefce8')) tipo = 'advertencia';
+      else if (style.includes('#fef2f2')) tipo = 'peligro';
+      else if (style.includes('#f0fdf4')) tipo = 'exito';
+      return { id: uid(), type: 'alerta', order: 0, tipo, texto };
+    }
+    let tipo = 'tip';
+    if (style.includes('#fefce8')) tipo = 'warning';
+    else if (style.includes('#eff6ff')) tipo = 'important';
+    return { id: uid(), type: 'callout', order: 0, tipo, texto };
+  }
+
+  // fallback — preserve as editable rich text
   return { id: uid(), type: 'texto', order: 0, html: el.innerHTML };
 }
 
