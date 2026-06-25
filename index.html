@@ -376,6 +376,8 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .page-item-title:focus{white-space:normal;border-bottom:1px solid rgba(255,255,255,.3)}
 .page-del-btn{background:none;border:none;color:rgba(255,255,255,.3);font-size:11px;padding:1px 4px;border-radius:3px;cursor:pointer;flex-shrink:0;line-height:1}
 .page-del-btn:hover{background:rgba(239,68,68,.2);color:#fca5a5}
+.page-dup-btn{background:none;border:none;color:rgba(255,255,255,.3);font-size:12px;padding:1px 4px;border-radius:3px;cursor:pointer;flex-shrink:0;line-height:1}
+.page-dup-btn:hover{background:rgba(255,255,255,.15);color:#fff}
 .page-add-btn{display:flex;align-items:center;gap:6px;width:100%;padding:6px 14px;background:transparent;color:rgba(255,255,255,.45);font-size:12px;cursor:pointer;border:none;transition:all .15s;text-align:left;flex-shrink:0}
 .page-add-btn:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.8)}
 /* page indicator in topbar */
@@ -3557,6 +3559,29 @@ function deletePage(id) {
   scheduleLocalSave();
 }
 
+function duplicatePage(id) {
+  // Capturar los últimos cambios de la página activa antes de clonar
+  if (STATE.activePage) {
+    const cur = STATE.pages.find(p => p.id === STATE.activePage);
+    if (cur) cur.blocks = [...STATE.blocks];
+  }
+  const idx = STATE.pages.findIndex(p => p.id === id);
+  if (idx === -1) return;
+  const src = STATE.pages[idx];
+  // Clonado profundo con ids NUEVOS de bloque (los ids deben ser únicos en todo el manual).
+  // storagePath de imágenes/vídeos se conserva: ambas páginas referencian el mismo archivo
+  // en Storage; si luego cambias el medio en una, se sube uno nuevo y la otra no se afecta.
+  const clonedBlocks = (src.blocks || []).map(b => {
+    const nb = JSON.parse(JSON.stringify(b));
+    nb.id = uid();
+    return nb;
+  });
+  const newPage = { id: uid(), title: (src.title || 'Página') + ' (copia)', blocks: clonedBlocks };
+  STATE.pages.splice(idx + 1, 0, newPage); // insertar justo después del original
+  switchPage(newPage.id); // ir a la copia para editar los matices (hace render + guardar)
+  notify('📑 Página duplicada');
+}
+
 function switchPage(id) {
   if (STATE.activePage === id) return;
   // Save current blocks to active page
@@ -3596,6 +3621,7 @@ function renderPagesPanel() {
         onblur="renamePage('${p.id}',this.textContent.trim())"
         onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}"
         spellcheck="false">${esc(p.title)}</span>
+      <button class="page-dup-btn" onclick="event.stopPropagation();duplicatePage('${p.id}')" title="Duplicar página">⧉</button>
       ${STATE.pages.length > 1 ? `<button class="page-del-btn" onclick="event.stopPropagation();deletePage('${p.id}')" title="Eliminar">🗑</button>` : ''}
     </div>`).join('');
 }
