@@ -128,7 +128,15 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .b-alerta.peligro{background:#fef2f2;border-left:4px solid #ef4444}
 .b-alerta.exito{background:#f0fdf4;border-left:4px solid #22c55e}
 .b-alerta .alert-icon{font-size:18px;flex-shrink:0;margin-top:1px}
-.b-alerta .alert-text{flex:1;font-size:14px;line-height:1.5}
+.b-alerta .alerta-body{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.b-alerta .alert-text{font-size:14px;line-height:1.5;list-style:disc;padding-left:18px;margin:0;outline:none;min-height:1.3em}
+.b-alerta .alert-text li{padding:1px 0}
+.b-alerta .alert-text:empty::before{content:attr(data-placeholder);color:rgba(0,0,0,.35)}
+.alerta-tipos{display:flex;gap:4px;opacity:.4;transition:opacity .12s}
+.b-alerta:hover .alerta-tipos{opacity:1}
+.alerta-tipo-btn{cursor:pointer;font-size:13px;padding:0 5px;border-radius:5px;border:1px solid transparent;line-height:1.6;user-select:none}
+.alerta-tipo-btn:hover{background:rgba(0,0,0,.06)}
+.alerta-tipo-btn.active{background:rgba(0,0,0,.12);border-color:rgba(0,0,0,.18)}
 
 /* block: paso */
 .b-paso{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm)}
@@ -503,7 +511,6 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <button class="block-btn" onclick="addBlock('paso')" draggable="true" data-type="paso"><span class="icon">🔢</span>Paso</button>
     <button class="block-btn" onclick="addBlock('imagen')" draggable="true" data-type="imagen"><span class="icon">🖼</span>Imagen</button>
     <button class="block-btn" onclick="addBlock('tabla')" draggable="true" data-type="tabla"><span class="icon">📊</span>Tabla</button>
-    <button class="block-btn" onclick="addBlock('callout')" draggable="true" data-type="callout"><span class="icon">💡</span>Callout</button>
     <button class="block-btn" onclick="addBlock('lista')" draggable="true" data-type="lista"><span class="icon">✅</span>Lista</button>
     <button class="block-btn" onclick="addBlock('separador')" draggable="true" data-type="separador"><span class="icon">—</span>Separador</button>
     <button class="block-btn" onclick="addBlock('texto')" draggable="true" data-type="texto"><span class="icon">📝</span>Texto</button>
@@ -1175,36 +1182,20 @@ const BLOCK_TYPES = {
     render(b) {
       const icons = {info:'ℹ️', advertencia:'⚠️', peligro:'🚨', exito:'✅'};
       const _aIcon = b.icon ? iconSVG(b.icon,18) : (icons[b.tipo||'info']||'ℹ️');
-      const _aLines = (b.texto||'').split('\n').filter(l=>l.trim());
-      const _aHtml = _aLines.length > 0
-        ? `<ul style="margin:0;padding-left:16px">${_aLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`
-        : '';
-      return `<div class="b-alerta block-inner ${b.tipo||'info'}" ondblclick="openBlockEditor('${b.id}')">
+      const _aItems = (b.texto||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
+      const TIPOS = [['info','ℹ️'],['advertencia','⚠️'],['peligro','🚨'],['exito','✅']];
+      const tipoBtns = TIPOS.map(([t,ic])=>`<span class="alerta-tipo-btn${(b.tipo||'info')===t?' active':''}" onmousedown="event.preventDefault()" onclick="event.stopPropagation();setAlertaTipo('${b.id}','${t}')" title="${t}">${ic}</span>`).join('');
+      return `<div class="b-alerta block-inner ${b.tipo||'info'}">
         <span class="alert-icon">${_aIcon}</span>
-        <div class="alert-text">${_aHtml}</div>
+        <div class="alerta-body">
+          <ul contenteditable="true" class="alert-text" data-id="${b.id}" data-field="texto" data-placeholder="Escribe la alerta… (Enter = nuevo punto)" spellcheck="false" onblur="saveInlineEdit(this)">${_aItems}</ul>
+          <div class="alerta-tipos">${tipoBtns}</div>
+        </div>
       </div>`;
     },
-    editorHTML(b) {
-      const _ip = b.icon ? iconSVG(b.icon,24) : '<span style="color:var(--text-muted);font-size:18px">–</span>';
-      return `<div class="form-group"><label class="form-label">Tipo</label>
-        <select class="form-select" id="be-tipo">
-          ${['info','advertencia','peligro','exito'].map(t=>`<option value="${t}" ${b.tipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
-        </select></div>
-        <div class="form-group"><label class="form-label">Icono personalizado</label>
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
-          <div id="be-icon-preview" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${_ip}</div>
-          <button type="button" onmousedown="event.preventDefault();openIconPickerForEditor()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">Cambiar</button>
-          <button type="button" onmousedown="event.preventDefault();clearEditorIcon()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">× Quitar</button>
-          <span style="font-size:11px;color:var(--text-muted);margin-left:4px">Sustituye al emoji del tipo</span>
-        </div>
-        <input type="hidden" id="be-icon" value="${b.icon||''}"></div>
-        <div class="form-group"><label class="form-label">Texto <span style="color:var(--text-muted);font-size:11px">(una línea = un punto · Enter para más)</span></label>
-        <textarea class="form-textarea" id="be-texto">${esc(b.texto||'')}</textarea></div>`;
-    },
-    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; b.icon=q('#be-icon').value||null; },
     toTeamsText(b) {
       const icons = {info:'ℹ️', advertencia:'⚠️', peligro:'🚨', exito:'✅'};
-      return `${icons[b.tipo||'info']} ${b.texto||''}`;
+      return `${icons[b.tipo||'info']} ${(b.texto||'').replace(/<[^>]+>/g,'')}`;
     }
   },
   paso: {
@@ -1694,6 +1685,7 @@ function hexToLight(hex){
 // ═══════════════════════════════════════════════════════
 function render() {
   const canvas = q('#canvas');
+  migrateLegacyBlocks(STATE.blocks);
   if (!STATE.blocks.length) {
     canvas.innerHTML = `<div id="canvas-empty">
       <div class="ec-icon">📄</div>
@@ -1924,6 +1916,25 @@ function saveInlineEdit(el) {
 function handleTextoKey(ev) {
   if (ev.ctrlKey && ev.key === 'b') { ev.preventDefault(); document.execCommand('bold'); }
   if (ev.ctrlKey && ev.key === 'i') { ev.preventDefault(); document.execCommand('italic'); }
+}
+
+// Cambia el tipo (color/icono) de una alerta desde sus botones inline
+function setAlertaTipo(id, tipo) {
+  const b = STATE.blocks.find(x => x.id === id);
+  if (!b) return;
+  b.tipo = tipo;
+  render();
+  scheduleLocalSave();
+}
+
+// Callout y Alerta se fusionaron en Alerta: convierte los callouts antiguos al renderizar/cargar
+function migrateLegacyBlocks(blocks) {
+  if (!Array.isArray(blocks)) return blocks;
+  const map = { tip:'exito', warning:'advertencia', important:'info' };
+  for (const b of blocks) {
+    if (b && b.type === 'callout') { b.type = 'alerta'; b.tipo = map[b.tipo] || 'info'; }
+  }
+  return blocks;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2694,7 +2705,7 @@ function renderBlockForExport(b, pasoN) {
       const _aiIcon = b.icon ? iconSVG(b.icon,18,'#374151') : icons[b.tipo||'info'];
       const _aiLines = (b.texto||'').split('\n').filter(l=>l.trim());
       const _aiHtml = _aiLines.length > 0
-        ? `<ul style="margin:0;padding-left:16px">${_aiLines.map(l=>`<li style="font-size:14px;line-height:1.6">${esc(l)}</li>`).join('')}</ul>`
+        ? `<ul style="margin:0;padding-left:16px">${_aiLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
       return `<div style="padding:12px 16px;border-radius:8px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'info']||styles.info};margin-bottom:12px"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_aiIcon}</span><div>${_aiHtml}</div></div>`;
     }
