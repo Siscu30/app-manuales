@@ -429,10 +429,24 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .mp2-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:15px}
 /* ── Sidebar Format Panel ── */
 .sid-fmt-panel{padding:0 10px 8px}
-.ico-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:7px}
-.ico-cell:hover{border-color:var(--primary);background:var(--surface)}
-.ico-cell img{width:100%;height:100%;object-fit:contain;display:block}
-.ico-msg{grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:13px;padding:24px 10px}
+.ico-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:7px;cursor:pointer;padding:5px}
+.ico-cell:hover{border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.22)}
+.ico-cell iconify-icon{display:block}
+.ico-msg{grid-column:1/-1;text-align:center;color:#94a3b8;font-size:12px;padding:18px 8px}
+.ico-cat{font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid rgba(127,127,127,.3);background:rgba(127,127,127,.12);color:#94a3b8;cursor:pointer;font-family:inherit;white-space:nowrap}
+.ico-cat:hover{color:#fff;background:rgba(127,127,127,.4)}
+.ico-cat.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.sid-iconos{padding:0 10px 10px}
+.ico-inp{width:100%;padding:6px 9px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(255,255,255,.05);color:#fff;font-size:12px;font-family:inherit;outline:none;margin-bottom:6px}
+.ico-inp::placeholder{color:rgba(255,255,255,.35)}
+.ico-cats{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:7px}
+.ico-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;max-height:175px;overflow-y:auto}
+.ico-foot{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.ico-colorlbl{display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,.5)}
+.ico-colorlbl input{width:26px;height:22px;border:none;background:none;cursor:pointer;padding:0}
+.ico-expand{font-size:10px;padding:3px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);cursor:pointer;font-family:inherit}
+.ico-expand:hover{background:rgba(255,255,255,.14);color:#fff}
+.ico-hint{font-size:9px;color:rgba(255,255,255,.3);text-align:center;margin-top:5px;font-style:italic}
 .fmt-hint{font-size:10px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0 6px;font-style:italic}
 .fmt-row{display:flex;gap:3px;margin-bottom:3px}
 .fmt-btn{flex:1;display:flex;align-items:center;justify-content:center;min-height:29px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.65);font-size:13px;cursor:pointer;transition:all .12s;font-family:inherit;padding:0}
@@ -559,10 +573,6 @@ input,textarea,select{font-family:inherit;font-size:14px}
       <button class="fmt-btn" id="fmts-insertOrderedList" data-cmd="insertOrderedList" title="Lista numerada" onmousedown="event.preventDefault();fmt('insertOrderedList')" style="font-size:11px">1. Lista</button>
     </div>
     <div class="fmt-sep"></div>
-    <div class="fmt-row">
-      <button class="fmt-btn" id="fmts-icono" title="Insertar icono donde tengas el cursor" onmousedown="event.preventDefault();_saveFmtSel();openIconifyPicker()" style="font-size:11px">✱ Insertar icono</button>
-    </div>
-    <div class="fmt-sep"></div>
     <div class="fmt-label">Tamaño</div>
     <div class="fmt-row">
       <button class="fmt-btn" onmousedown="event.preventDefault();fmtSize(2)" title="Pequeño" style="font-size:10px">S</button>
@@ -588,18 +598,31 @@ input,textarea,select{font-family:inherit;font-size:14px}
     </div>
     <input type="color" id="fmt-sid-custom-inp" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" oninput="_restoreFmtSel();document.execCommand('foreColor',false,this.value)">
   </div>
+  <hr class="sid-divider">
+  <div class="sb-section-hdr" onclick="toggleSidSection('sid-iconos','arrow-iconos');_icoInit()">
+    <span>Iconos</span><span class="sb-toggle" id="arrow-iconos">▶</span>
+  </div>
+  <div class="sid-iconos" id="sid-iconos" style="display:none">
+    <input id="ico-search-sb" class="ico-inp" placeholder="Buscar icono…" oninput="_icoOnSearch(this.value)">
+    <div class="ico-cats" id="ico-cats-sb"></div>
+    <div class="ico-grid" id="ico-grid-sb"></div>
+    <div class="ico-foot">
+      <label class="ico-colorlbl" title="Color del icono">Color <input type="color" id="ico-color-sb" value="#374151" oninput="_icoSetColor(this.value)"></label>
+      <button class="ico-expand" onclick="openIconifyPicker()" title="Ver más grande">⛶ Más</button>
+    </div>
+    <div class="ico-hint">Clic en el texto y luego en un icono.</div>
+  </div>
 <div id="modal-iconify" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.5);align-items:center;justify-content:center" onclick="if(event.target===this)closeIconifyPicker()">
-  <div style="background:var(--surface);border-radius:12px;width:min(560px,93vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45)">
+  <div style="background:var(--surface);border-radius:12px;width:min(620px,94vw);max-height:86vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45)">
     <div style="padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
       <strong style="flex:1;color:var(--ui-text);font-size:15px">✱ Insertar icono</strong>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">Color <input type="color" id="ico-color-modal" value="#374151" oninput="_icoSetColor(this.value)" style="width:30px;height:26px;border:none;background:none;cursor:pointer;padding:0"></label>
       <button onclick="closeIconifyPicker()" style="background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;line-height:1">×</button>
     </div>
-    <div style="padding:12px 18px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--border)">
-      <input id="ico-search" placeholder="Buscar… (warning, user, gear, check, mail…)" oninput="_icoSearchDebounced(this.value)" style="flex:1;padding:8px 11px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--ui-text);font-size:14px;font-family:inherit;outline:none">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);white-space:nowrap">Color <input type="color" id="ico-color" value="#374151" oninput="_icoRecolor()" style="width:32px;height:28px;border:none;background:none;cursor:pointer;padding:0"></label>
-    </div>
-    <div id="ico-grid" style="padding:14px 18px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px;min-height:140px"></div>
-    <div style="padding:9px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">Miles de iconos (Material, Tabler, Lucide…) vía Iconify. Se incrustan en el texto y quedan offline en el manual exportado.</div>
+    <div style="padding:12px 18px 8px"><input id="ico-search-modal" placeholder="Buscar… (warning, user, gear, check, mail…)" oninput="_icoOnSearch(this.value)" style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--ui-text);font-size:14px;font-family:inherit;outline:none"></div>
+    <div id="ico-cats-modal" style="display:flex;flex-wrap:wrap;gap:5px;padding:0 18px 8px"></div>
+    <div id="ico-grid-modal" style="padding:6px 18px 14px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;min-height:160px"></div>
+    <div style="padding:9px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">Clic en un icono para insertarlo donde tengas el cursor. Se incrusta y queda offline en el manual.</div>
   </div>
 </div>
 
@@ -4796,12 +4819,76 @@ function updateFmtStates() {
   });
 }
 
-// ── Iconify: buscador e inserción de iconos inline en el texto ──────────────
-let _icoResults = [];
+// ── Iconos (Iconify): módulo en barra lateral + modal "más grande" ──────────
+const ICO_CATS = [
+  ['Manuales', ['mdi:book-open-page-variant','mdi:format-list-checks','mdi:information','mdi:alert','mdi:check-circle','mdi:close-circle','mdi:cog','mdi:wrench','mdi:lightbulb-on','mdi:folder','mdi:file-document','mdi:clock-outline']],
+  ['Avisos', ['mdi:alert','mdi:alert-circle','mdi:information','mdi:check-circle','mdi:close-circle','mdi:help-circle','mdi:bell','mdi:flag','mdi:shield-alert','mdi:cancel','mdi:fire','mdi:exclamation-thick']],
+  ['Acciones', ['mdi:pencil','mdi:delete','mdi:plus','mdi:content-save','mdi:magnify','mdi:content-copy','mdi:download','mdi:upload','mdi:refresh','mdi:send','mdi:printer','mdi:share-variant']],
+  ['Objetos', ['mdi:folder','mdi:file-document','mdi:cog','mdi:wrench','mdi:monitor','mdi:cellphone','mdi:email','mdi:link-variant','mdi:paperclip','mdi:image','mdi:calendar','mdi:lock']],
+  ['Personas', ['mdi:account','mdi:account-group','mdi:account-circle','mdi:badge-account-horizontal','mdi:face-agent','mdi:account-hard-hat','mdi:account-cog','mdi:account-plus','mdi:shield-account','mdi:briefcase','mdi:school','mdi:card-account-details']],
+  ['Flechas', ['mdi:arrow-right','mdi:arrow-left','mdi:arrow-up','mdi:arrow-down','mdi:chevron-right','mdi:chevron-down','mdi:arrow-top-right','mdi:sync','mdi:undo','mdi:redo','mdi:arrow-right-bold','mdi:swap-horizontal']]
+];
+let _icoColorVal = '#374151';
+let _icoMode = 'cat';
+let _icoCurCat = 0;
+let _icoResults = ICO_CATS[0][1].slice();
 let _icoSearchTimer = null;
 let _icoTargetEl = null;
-function openIconifyPicker() {
-  // Captura el contenteditable donde estaba el cursor para reinsertar luego
+let _icoLibLoaded = false;
+let _icoInited = false;
+function _icoEnsureLib() {
+  if (_icoLibLoaded) return;
+  _icoLibLoaded = true;
+  loadScript('https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js').catch(() => { _icoLibLoaded = false; });
+}
+function _icoInit() {
+  _icoEnsureLib();
+  if (!_icoInited) { _icoInited = true; _icoSetCat(0); }
+  else { _icoRenderCats(); _icoRenderGrids(); }
+}
+function _icoRenderCats() {
+  const html = ICO_CATS.map((c, i) => `<button class="ico-cat${(i === _icoCurCat && _icoMode === 'cat') ? ' active' : ''}" onclick="_icoSetCat(${i})">${c[0]}</button>`).join('');
+  ['ico-cats-sb', 'ico-cats-modal'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
+}
+function _icoSetCat(i) {
+  _icoMode = 'cat'; _icoCurCat = i; _icoResults = ICO_CATS[i][1].slice();
+  ['ico-search-sb', 'ico-search-modal'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  _icoRenderCats(); _icoRenderGrids();
+}
+function _icoOnSearch(v) {
+  ['ico-search-sb', 'ico-search-modal'].forEach(id => { const el = document.getElementById(id); if (el && el.value !== v) el.value = v; });
+  clearTimeout(_icoSearchTimer);
+  _icoSearchTimer = setTimeout(() => _icoDoSearch(v), 250);
+}
+async function _icoDoSearch(query) {
+  query = (query || '').trim();
+  if (!query) { _icoSetCat(_icoCurCat); return; }
+  _icoMode = 'search'; _icoEnsureLib();
+  _icoRenderCats();
+  ['ico-grid-sb', 'ico-grid-modal'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<div class="ico-msg">Buscando…</div>'; });
+  try {
+    const r = await fetch('https://api.iconify.design/search?query=' + encodeURIComponent(query) + '&limit=60');
+    const d = await r.json();
+    _icoResults = (d.icons || []);
+    _icoRenderGrids();
+  } catch (e) {
+    _icoResults = [];
+    _icoRenderGrids('Sin conexión para buscar. Los iconos ya insertados sí funcionan offline.');
+  }
+}
+function _icoSetColor(v) {
+  _icoColorVal = v || '#374151';
+  ['ico-color-sb', 'ico-color-modal'].forEach(id => { const el = document.getElementById(id); if (el && el.value !== _icoColorVal) el.value = _icoColorVal; });
+  _icoRenderGrids();
+}
+function _icoCellHTML(full) {
+  return `<button class="ico-cell" title="${full}" onmousedown="event.preventDefault()" onclick="insertIconAt('${full}')"><iconify-icon icon="${full}" style="font-size:24px;color:${_icoColorVal}"></iconify-icon></button>`;
+}
+function _icoRenderGrids(msg) {
+  const html = msg ? `<div class="ico-msg">${msg}</div>` : (_icoResults.length ? _icoResults.map(_icoCellHTML).join('') : '<div class="ico-msg">Sin resultados</div>');
+  ['ico-grid-sb', 'ico-grid-modal'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
+}
+async function insertIconAt(full) {
   _icoTargetEl = null;
   if (_fmtSavedSel) {
     let n = _fmtSavedSel.startContainer;
@@ -4810,64 +4897,31 @@ function openIconifyPicker() {
     _icoTargetEl = n;
   }
   if (!_icoTargetEl) { notify('Coloca el cursor dentro de un texto, paso, título o subtítulo primero'); return; }
-  const m = document.getElementById('modal-iconify');
-  m.style.display = 'flex';
-  const s = document.getElementById('ico-search');
-  s.value = '';
-  setTimeout(() => s.focus(), 50);
-  _icoSearch('check');
-}
-function closeIconifyPicker() {
-  const m = document.getElementById('modal-iconify');
-  if (m) m.style.display = 'none';
-}
-function _icoSearchDebounced(v) {
-  clearTimeout(_icoSearchTimer);
-  _icoSearchTimer = setTimeout(() => _icoSearch(v), 300);
-}
-function _icoColor() { const c = document.getElementById('ico-color'); return (c && c.value) || '#374151'; }
-async function _icoSearch(query) {
-  const grid = document.getElementById('ico-grid');
-  if (!grid) return;
-  query = (query || '').trim();
-  if (!query) { grid.innerHTML = '<div class="ico-msg">Escribe para buscar…</div>'; return; }
-  grid.innerHTML = '<div class="ico-msg">Buscando…</div>';
+  const i = full.indexOf(':'); const prefix = full.slice(0, i), name = full.slice(i + 1);
   try {
-    const r = await fetch('https://api.iconify.design/search?query=' + encodeURIComponent(query) + '&limit=80');
-    const data = await r.json();
-    _icoResults = (data.icons || []).map(full => { const i = full.indexOf(':'); return { prefix: full.slice(0, i), name: full.slice(i + 1), full }; });
-    _icoRenderGrid();
-  } catch (e) {
-    grid.innerHTML = '<div class="ico-msg" style="color:#dc2626">Sin conexión. Necesitas internet para buscar (una vez insertado, el icono queda offline en el manual).</div>';
-  }
-}
-function _icoRenderGrid() {
-  const grid = document.getElementById('ico-grid');
-  if (!grid) return;
-  if (!_icoResults.length) { grid.innerHTML = '<div class="ico-msg">Sin resultados</div>'; return; }
-  const col = encodeURIComponent(_icoColor());
-  grid.innerHTML = _icoResults.map(ic =>
-    `<button class="ico-cell" title="${ic.full}" onclick="insertIconifyIcon('${ic.prefix}','${ic.name}')"><img src="https://api.iconify.design/${ic.prefix}/${ic.name}.svg?color=${col}&height=28" alt="" loading="lazy"></button>`
-  ).join('');
-}
-function _icoRecolor() { if (_icoResults.length) _icoRenderGrid(); }
-async function insertIconifyIcon(prefix, name) {
-  const color = _icoColor();
-  try {
-    const r = await fetch('https://api.iconify.design/' + prefix + '/' + name + '.svg?color=' + encodeURIComponent(color) + '&height=18');
+    const r = await fetch('https://api.iconify.design/' + prefix + '/' + name + '.svg?color=' + encodeURIComponent(_icoColorVal) + '&height=18');
     let svg = await r.text();
     if (!svg || svg.indexOf('<svg') === -1) throw new Error('icono no disponible');
     svg = svg.replace('<svg ', '<svg class="inline-ico" style="display:inline-block;vertical-align:-0.18em;height:1.05em;width:auto;margin:0 1px" ');
     closeIconifyPicker();
-    if (_icoTargetEl) _icoTargetEl.focus();
+    _icoTargetEl.focus();
     _restoreFmtSel();
     document.execCommand('insertHTML', false, svg + '​');
-    if (_icoTargetEl) saveInlineEdit(_icoTargetEl);
+    saveInlineEdit(_icoTargetEl);
     scheduleLocalSave();
     notify('✱ Icono insertado');
   } catch (e) {
     notify('❌ No se pudo insertar el icono: ' + (e.message || e));
   }
+}
+function openIconifyPicker() {
+  _icoInit();
+  const m = document.getElementById('modal-iconify'); if (m) m.style.display = 'flex';
+  _icoRenderCats(); _icoRenderGrids();
+  const s = document.getElementById('ico-search-modal'); if (s) setTimeout(() => s.focus(), 50);
+}
+function closeIconifyPicker() {
+  const m = document.getElementById('modal-iconify'); if (m) m.style.display = 'none';
 }
 (function initFormatPanel() {
   const canvas = document.getElementById('canvas');
