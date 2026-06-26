@@ -430,6 +430,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .mp2-empty{text-align:center;padding:60px 20px;color:var(--text-muted);font-size:15px}
 /* ── Sidebar Format Panel ── */
 .sid-fmt-panel{padding:0 10px 8px}
+.ico-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;padding:7px}
+.ico-cell:hover{border-color:var(--primary);background:var(--surface)}
+.ico-cell img{width:100%;height:100%;object-fit:contain;display:block}
+.ico-msg{grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:13px;padding:24px 10px}
 .fmt-hint{font-size:10px;color:rgba(255,255,255,.3);text-align:center;padding:3px 0 6px;font-style:italic}
 .fmt-row{display:flex;gap:3px;margin-bottom:3px}
 .fmt-btn{flex:1;display:flex;align-items:center;justify-content:center;min-height:29px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.65);font-size:13px;cursor:pointer;transition:all .12s;font-family:inherit;padding:0}
@@ -530,7 +534,6 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <button class="block-btn" onclick="addBlock('video')" draggable="true" data-type="video"><span class="icon">🎬</span>Vídeo</button>
     <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><span class="icon">🔗</span>Enlace</button>
     <button class="block-btn" onclick="addBlock('codigo')" draggable="true" data-type="codigo"><span class="icon">💻</span>Código</button>
-    <button class="block-btn" onclick="addBlock('icono')" draggable="true" data-type="icono"><span class="icon">⭐</span>Icono</button>
   </div>
 
   <hr class="sid-divider">
@@ -555,6 +558,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <div class="fmt-row">
       <button class="fmt-btn" id="fmts-insertUnorderedList" data-cmd="insertUnorderedList" title="Lista viñetas" onmousedown="event.preventDefault();fmt('insertUnorderedList')" style="font-size:11px">&#8226; Lista</button>
       <button class="fmt-btn" id="fmts-insertOrderedList" data-cmd="insertOrderedList" title="Lista numerada" onmousedown="event.preventDefault();fmt('insertOrderedList')" style="font-size:11px">1. Lista</button>
+    </div>
+    <div class="fmt-sep"></div>
+    <div class="fmt-row">
+      <button class="fmt-btn" id="fmts-icono" title="Insertar icono donde tengas el cursor" onmousedown="event.preventDefault();_saveFmtSel();openIconifyPicker()" style="font-size:11px">✱ Insertar icono</button>
     </div>
     <div class="fmt-sep"></div>
     <div class="fmt-label">Tamaño</div>
@@ -582,6 +589,20 @@ input,textarea,select{font-family:inherit;font-size:14px}
     </div>
     <input type="color" id="fmt-sid-custom-inp" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" oninput="_restoreFmtSel();document.execCommand('foreColor',false,this.value)">
   </div>
+<div id="modal-iconify" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.5);align-items:center;justify-content:center" onclick="if(event.target===this)closeIconifyPicker()">
+  <div style="background:var(--surface);border-radius:12px;width:min(560px,93vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45)">
+    <div style="padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+      <strong style="flex:1;color:var(--ui-text);font-size:15px">✱ Insertar icono</strong>
+      <button onclick="closeIconifyPicker()" style="background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;line-height:1">×</button>
+    </div>
+    <div style="padding:12px 18px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--border)">
+      <input id="ico-search" placeholder="Buscar… (warning, user, gear, check, mail…)" oninput="_icoSearchDebounced(this.value)" style="flex:1;padding:8px 11px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--ui-text);font-size:14px;font-family:inherit;outline:none">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);white-space:nowrap">Color <input type="color" id="ico-color" value="#374151" oninput="_icoRecolor()" style="width:32px;height:28px;border:none;background:none;cursor:pointer;padding:0"></label>
+    </div>
+    <div id="ico-grid" style="padding:14px 18px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));gap:8px;min-height:140px"></div>
+    <div style="padding:9px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">Miles de iconos (Material, Tabler, Lucide…) vía Iconify. Se incrustan en el texto y quedan offline en el manual exportado.</div>
+  </div>
+</div>
 
   <hr class="sid-divider">
   <div class="sb-pages-header" onclick="togglePagesPanel()">
@@ -1175,8 +1196,8 @@ const BLOCK_TYPES = {
       }).join('');
       return `<div class="b-titulo block-inner" style="background:${bgC};border-left:none;text-align:center;color:${textC}">
         <span class="b-emoji" onclick="openEmojiPicker('${b.id}')" title="Cambiar emoji">${b.emoji||'📋'}</span>
-        <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${esc(b.titulo||'')}</div>
-        <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)" style="color:${subC}">${esc(b.subtitulo||'')}</div>
+        <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-rich="1" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${b.titulo||''}</div>
+        <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-rich="1" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)" style="color:${subC}">${b.subtitulo||''}</div>
         <div class="titulo-color-picker">
           ${swatchHTML}
           <label style="position:relative;cursor:pointer;width:22px;height:22px;display:inline-block;flex-shrink:0" title="Color personalizado">
@@ -1248,7 +1269,7 @@ const BLOCK_TYPES = {
         <div class="b-paso-header">
           <div class="paso-num${b.resetStep?' paso-reset':''}" title="${b.resetStep?'Reinicia contador desde 1':'Click para reiniciar contador aqui'}" onclick="event.stopPropagation();toggleResetStep('${b.id}')" style="cursor:pointer;position:relative">${pasoN}${b.resetStep?'<span style="position:absolute;top:-7px;right:-7px;background:#f97316;color:#fff;font-size:8px;border-radius:3px;padding:1px 3px;line-height:1;pointer-events:none">R1</span>':''}</div>
           <div class="paso-body">
-            <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${esc(b.titulo||'')}</div>
+            <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-rich="1" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${b.titulo||''}</div>
             <ul contenteditable="true" class="paso-desc-ul" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." spellcheck="false" onblur="saveInlineEdit(this)">${_descItems}</ul>
           </div>
         </div>
@@ -2733,7 +2754,7 @@ function renderBlockForExport(b, pasoN) {
       const _bgC = normalizeHex(b.blockBgColor || '#4a4a4a');
       const _txtC = isLightColor(_bgC) ? '#1a1a1a' : '#ffffff';
       const _subC = isLightColor(_bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
-      return `<div style="padding:20px 24px 16px;background:${_bgC};border-left:none;border-radius:8px;margin-bottom:12px;text-align:center;color:${_txtC}"><h2 style="font-size:22px;font-weight:700;margin:0;text-align:center;color:${_txtC}">${esc(b.titulo||'')}</h2>${b.subtitulo?`<p style="margin-top:4px;text-align:center;color:${_subC}">${esc(b.subtitulo)}</p>`:''}</div>`;
+      return `<div style="padding:20px 24px 16px;background:${_bgC};border-left:none;border-radius:8px;margin-bottom:12px;text-align:center;color:${_txtC}"><h2 style="font-size:22px;font-weight:700;margin:0;text-align:center;color:${_txtC}">${b.titulo||''}</h2>${b.subtitulo?`<p style="margin-top:4px;text-align:center;color:${_subC}">${b.subtitulo}</p>`:''}</div>`;
     }
     case 'alerta': {
       const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
@@ -2750,7 +2771,7 @@ function renderBlockForExport(b, pasoN) {
       const _dHtml = _dLines.length > 0
         ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
-      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${esc(b.titulo||'')}</div>`}${_dHtml}</div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
+      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
     }
     case 'imagen': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
@@ -4760,6 +4781,80 @@ function updateFmtStates() {
     if (!btn) return;
     try { btn.classList.toggle('active', document.queryCommandState(cmd)); } catch(e) {}
   });
+}
+
+// ── Iconify: buscador e inserción de iconos inline en el texto ──────────────
+let _icoResults = [];
+let _icoSearchTimer = null;
+let _icoTargetEl = null;
+function openIconifyPicker() {
+  // Captura el contenteditable donde estaba el cursor para reinsertar luego
+  _icoTargetEl = null;
+  if (_fmtSavedSel) {
+    let n = _fmtSavedSel.startContainer;
+    n = (n && n.nodeType === 1) ? n : (n ? n.parentElement : null);
+    while (n && !(n.matches && n.matches('[contenteditable][data-id]'))) n = n.parentElement;
+    _icoTargetEl = n;
+  }
+  if (!_icoTargetEl) { notify('Coloca el cursor dentro de un texto, paso, título o subtítulo primero'); return; }
+  const m = document.getElementById('modal-iconify');
+  m.style.display = 'flex';
+  const s = document.getElementById('ico-search');
+  s.value = '';
+  setTimeout(() => s.focus(), 50);
+  _icoSearch('check');
+}
+function closeIconifyPicker() {
+  const m = document.getElementById('modal-iconify');
+  if (m) m.style.display = 'none';
+}
+function _icoSearchDebounced(v) {
+  clearTimeout(_icoSearchTimer);
+  _icoSearchTimer = setTimeout(() => _icoSearch(v), 300);
+}
+function _icoColor() { const c = document.getElementById('ico-color'); return (c && c.value) || '#374151'; }
+async function _icoSearch(query) {
+  const grid = document.getElementById('ico-grid');
+  if (!grid) return;
+  query = (query || '').trim();
+  if (!query) { grid.innerHTML = '<div class="ico-msg">Escribe para buscar…</div>'; return; }
+  grid.innerHTML = '<div class="ico-msg">Buscando…</div>';
+  try {
+    const r = await fetch('https://api.iconify.design/search?query=' + encodeURIComponent(query) + '&limit=80');
+    const data = await r.json();
+    _icoResults = (data.icons || []).map(full => { const i = full.indexOf(':'); return { prefix: full.slice(0, i), name: full.slice(i + 1), full }; });
+    _icoRenderGrid();
+  } catch (e) {
+    grid.innerHTML = '<div class="ico-msg" style="color:#dc2626">Sin conexión. Necesitas internet para buscar (una vez insertado, el icono queda offline en el manual).</div>';
+  }
+}
+function _icoRenderGrid() {
+  const grid = document.getElementById('ico-grid');
+  if (!grid) return;
+  if (!_icoResults.length) { grid.innerHTML = '<div class="ico-msg">Sin resultados</div>'; return; }
+  const col = encodeURIComponent(_icoColor());
+  grid.innerHTML = _icoResults.map(ic =>
+    `<button class="ico-cell" title="${ic.full}" onclick="insertIconifyIcon('${ic.prefix}','${ic.name}')"><img src="https://api.iconify.design/${ic.prefix}/${ic.name}.svg?color=${col}&height=28" alt="" loading="lazy"></button>`
+  ).join('');
+}
+function _icoRecolor() { if (_icoResults.length) _icoRenderGrid(); }
+async function insertIconifyIcon(prefix, name) {
+  const color = _icoColor();
+  try {
+    const r = await fetch('https://api.iconify.design/' + prefix + '/' + name + '.svg?color=' + encodeURIComponent(color) + '&height=18');
+    let svg = await r.text();
+    if (!svg || svg.indexOf('<svg') === -1) throw new Error('icono no disponible');
+    svg = svg.replace('<svg ', '<svg class="inline-ico" style="display:inline-block;vertical-align:-0.18em;height:1.05em;width:auto;margin:0 1px" ');
+    closeIconifyPicker();
+    if (_icoTargetEl) _icoTargetEl.focus();
+    _restoreFmtSel();
+    document.execCommand('insertHTML', false, svg + '​');
+    if (_icoTargetEl) saveInlineEdit(_icoTargetEl);
+    scheduleLocalSave();
+    notify('✱ Icono insertado');
+  } catch (e) {
+    notify('❌ No se pudo insertar el icono: ' + (e.message || e));
+  }
 }
 (function initFormatPanel() {
   const canvas = document.getElementById('canvas');
