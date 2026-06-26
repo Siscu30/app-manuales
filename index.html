@@ -252,7 +252,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .b-enlace .enlace-desc{font-size:13px;color:var(--text);margin-top:6px;line-height:1.4}
 
 /* per-block color picker */
-.block-color-popup{position:absolute;top:calc(100% + 6px);right:0;background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:10px;padding:14px;z-index:30;box-shadow:0 12px 28px rgba(0,0,0,.4);min-width:240px}
+.block-color-popup{position:absolute;top:calc(100% + 6px);right:0;background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:10px;padding:14px;z-index:30;box-shadow:0 12px 28px rgba(0,0,0,.4);min-width:300px}
+.bcp-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;margin:6px 0}
+.bcp-sw{width:100%;aspect-ratio:1;border-radius:3px;cursor:pointer;border:1px solid rgba(0,0,0,.18)}
+.bcp-sw:hover{outline:2px solid var(--primary);outline-offset:1px;position:relative;z-index:1}
 .block-color-popup label{font-size:12px;font-weight:500;display:block;margin-bottom:4px;color:var(--ui-text-muted)}
 .block-color-popup .color-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .block-color-popup input[type=color]{width:36px;height:28px;border:1px solid var(--panel-border);border-radius:4px;padding:2px;cursor:pointer}
@@ -1801,7 +1804,7 @@ function render() {
         <button title="Bajar" onclick="moveBlock(${i},1,event)">↓</button>
         <button title="Color personalizado" onclick="openBlockColorPicker('${b.id}',event)" style="position:relative">🎨</button>
         ${(b.type==='imagen'||b.type==='paso')&&(b.src||b.storagePath)?`<button title="Anotar imagen" onclick="openAnnotationEditor('${b.id}');event.stopPropagation()" style="color:#2563EB">✏️</button>`:''}
-        <button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>
+        ${def.editorHTML?`<button title="Editar" onclick="openBlockEditor('${b.id}',event)">✏</button>`:''}
         <button class="del" title="Eliminar" onclick="deleteBlock('${b.id}',event)">🗑</button>
       </div>
     </div>`;
@@ -1847,10 +1850,11 @@ function applyBlockColors() {
     if (!inner) return;
     if (b.blockBgColor) {
       inner.style.backgroundColor = normalizeHex(b.blockBgColor);
-      if (b.type === 'titulo') {
+      if (b.type === 'titulo' || b.type === 'subtitulo') {
         inner.style.borderLeft = 'none';
         const light = isLightColor(b.blockBgColor);
         inner.style.color = light ? '#1a1a1a' : '#ffffff';
+        inner.querySelectorAll('.b-titulo-t, .sub-text').forEach(el => { el.style.color = light ? '#1a1a1a' : '#ffffff'; });
         const sub = inner.querySelector('.subtitulo');
         if (sub) sub.style.color = light ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
       }
@@ -1865,37 +1869,50 @@ function applyBlockColors() {
   });
 }
 
+const BLOCK_PALETTE = ['#FFFFFF','#F8FAFC','#E2E8F0','#CBD5E1','#94A3B8','#64748B','#475569','#334155','#1E293B','#0F172A','#FEE2E2','#FCA5A5','#EF4444','#DC2626','#B91C1C','#FFEDD5','#FDBA74','#F97316','#EA580C','#C2410C','#FEF9C3','#FDE047','#EAB308','#CA8A04','#A16207','#DCFCE7','#86EFAC','#22C55E','#16A34A','#15803D','#CFFAFE','#67E8F9','#06B6D4','#0891B2','#0E7490','#DBEAFE','#93C5FD','#3B82F6','#2563EB','#1D4ED8','#E0E7FF','#A5B4FC','#6366F1','#4F46E5','#4338CA','#F3E8FF','#D8B4FE','#A855F7','#9333EA','#7E22CE','#FCE7F3','#F9A8D4','#EC4899','#DB2777','#BE185D','#F5F5F4','#D6D3D1','#78716C','#57534E','#292524'];
 function openBlockColorPicker(blockId, ev) {
   if (ev) ev.stopPropagation();
   document.querySelectorAll('.block-color-popup').forEach(p=>p.remove());
   const block = STATE.blocks.find(b=>b.id===blockId);
   if (!block) return;
-  if (block.type === 'titulo') return; // titulo uses inline swatches
   const btn = ev.currentTarget;
   const popup = document.createElement('div');
   popup.className = 'block-color-popup';
+  const sw = BLOCK_PALETTE.map(c=>`<span class="bcp-sw" style="background:${c}" title="${c}" onclick="setBlockBg('${blockId}','${c}')"></span>`).join('');
   popup.innerHTML = `
-    <label>Color de borde / acento</label>
-    <div class="color-row">
-      <input type="color" id="bcp-border" value="${block.blockBorderColor||'#2563EB'}">
-      <span style="font-size:12px;flex:1;color:var(--text-muted)">${block.blockBorderColor||'Por defecto'}</span>
-      <button class="reset-btn" onclick="clearBlockColor('${blockId}','border')">Quitar</button>
-    </div>
-    <label>Color de fondo</label>
-    <div class="color-row">
-      <input type="color" id="bcp-bg" value="${block.blockBgColor||'#ffffff'}">
-      <span style="font-size:12px;flex:1;color:var(--text-muted)">${block.blockBgColor||'Por defecto'}</span>
+    <label>Color de fondo del bloque</label>
+    <div class="bcp-grid">${sw}</div>
+    <div class="color-row" style="margin-top:8px">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
+      <input type="color" id="bcp-bg" value="${block.blockBgColor||'#ffffff'}" oninput="setBlockBg('${blockId}',this.value)">
       <button class="reset-btn" onclick="clearBlockColor('${blockId}','bg')">Quitar</button>
     </div>
-    <div style="display:flex;gap:6px;margin-top:4px">
-      <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveBlockColors('${blockId}')">Aplicar</button>
-      <button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove()">✕</button>
-    </div>`;
+    <label style="margin-top:8px">Borde / acento</label>
+    <div class="color-row">
+      <input type="color" id="bcp-border" value="${block.blockBorderColor||'#2563EB'}" oninput="setBlockBorder('${blockId}',this.value)">
+      <span style="font-size:11px;flex:1;color:var(--text-muted)">${block.blockBorderColor||'Por defecto'}</span>
+      <button class="reset-btn" onclick="clearBlockColor('${blockId}','border')">Quitar</button>
+    </div>
+    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove()">Cerrar</button></div>`;
   btn.style.position = 'relative';
   btn.appendChild(popup);
   setTimeout(()=>document.addEventListener('click', function handler(e){
     if(!popup.contains(e.target)){popup.remove();document.removeEventListener('click',handler);}
   }), 10);
+}
+function setBlockBg(blockId, color) {
+  const block = STATE.blocks.find(b=>b.id===blockId);
+  if (!block) return;
+  block.blockBgColor = color;
+  applyBlockColors();
+  scheduleLocalSave();
+}
+function setBlockBorder(blockId, color) {
+  const block = STATE.blocks.find(b=>b.id===blockId);
+  if (!block) return;
+  block.blockBorderColor = color;
+  applyBlockColors();
+  scheduleLocalSave();
 }
 
 function saveBlockColors(blockId) {
