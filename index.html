@@ -114,6 +114,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 
 /* block: titulo */
 .b-titulo{padding:20px 24px 16px;background:#4a4a4a;border-radius:var(--radius);text-align:center;box-shadow:var(--shadow-sm);color:#fff}
+.b-subtitulo{background:#f8fafc;border-left:4px solid var(--primary);border-radius:6px;padding:9px 14px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-sm)}
+.b-subtitulo .sub-emoji{font-size:16px;cursor:pointer;flex-shrink:0;line-height:1}
+.b-subtitulo .sub-text{flex:1;font-weight:600;font-size:16px;color:#1e293b;outline:none;min-height:1.2em}
+.b-subtitulo .sub-text:empty::before{content:attr(data-placeholder);color:#94a3b8;font-weight:400}
 .b-titulo .b-emoji{font-size:28px;cursor:pointer;display:block;margin-bottom:6px}
 .b-titulo .b-titulo-t{font-size:22px;font-weight:700;line-height:1.2}
 .b-titulo .subtitulo{font-size:14px;margin-top:4px}
@@ -215,7 +219,14 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .b-separador hr{border:none;border-top:2px solid var(--border)}
 
 /* block: texto */
-.b-texto{background:var(--surface);border-radius:var(--radius);border:1px solid transparent;padding:12px 16px;font-size:14px;line-height:1.6;box-shadow:var(--shadow-sm)}
+.b-texto-wrap{background:var(--surface);border-radius:var(--radius);border:1px solid transparent;padding:12px 16px;font-size:14px;line-height:1.6;box-shadow:var(--shadow-sm)}
+.b-texto-edit{outline:none;min-height:1.4em}
+.b-texto-pic{width:100%;display:block;border-radius:6px;margin-top:10px}
+.b-texto-imgwrap{position:relative;margin-top:4px}
+.b-texto-imgdel{position:absolute;top:6px;right:6px;background:#ef4444;color:#fff;border:none;border-radius:5px;padding:2px 7px;font-size:11px;cursor:pointer;line-height:1.4}
+.b-texto-addimg{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:11px;color:var(--text-muted);cursor:pointer;border:1px dashed var(--border);border-radius:6px;padding:3px 9px;opacity:0;transition:opacity .12s}
+.b-texto-wrap:hover .b-texto-addimg{opacity:.7}
+.b-texto-addimg:hover{opacity:1!important;border-color:var(--primary);color:var(--primary)}
 .b-texto:hover{border-color:var(--border)}
 
 /* block: flujos */
@@ -507,6 +518,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
   </div>
   <div class="sid-chips" id="sid-chips-bloques">
     <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><span class="icon">📑</span>Título</button>
+    <button class="block-btn" onclick="addBlock('subtitulo')" draggable="true" data-type="subtitulo"><span class="icon">🔹</span>Subtítulo</button>
     <button class="block-btn" onclick="addBlock('alerta')" draggable="true" data-type="alerta"><span class="icon">⚠️</span>Alerta</button>
     <button class="block-btn" onclick="addBlock('paso')" draggable="true" data-type="paso"><span class="icon">🔢</span>Paso</button>
     <button class="block-btn" onclick="addBlock('imagen')" draggable="true" data-type="imagen"><span class="icon">🖼</span>Imagen</button>
@@ -1176,6 +1188,17 @@ const BLOCK_TYPES = {
     },
     toTeamsText(b) { return `${b.emoji||'📋'} **${b.titulo||''}**\n${b.subtitulo ? b.subtitulo+'\n' : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`; }
   },
+  subtitulo: {
+    label: 'Subtítulo',
+    defaultData: () => ({ emoji:'▸', texto:'Subtítulo del tema' }),
+    render(b) {
+      return `<div class="b-subtitulo block-inner">
+        <span class="sub-emoji" onclick="openEmojiPicker('${b.id}')" title="Cambiar emoji">${b.emoji||'▸'}</span>
+        <div contenteditable="true" class="sub-text" data-id="${b.id}" data-field="texto" data-rich="1" data-placeholder="Subtítulo…" spellcheck="false" onblur="saveInlineEdit(this)">${b.texto||''}</div>
+      </div>`;
+    },
+    toTeamsText(b) { return `**${(b.texto||'').replace(/<[^>]+>/g,'')}**`; }
+  },
   alerta: {
     label: 'Alerta / Aviso',
     defaultData: () => ({ tipo:'info', texto:'Texto de la alerta' }),
@@ -1394,7 +1417,19 @@ const BLOCK_TYPES = {
     label: 'Texto libre',
     defaultData: () => ({ html:'Escribe aquí tu texto...' }),
     render(b) {
-      return `<div class="b-texto block-inner" contenteditable="true" data-id="${b.id}" data-field="html" onblur="saveInlineEdit(this)" onkeydown="handleTextoKey(event)">${b.html||''}</div>`;
+      const hasImg = b.src || b.storagePath;
+      const imgTag = b.src
+        ? `<img src="${b.src}" class="b-texto-pic" onclick="openLightbox(this)" alt="">`
+        : b.storagePath
+        ? `<img src="" data-path="${b.storagePath}" class="b-texto-pic lazy-img" onclick="openLightbox(this)" alt="">`
+        : '';
+      const imgArea = hasImg
+        ? `<div class="b-texto-imgwrap">${imgTag}<button class="b-texto-imgdel" onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen">✕</button></div>`
+        : `<label class="b-texto-addimg" title="Añadir imagen">📷 Imagen<input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')"></label>`;
+      return `<div class="b-texto-wrap block-inner">
+        <div class="b-texto-edit" contenteditable="true" data-id="${b.id}" data-field="html" onblur="saveInlineEdit(this)" onkeydown="handleTextoKey(event)">${b.html||''}</div>
+        ${imgArea}
+      </div>`;
     },
     toTeamsText(b) {
       const tmp = document.createElement('div');
@@ -1908,7 +1943,7 @@ function saveInlineEdit(el) {
   if (el.tagName === 'UL' || el.tagName === 'OL') {
     block[field] = [...el.querySelectorAll('li')].map(li => li.innerHTML.trim()).filter(Boolean).join('\n');
   } else {
-    block[field] = field === 'html' ? el.innerHTML : el.textContent;
+    block[field] = (field === 'html' || el.dataset.rich) ? el.innerHTML : el.textContent;
   }
   scheduleLocalSave();
 }
@@ -2693,6 +2728,7 @@ function renderBlockForExport(b, pasoN) {
   const borderAccent = b.blockBorderColor || color;
 
   switch(b.type) {
+    case 'subtitulo': return `<div style="background:#f8fafc;border-left:4px solid ${color};border-radius:6px;padding:9px 14px;margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:16px;flex-shrink:0">${b.emoji||'▸'}</span><div style="font-weight:600;font-size:16px;color:#1e293b">${b.texto||''}</div></div>`;
     case 'titulo': {
       const _bgC = normalizeHex(b.blockBgColor || '#4a4a4a');
       const _txtC = isLightColor(_bgC) ? '#1a1a1a' : '#ffffff';
@@ -2734,7 +2770,10 @@ function renderBlockForExport(b, pasoN) {
     }
     case 'lista': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;margin-bottom:12px">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0"><span style="font-size:16px">${it.icono==='check'?'✅':'❌'}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
     case 'separador': return `<div style="padding:8px 0;margin-bottom:12px"><hr style="border:none;border-top:2px solid #e2e8f0"></div>`;
-    case 'texto': return `<div style="padding:12px 16px;background:#fff;border-radius:8px;font-size:14px;line-height:1.6;margin-bottom:12px">${b.html||''}</div>`;
+    case 'texto': {
+      const _tImg = b.src ? `<img src="${b.src}" style="width:100%;display:block;border-radius:6px;margin-top:10px" alt="">` : '';
+      return `<div style="padding:12px 16px;background:#fff;border-radius:8px;font-size:14px;line-height:1.6;margin-bottom:12px">${b.html||''}${_tImg}</div>`;
+    }
     case 'flujos': {
       const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0">${esc(r.accion||'')}</td></tr>`).join('');
       return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
