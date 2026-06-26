@@ -3665,6 +3665,7 @@ function togglePagesPanel() {
   const isOpen = panel.style.display !== 'none';
   panel.style.display = isOpen ? 'none' : 'block';
   if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+  saveUserPrefs();
 }
 function toggleSidSection(id, arrowId) {
   const panel = document.getElementById(id);
@@ -3673,6 +3674,61 @@ function toggleSidSection(id, arrowId) {
   const isOpen = panel.style.display !== 'none';
   panel.style.display = isOpen ? 'none' : '';
   if (arrow) { arrow.textContent = isOpen ? '▶' : '▼'; arrow.style.transform = isOpen ? 'rotate(-90deg)' : ''; }
+  saveUserPrefs();
+}
+
+// ═══════════════════════════════════════════════════════
+// USER PREFS (sidebar layout, cross-device)
+// ═══════════════════════════════════════════════════════
+const _SIDEBAR_PANELS = [
+  { id: 'sid-chips-manuales', arrowId: 'arrow-manuales' },
+  { id: 'sid-chips-bloques',  arrowId: 'arrow-bloques' },
+  { id: 'sid-fmt-panel',      arrowId: 'arrow-fmt' },
+  { id: 'sid-iconos',         arrowId: 'arrow-iconos' },
+];
+let _prefsTimer = null;
+
+async function loadUserPrefs() {
+  if (!STATE.user) return;
+  try {
+    const { data } = await sb.from('user_prefs').select('prefs').eq('user_id', STATE.user.id).single();
+    if (!data?.prefs?.sidebar) return;
+    const s = data.prefs.sidebar;
+    _SIDEBAR_PANELS.forEach(({ id, arrowId }) => {
+      if (s[id] === undefined) return;
+      const panel = document.getElementById(id);
+      const arrow = document.getElementById(arrowId);
+      if (!panel) return;
+      const open = s[id];
+      panel.style.display = open ? '' : 'none';
+      if (arrow) { arrow.textContent = open ? '▼' : '▶'; arrow.style.transform = open ? '' : 'rotate(-90deg)'; }
+    });
+    if (s['pages-panel'] !== undefined) {
+      const panel = document.getElementById('pages-panel-body');
+      const arrow = document.getElementById('pages-toggle-arrow');
+      if (panel) {
+        panel.style.display = s['pages-panel'] ? 'block' : 'none';
+        if (arrow) arrow.textContent = s['pages-panel'] ? '▼' : '▶';
+      }
+    }
+  } catch(_) {}
+}
+
+function saveUserPrefs() {
+  if (!STATE.user) return;
+  clearTimeout(_prefsTimer);
+  _prefsTimer = setTimeout(async () => {
+    const s = {};
+    _SIDEBAR_PANELS.forEach(({ id }) => {
+      const panel = document.getElementById(id);
+      if (panel) s[id] = panel.style.display !== 'none';
+    });
+    const pagesPanel = document.getElementById('pages-panel-body');
+    if (pagesPanel) s['pages-panel'] = pagesPanel.style.display !== 'none';
+    try {
+      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s }, updated_at: new Date().toISOString() });
+    } catch(_) {}
+  }, 500);
 }
 
 function addPage() {
@@ -4576,6 +4632,7 @@ async function handleSession(session) {
     if (!role) role = await loadUserRole(session.user.id);
     STATE.role = role || 'editor';
     applyRoleUI(STATE.role);
+    loadUserPrefs();
             loadManualesPanel('activos');
 
     // Load local draft for the current manual if any
