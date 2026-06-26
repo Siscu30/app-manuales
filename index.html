@@ -659,6 +659,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
   <div class="dropdown" id="share-dropdown">
     <button class="tb-btn" onclick="toggleShareMenu()">Compartir ▾</button>
     <div class="dropdown-menu" id="share-menu">
+      <div class="dropdown-item" onclick="exportHTML(true)">👁 Vista previa (HTML / PDF)</div>
       <div class="dropdown-item" onclick="exportHTML()">🗂 Exportar HTML</div>
       <div class="dropdown-item" onclick="exportPDF()">📄 Exportar PDF</div>
       <div class="dropdown-item" onclick="openTeamsModal()">💬 Copiar para Teams</div>
@@ -1214,22 +1215,10 @@ const BLOCK_TYPES = {
       const bgC = normalizeHex(b.blockBgColor || '#4a4a4a');
       const textC = isLightColor(bgC) ? '#1a1a1a' : '#ffffff';
       const subC = isLightColor(bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
-      const SWATCHES = ['#EA580C','#2563EB','#16A34A','#DC2626','#7C3AED','#0891B2','#374151','#1a1a1a'];
-      const swatchHTML = SWATCHES.map(c => {
-        const active = c === bgC;
-        return `<span class="titulo-color-swatch" data-color="${c}" style="background:${c};width:22px;height:22px;border:${active?'2px solid white':'2px solid transparent'}" title="${c}"></span>`;
-      }).join('');
       return `<div class="b-titulo block-inner" style="background:${bgC};border-left:none;text-align:center;color:${textC}">
         <span class="b-emoji" onclick="openEmojiPicker('${b.id}')" title="Cambiar emoji">${b.emoji||'📋'}</span>
         <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-rich="1" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${b.titulo||''}</div>
         <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-rich="1" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)" style="color:${subC}">${b.subtitulo||''}</div>
-        <div class="titulo-color-picker">
-          ${swatchHTML}
-          <label style="position:relative;cursor:pointer;width:22px;height:22px;display:inline-block;flex-shrink:0" title="Color personalizado">
-            <span class="titulo-cprev" style="width:22px;height:22px;border-radius:50%;background:${bgC};display:block;border:2px solid rgba(255,255,255,.5)"></span>
-            <input type="color" class="titulo-color-custom" value="${bgC}" style="position:absolute;opacity:0;width:0;height:0">
-          </label>
-        </div>
       </div>`;
     },
     toTeamsText(b) { return `${b.emoji||'📋'} **${b.titulo||''}**\n${b.subtitulo ? b.subtitulo+'\n' : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`; }
@@ -1240,17 +1229,8 @@ const BLOCK_TYPES = {
     render(b) {
       const bgC = normalizeHex(b.blockBgColor || '#64748b');
       const textC = isLightColor(bgC) ? '#1a1a1a' : '#ffffff';
-      const SWATCHES = ['#EA580C','#2563EB','#16A34A','#DC2626','#7C3AED','#0891B2','#64748B','#374151'];
-      const swatchHTML = SWATCHES.map(c => `<span class="titulo-color-swatch" data-color="${c}" style="background:${c};width:18px;height:18px;border:${c===bgC?'2px solid white':'2px solid transparent'}" title="${c}"></span>`).join('');
       return `<div class="b-subtitulo block-inner" style="background:${bgC};text-align:center;color:${textC}">
         <div contenteditable="true" class="sub-text" data-id="${b.id}" data-field="texto" data-rich="1" data-placeholder="Subtítulo del tema" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${b.texto||''}</div>
-        <div class="titulo-color-picker">
-          ${swatchHTML}
-          <label style="position:relative;cursor:pointer;width:18px;height:18px;display:inline-block;flex-shrink:0" title="Color personalizado">
-            <span class="titulo-cprev" style="width:18px;height:18px;border-radius:50%;background:${bgC};display:block;border:2px solid rgba(255,255,255,.5)"></span>
-            <input type="color" class="titulo-color-custom" value="${bgC}" style="position:absolute;opacity:0;width:0;height:0">
-          </label>
-        </div>
       </div>`;
     },
     toTeamsText(b) { return `**${(b.texto||'').replace(/<[^>]+>/g,'')}**`; }
@@ -2715,14 +2695,14 @@ async function rejectManual() {
 // ═══════════════════════════════════════════════════════
 // EXPORT HTML
 // ═══════════════════════════════════════════════════════
-async function exportHTML() {
+async function exportHTML(preview) {
   // Multi-page export when pages exist
   if (STATE.pages.length > 0) {
     if (STATE.activePage) {
       const cur = STATE.pages.find(p => p.id === STATE.activePage);
       if (cur) cur.blocks = [...STATE.blocks];
     }
-    await exportHTMLMultipage();
+    await exportHTMLMultipage(preview);
     return;
   }
 
@@ -2773,6 +2753,7 @@ async function exportHTML() {
   bar.style.width = '100%';
   setTimeout(()=>{
     prog.classList.remove('show');
+    if (preview) { _showHtmlPreview(html, titulo); return; }
     const blob = new Blob([html], {type:'text/html;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2783,6 +2764,41 @@ async function exportHTML() {
     const size = (blob.size/1024/1024).toFixed(1);
     notify(`✅ Exportado: ${size} MB`);
   }, 400);
+}
+
+// ── Previsualizador HTML/PDF: muestra el manual generado en un iframe ────────
+let _pvHtml = '', _pvTitle = '';
+function _showHtmlPreview(html, titulo) {
+  _pvHtml = html; _pvTitle = titulo || 'Manual';
+  let modal = document.getElementById('preview-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'preview-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:4000;background:rgba(15,23,42,.7);display:flex;flex-direction:column';
+    modal.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+        <strong style="flex:1;color:var(--ui-text);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👁 Vista previa — <span id="pv-title"></span></strong>
+        <button class="btn btn-sm" onclick="_pvPrint()">🖨 Imprimir / PDF</button>
+        <button class="btn btn-sm" onclick="_pvDownload()">⬇ Descargar HTML</button>
+        <button class="btn btn-sm" onclick="document.getElementById('preview-modal').style.display='none'">✕ Cerrar</button>
+      </div>
+      <iframe id="pv-frame" style="flex:1;width:100%;border:none;background:#fff"></iframe>`;
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  document.getElementById('pv-title').textContent = _pvTitle;
+  document.getElementById('pv-frame').srcdoc = html;
+}
+function _pvDownload() {
+  const blob = new Blob([_pvHtml], {type:'text/html;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = (_pvTitle.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g,'').trim()||'manual') + '.html';
+  a.click(); URL.revokeObjectURL(url);
+}
+function _pvPrint() {
+  const f = document.getElementById('pv-frame');
+  if (f && f.contentWindow) { f.contentWindow.focus(); f.contentWindow.print(); }
 }
 
 function blobToBase64(blob) {
@@ -4308,7 +4324,7 @@ function confirmUnifiedImport() {
 // ═══════════════════════════════════════════════════════
 // MULTI-PAGE EXPORT
 // ═══════════════════════════════════════════════════════
-async function exportHTMLMultipage() {
+async function exportHTMLMultipage(preview) {
   const titulo = q('#manual-titulo').value || 'Manual';
   const empresa = q('#manual-empresa').value || '';
   const color = STATE.manual.color || '#2563EB';
@@ -4351,6 +4367,7 @@ async function exportHTMLMultipage() {
   bar.style.width = '100%';
   setTimeout(() => {
     prog.classList.remove('show');
+    if (preview) { _showHtmlPreview(html, titulo); return; }
     const blob = new Blob([html], {type:'text/html;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
