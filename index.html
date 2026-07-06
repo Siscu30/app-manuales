@@ -371,6 +371,11 @@ input,textarea,select{font-family:inherit;font-size:14px}
   #viewer{margin-left:0}
   #touch-warning{margin-left:0}
   #tb-hamburger{display:inline-flex!important}
+  #canvas-wrap{padding:16px 8px}
+  #manual-empresa{display:none}
+}
+@media(hover:none){
+  .block-bar{opacity:1} /* sin hover en tactil: mostrar siempre los controles */
 }
 
 @media print{
@@ -518,7 +523,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- ── SIDEBAR (fixed, full-height) ── -->
-<aside id="sidebar">
+<aside id="sidebar" role="navigation" aria-label="Panel lateral de bloques y herramientas">
   <div class="sid-header">
     <span class="sid-logo">📋</span>
     <span class="sid-brand">Manuales</span>
@@ -541,6 +546,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
     <span>Bloques</span><span class="sb-toggle" id="arrow-bloques">▼</span>
   </div>
   <div class="sid-chips" id="sid-chips-bloques">
+    <input id="block-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar bloque…" aria-label="Buscar tipo de bloque" oninput="filterBlockBtns(this.value)">
     <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><span class="icon">📑</span>Título</button>
     <button class="block-btn" onclick="addBlock('subtitulo')" draggable="true" data-type="subtitulo"><span class="icon">🔹</span>Subtítulo</button>
     <button class="block-btn" onclick="addBlock('alerta')" draggable="true" data-type="alerta"><span class="icon">⚠️</span>Alerta</button>
@@ -648,11 +654,11 @@ input,textarea,select{font-family:inherit;font-size:14px}
 <div id="touch-warning">📱 App optimizada para escritorio. En táctil usa los botones del panel para añadir bloques.</div>
 
 <!-- ── TOP BAR ── -->
-<div id="topbar">
-  <button id="tb-hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')" title="Menú">☰</button>
-  <input id="manual-titulo" type="text" value="Nuevo manual" spellcheck="false" title="Título del manual">
+<div id="topbar" role="toolbar" aria-label="Barra de herramientas del manual">
+  <button id="tb-hamburger" aria-label="Abrir menú lateral" onclick="document.getElementById('sidebar').classList.toggle('open')" title="Menú">☰</button>
+  <input id="manual-titulo" type="text" value="Nuevo manual" spellcheck="false" title="Título del manual" aria-label="Título del manual">
   <span style="color:rgba(255,255,255,.2);font-size:12px;flex-shrink:0">·</span>
-  <input id="manual-empresa" type="text" placeholder="Empresa" spellcheck="false">
+  <input id="manual-empresa" type="text" placeholder="Empresa" spellcheck="false" aria-label="Nombre de la empresa">
   <div class="topbar-spacer"></div>
   <span id="save-status"></span>
   <span id="stats-indicator" style="font-size:11px;color:rgba(255,255,255,.35);white-space:nowrap;margin:0 6px"></span>
@@ -684,7 +690,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- ── MAIN APP ── -->
-<div id="app">
+<div id="app" role="main" aria-label="Editor del manual">
   <div id="canvas-wrap">
     <div id="canvas"></div>
   </div>
@@ -699,7 +705,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 <!-- ── MODALS ── -->
 
 <!-- Mis Manuales -->
-<div class="modal-backdrop hidden" id="modal-manuales">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-manuales">
   <div class="modal modal-md">
     <div class="modal-header"><h3>📂 Mis manuales</h3><button class="modal-close" onclick="closeModal('modal-manuales')">×</button></div>
     <div class="modal-body" id="manuales-list" style="min-height:200px"></div>
@@ -708,7 +714,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Teams copy -->
-<div class="modal-backdrop hidden" id="modal-teams">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-teams">
   <div class="modal modal-md">
     <div class="modal-header"><h3>💬 Copiar para Teams</h3><button class="modal-close" onclick="closeModal('modal-teams')">×</button></div>
     <div class="modal-body">
@@ -723,7 +729,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Block editor (generic) -->
-<div class="modal-backdrop hidden" id="modal-block-editor">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-block-editor">
   <div class="modal modal-md">
     <div class="modal-header"><h3 id="block-editor-title">Editar bloque</h3><button class="modal-close" onclick="closeModal('modal-block-editor')">×</button></div>
     <div class="modal-body" id="block-editor-body"></div>
@@ -735,7 +741,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Gestionar usuarios (admin) -->
-<div class="modal-backdrop hidden" id="modal-users">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-users">
   <div class="modal modal-md">
     <div class="modal-header"><h3>👥 Gestionar usuarios</h3><button class="modal-close" onclick="closeModal('modal-users')">×</button></div>
     <div class="modal-body" id="users-body">
@@ -760,7 +766,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Import PDF/DOCX modal -->
-<div class="modal-backdrop hidden" id="modal-import">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-import">
   <div class="modal modal-lg">
     <div class="modal-header">
       <h3>📥 Importar PDF o Word</h3>
@@ -789,7 +795,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 
 <!-- Export progress -->
 <!-- Version history modal -->
-<div class="modal-backdrop hidden" id="modal-versions">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-versions">
   <div class="modal modal-md">
     <div class="modal-header">
       <h3>📜 Historial de versiones</h3>
@@ -805,7 +811,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Templates modal -->
-<div class="modal-backdrop hidden" id="modal-templates">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-templates">
   <div class="modal modal-md">
     <div class="modal-header">
       <h3>📋 Plantillas</h3>
@@ -828,7 +834,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 </div>
 
 <!-- Unified Import Modal -->
-<div class="modal-backdrop hidden" id="modal-import-unified">
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-import-unified">
   <div class="modal modal-lg">
     <div class="modal-header">
       <h3>📥 Importar manual</h3>
@@ -1949,11 +1955,27 @@ function addBlock(type) {
 
 function deleteBlock(id, ev) {
   if (ev) ev.stopPropagation();
+  if (!confirm('¿Eliminar este bloque?')) return;
   pushHistory();
   STATE.blocks = STATE.blocks.filter(b=>b.id!==id);
   if (STATE.selectedBlockId === id) STATE.selectedBlockId = null;
   render();
   scheduleLocalSave();
+  notifyUndo('🗑 Bloque eliminado');
+}
+// Restaura el snapshot tomado justo antes de la ultima accion destructiva
+function undoLastAction() {
+  if (STATE.history.length) {
+    STATE.blocks = JSON.parse(STATE.history[STATE.historyIdx]);
+    render(); scheduleLocalSave();
+  }
+  q('#notif').classList.remove('show');
+}
+function notifyUndo(msg) {
+  const n = q('#notif');
+  n.innerHTML = esc(msg) + ' <button onclick="undoLastAction()" style="margin-left:8px;background:none;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:5px;padding:2px 8px;cursor:pointer;font-family:inherit;font-size:12px">Deshacer</button>';
+  n.classList.add('show');
+  clearTimeout(n._t); n._t = setTimeout(()=>n.classList.remove('show'), 5000);
 }
 
 function moveBlock(idx, dir, ev) {
@@ -2362,7 +2384,27 @@ document.addEventListener('keydown', ev=>{
       render(); scheduleLocalSave();
     }
   }
+  const _tag = (ev.target.tagName||'').toLowerCase();
+  const _typing = _tag==='input' || _tag==='textarea' || _tag==='select' || ev.target.isContentEditable;
+  if ((ev.ctrlKey||ev.metaKey) && ev.key==='s') { ev.preventDefault(); guardar(); }
+  if ((ev.ctrlKey||ev.metaKey) && ev.key==='d' && !_typing) { ev.preventDefault(); duplicateSelectedBlock(); }
+  if (ev.key==='Delete' && !_typing && STATE.selectedBlockId) { ev.preventDefault(); deleteBlock(STATE.selectedBlockId); }
 });
+
+function filterBlockBtns(qtext) {
+  const t = (qtext||'').toLowerCase().trim();
+  document.querySelectorAll('#sid-chips-bloques .block-btn').forEach(btn=>{
+    btn.style.display = !t || btn.textContent.toLowerCase().includes(t) ? '' : 'none';
+  });
+}
+function duplicateSelectedBlock() {
+  const b = STATE.blocks.find(x=>x.id===STATE.selectedBlockId);
+  if (!b) { notify('Selecciona un bloque primero'); return; }
+  pushHistory();
+  const copy = JSON.parse(JSON.stringify(b)); copy.id = uid();
+  STATE.blocks.splice(STATE.blocks.indexOf(b)+1, 0, copy);
+  render(); scheduleLocalSave(); notify('📋 Bloque duplicado (Ctrl+D)');
+}
 
 // ═══════════════════════════════════════════════════════
 // LOCAL SAVE
