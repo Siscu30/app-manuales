@@ -199,6 +199,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .b-tabla td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top}
 .b-tabla tr:last-child td{border-bottom:none}
 
+.editable-dbl{position:relative}
+.editable-dbl:hover::after{content:'\270F  doble clic para editar';position:absolute;top:6px;right:8px;font-size:10px;color:#94a3b8;background:rgba(255,255,255,.85);padding:2px 7px;border-radius:8px;pointer-events:none}
+.img-skeleton{min-height:70px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:img-shimmer 1.2s infinite}
+@keyframes img-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
 /* block: callout */
 .b-callout{padding:14px 16px;border-radius:var(--radius);display:flex;gap:10px;box-shadow:var(--shadow-sm)}
 .b-callout.tip{background:#f0fdf4;border:1px solid #bbf7d0}
@@ -1330,7 +1334,7 @@ const BLOCK_TYPES = {
     render(b) {
       const headers = (b.columnas||[]).map(c=>`<th>${esc(c)}</th>`).join('');
       const rows = (b.filas||[]).map(row=>`<tr>${(row||[]).map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
-      return `<div class="b-tabla block-inner" ondblclick="openBlockEditor('${b.id}')">
+      return `<div class="b-tabla block-inner editable-dbl" title="Doble clic para editar" ondblclick="openBlockEditor('${b.id}')">
         <table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>
       </div>`;
     },
@@ -1370,44 +1374,6 @@ const BLOCK_TYPES = {
       return `${header}\n${'─'.repeat(header.length)}\n${rows}`;
     }
   },
-  callout: {
-    label: 'Callout / Nota',
-    defaultData: () => ({ tipo:'tip', texto:'Texto del callout' }),
-    render(b) {
-      const icons = {tip:'💡', warning:'⚠️', important:'📌'};
-      const _cIcon = b.icon ? iconSVG(b.icon,18) : (icons[b.tipo||'tip']||'💡');
-      const _cLines = (b.texto||'').split('\n').filter(l=>l.trim());
-      const _cHtml = _cLines.length > 0
-        ? `<ul style="margin:0;padding-left:16px">${_cLines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`
-        : '';
-      return `<div class="b-callout block-inner ${b.tipo||'tip'}" ondblclick="openBlockEditor('${b.id}')">
-        <span class="callout-icon">${_cIcon}</span>
-        <div class="callout-text">${_cHtml}</div>
-      </div>`;
-    },
-    editorHTML(b) {
-      const _ip = b.icon ? iconSVG(b.icon,24) : '<span style="color:var(--text-muted);font-size:18px">–</span>';
-      return `<div class="form-group"><label class="form-label">Tipo</label>
-        <select class="form-select" id="be-tipo">
-          ${['tip','warning','important'].map(t=>`<option value="${t}" ${b.tipo===t?'selected':''}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join('')}
-        </select></div>
-        <div class="form-group"><label class="form-label">Icono personalizado</label>
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
-          <div id="be-icon-preview" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${_ip}</div>
-          <button type="button" onmousedown="event.preventDefault();openIconPickerForEditor()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">Cambiar</button>
-          <button type="button" onmousedown="event.preventDefault();clearEditorIcon()" style="padding:4px 10px;font-size:12px;cursor:pointer;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--ui-text);font-family:inherit">× Quitar</button>
-          <span style="font-size:11px;color:var(--text-muted);margin-left:4px">Sustituye al emoji del tipo</span>
-        </div>
-        <input type="hidden" id="be-icon" value="${b.icon||''}"></div>
-        <div class="form-group"><label class="form-label">Texto <span style="color:var(--text-muted);font-size:11px">(una línea = un punto · Enter para más)</span></label>
-        <textarea class="form-textarea" id="be-texto">${esc(b.texto||'')}</textarea></div>`;
-    },
-    saveEditor(b) { b.tipo=q('#be-tipo').value; b.texto=q('#be-texto').value; b.icon=q('#be-icon').value||null; },
-    toTeamsText(b) {
-      const icons = {tip:'💡', warning:'⚠️', important:'📌'};
-      return `${icons[b.tipo||'tip']} *${b.texto||''}*`;
-    }
-  },
   lista: {
     label: 'Lista verificación',
     defaultData: () => ({ items:[{icono:'check',texto:'Elemento 1'},{icono:'cross',texto:'Elemento 2'}] }),
@@ -1416,7 +1382,7 @@ const BLOCK_TYPES = {
         <span class="li-icon">${it.icono==='check'?'✅':'❌'}</span>
         <span class="li-text">${esc(it.texto||'')}</span>
       </div>`).join('');
-      return `<div class="b-lista block-inner" ondblclick="openBlockEditor('${b.id}')">${items||'<em style="color:var(--text-muted)">Sin elementos</em>'}</div>`;
+      return `<div class="b-lista block-inner editable-dbl" title="Doble clic para editar" ondblclick="openBlockEditor('${b.id}')">${items||'<em style="color:var(--text-muted)">Sin elementos</em>'}</div>`;
     },
     editorHTML(b) {
       const items = b.items||[];
@@ -1457,7 +1423,7 @@ const BLOCK_TYPES = {
       const imgTag = b.src
         ? `<img src="${b.src}" class="b-texto-pic" onclick="openLightbox(this)" alt="">`
         : b.storagePath
-        ? `<img src="" data-path="${b.storagePath}" class="b-texto-pic lazy-img" onclick="openLightbox(this)" alt="">`
+        ? `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-path="${b.storagePath}" class="b-texto-pic lazy-img img-skeleton" onclick="openLightbox(this)" alt="">`
         : '';
       const imgArea = hasImg
         ? `<div class="b-texto-imgwrap">${imgTag}<button class="b-texto-imgdel" onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen">✕</button></div>`
@@ -1710,6 +1676,27 @@ const BLOCK_TYPES = {
 // ═══════════════════════════════════════════════════════
 function q(sel){ return document.querySelector(sel); }
 function esc(str){ const d=document.createElement('div');d.textContent=str;return d.innerHTML; }
+// Quita scripts, iframes, atributos on* y URLs javascript: de HTML enriquecido
+function sanitizeRichHtml(html) {
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html || '';
+  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta,form').forEach(n=>n.remove());
+  tpl.content.querySelectorAll('*').forEach(el=>{
+    [...el.attributes].forEach(a=>{
+      const n=a.name.toLowerCase(), v=String(a.value||'');
+      if (n.startsWith('on') || ((n==='href'||n==='src'||n==='xlink:href') && /^\s*javascript:/i.test(v))) el.removeAttribute(a.name);
+    });
+  });
+  return tpl.innerHTML;
+}
+document.addEventListener('paste', ev => {
+  const ce = ev.target && ev.target.closest ? ev.target.closest('[contenteditable="true"]') : null;
+  if (!ce) return;
+  const html = ev.clipboardData && ev.clipboardData.getData('text/html');
+  if (!html) return;
+  ev.preventDefault();
+  document.execCommand('insertHTML', false, sanitizeRichHtml(html));
+});
 function getVideoEmbedUrl(url) {
   if (!url) return null;
   const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
@@ -1757,6 +1744,7 @@ function hexToLight(hex){
 function render() {
   const canvas = q('#canvas');
   migrateLegacyBlocks(STATE.blocks);
+  (STATE.pages||[]).forEach(p => migrateLegacyBlocks(p.blocks)); // páginas inactivas también, para exports
   if (!STATE.blocks.length) {
     canvas.innerHTML = `<div id="canvas-empty">
       <div class="ec-icon">📄</div>
@@ -1920,13 +1908,13 @@ function clearBlockColor(blockId, which) {
 async function loadLazyImages() {
   const imgs = document.querySelectorAll('.lazy-img[data-path]');
   for (const img of imgs) {
-    if (img.src && img.src !== window.location.href) continue;
+    if (img.dataset.lazyDone) continue;
     const path = img.getAttribute('data-path');
     if (!path) continue;
     try {
       const { data, error } = await sb.storage.from('manual-images').createSignedUrl(path, 3600);
-      if (!error && data?.signedUrl) img.src = data.signedUrl;
-    } catch(e) {}
+      if (!error && data?.signedUrl) { img.src = data.signedUrl; img.dataset.lazyDone = '1'; img.classList.remove('img-skeleton'); }
+    } catch(e) { console.warn('lazy-img:', e); }
   }
   // Lazy-load de vídeos guardados en Storage (mismo bucket privado, vía URL firmada)
   const vids = document.querySelectorAll('.lazy-video[data-vpath]');
@@ -1991,9 +1979,9 @@ function saveInlineEdit(el) {
   const block = STATE.blocks.find(b=>b.id===id);
   if (!block) return;
   if (el.tagName === 'UL' || el.tagName === 'OL') {
-    block[field] = [...el.querySelectorAll('li')].map(li => li.innerHTML.trim()).filter(Boolean).join('\n');
+    block[field] = [...el.querySelectorAll('li')].map(li => sanitizeRichHtml(li.innerHTML).trim()).filter(Boolean).join('\n');
   } else {
-    block[field] = (field === 'html' || el.dataset.rich) ? el.innerHTML : el.textContent;
+    block[field] = (field === 'html' || el.dataset.rich) ? sanitizeRichHtml(el.innerHTML) : el.textContent;
   }
   scheduleLocalSave();
 }
@@ -2175,7 +2163,8 @@ async function uploadBlockImage(input, blockId) {
       const storagePath = `${STATE.user.id}/${manualId}/${blockId}/${Date.now()}.${ext}`;
       const { error: upErr } = await sb.storage.from('manual-images').upload(storagePath, safeBlob, { contentType: safeBlob.type, upsert: true });
       if (!upErr) { block.storagePath = storagePath; scheduleLocalSave(); }
-    } catch(_) {}
+      else { console.warn('Storage upload:', upErr); notify('⚠️ Imagen guardada solo en este equipo (fallo al subir a la nube)', 4000); }
+    } catch(e) { console.warn('Storage upload:', e); notify('⚠️ Imagen guardada solo en este equipo (fallo al subir a la nube)', 4000); }
 
   } catch(e) {
     if (wrap) wrap.classList.remove('img-uploading');
@@ -2252,7 +2241,7 @@ function removeBlockImage(blockId) {
   scheduleLocalSave();
 }
 // Reinicia la numeración de pasos desde este bloque (clic en el número). Debe ser global para el onclick inline.
-function toggleResetStep(id) { const b = STATE.blocks.find(x => x.id === id); if (!b) return; b.resetStep = !b.resetStep; pushHistory(); render(); localSave(); }
+function toggleResetStep(id) { const b = STATE.blocks.find(x => x.id === id); if (!b) return; b.resetStep = !b.resetStep; pushHistory(); render(); scheduleLocalSave(); }
 
 // drop images onto canvas
 document.addEventListener('dragover', e=>{ if(e.dataTransfer.types.includes('Files')) e.preventDefault(); });
@@ -2387,8 +2376,12 @@ function scheduleLocalSave() {
 }
 function startAutoSave() {
   if (STATE.autoSaveTimer) clearInterval(STATE.autoSaveTimer);
-  STATE.autoSaveTimer = setInterval(() => {
-    if (STATE.isDirty && STATE.user && STATE.manual.id) guardar();
+  STATE.autoSaveTimer = setInterval(async () => {
+    if (STATE.isDirty && STATE.user && STATE.manual.id) {
+      let ok = await guardar();
+      if (!ok) ok = await guardar(); // reintento unico
+      if (!ok) setSaveStatus('⚠ Sin sincronizar — reintento en 1 min');
+    }
   }, 60000);
 }
 function localSave() {
@@ -2477,10 +2470,12 @@ async function guardar() {
     saveVersion();
     notify('✅ Manual guardado');
     updateRevisionBanner();
+    return true;
   } catch(e) {
     setSaveStatus('⚠ Solo guardado local');
     notify('❌ Error al guardar: ' + (e.message||e), 4000);
     localSave();
+    return false;
   } finally {
     btn.textContent = '💾 Guardar'; btn.disabled = false;
   }
@@ -3711,7 +3706,7 @@ async function loadUserPrefs() {
         if (arrow) arrow.textContent = s['pages-panel'] ? '▼' : '▶';
       }
     }
-  } catch(_) {}
+  } catch(e) { console.warn('loadUserPrefs:', e); }
 }
 
 function saveUserPrefs() {
@@ -3727,7 +3722,7 @@ function saveUserPrefs() {
     if (pagesPanel) s['pages-panel'] = pagesPanel.style.display !== 'none';
     try {
       await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s }, updated_at: new Date().toISOString() });
-    } catch(_) {}
+    } catch(e) { console.warn('saveUserPrefs:', e); }
   }, 500);
 }
 
@@ -5146,7 +5141,7 @@ async function _resolveAnnotationSrc(block) {
     try {
       const { data } = await sb.storage.from('manual-images').createSignedUrl(block.storagePath, 3600);
       if (data && data.signedUrl) return data.signedUrl;
-    } catch(_) {}
+    } catch(e) { console.warn('signedUrl:', e); }
   }
   return null;
 }
