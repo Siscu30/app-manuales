@@ -1452,6 +1452,8 @@ document.addEventListener('keydown', ev=>{
   if ((ev.ctrlKey||ev.metaKey) && ev.key==='s') { ev.preventDefault(); guardar(); }
   if ((ev.ctrlKey||ev.metaKey) && ev.key==='d' && !_typing) { ev.preventDefault(); duplicateSelectedBlock(); }
   if (ev.key==='Delete' && !_typing && STATE.selectedBlockId) { ev.preventDefault(); deleteBlock(STATE.selectedBlockId); }
+  if ((ev.ctrlKey||ev.metaKey) && ev.key==='f' && !_typing) { ev.preventDefault(); openGlobalSearch(); }
+  if (ev.key==='Escape') { const gs=document.getElementById('global-search'); if (gs) gs.remove(); }
 });
 
 function filterBlockBtns(qtext) {
@@ -1459,6 +1461,62 @@ function filterBlockBtns(qtext) {
   document.querySelectorAll('#sid-chips-bloques .block-btn').forEach(btn=>{
     btn.style.display = !t || btn.textContent.toLowerCase().includes(t) ? '' : 'none';
   });
+}
+// ── Buscador global del manual (Ctrl+F): busca en todas las páginas ──
+function _blockText(b) {
+  const parts = [b.titulo, b.subtitulo, b.descripcion, b.texto, b.caption, b.code, b.url];
+  if (b.html) { const t = document.createElement('div'); t.innerHTML = b.html; parts.push(t.textContent); }
+  if (b.items) b.items.forEach(it => parts.push(it.texto));
+  if (b.columnas) parts.push(b.columnas.join(' '));
+  if (b.filas) b.filas.forEach(r => parts.push((r||[]).join(' ')));
+  const t2 = document.createElement('div'); t2.innerHTML = parts.filter(Boolean).join(' ');
+  return t2.textContent || '';
+}
+function openGlobalSearch() {
+  let panel = document.getElementById('global-search');
+  if (panel) { panel.querySelector('input').focus(); return; }
+  panel = document.createElement('div');
+  panel.id = 'global-search';
+  panel.setAttribute('role','search');
+  panel.style.cssText = 'position:fixed;top:60px;right:20px;z-index:3500;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:10px;width:340px;max-width:calc(100vw - 40px)';
+  panel.innerHTML = '<div style="display:flex;gap:6px;align-items:center">' +
+    '<input type="text" placeholder="Buscar en el manual…" aria-label="Buscar en el manual" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-family:inherit;font-size:13px" oninput="_gsSearch(this.value)">' +
+    '<button onclick="document.getElementById(\'global-search\').remove()" style="border:none;background:none;cursor:pointer;font-size:16px;color:var(--text-muted)" aria-label="Cerrar buscador">×</button></div>' +
+    '<div id="gs-results" style="max-height:320px;overflow-y:auto;margin-top:6px"></div>';
+  document.body.appendChild(panel);
+  panel.querySelector('input').focus();
+}
+function _gsSearch(term) {
+  const box = document.getElementById('gs-results');
+  if (!box) return;
+  const t = (term||'').toLowerCase().trim();
+  if (t.length < 2) { box.innerHTML = ''; return; }
+  // Sincroniza la página activa antes de recorrer todas
+  if (STATE.activePage && STATE.pages.length) {
+    const cur = STATE.pages.find(p => p.id === STATE.activePage);
+    if (cur) cur.blocks = [...STATE.blocks];
+  }
+  const scopes = STATE.pages.length
+    ? STATE.pages.map(pg => ({ pid: pg.id, ptitle: pg.title, blocks: pg.blocks || [] }))
+    : [{ pid: null, ptitle: '', blocks: STATE.blocks }];
+  const hits = [];
+  scopes.forEach(sc => sc.blocks.forEach(b => {
+    const txt = _blockText(b);
+    const i = txt.toLowerCase().indexOf(t);
+    if (i >= 0 && hits.length < 30) hits.push({ pid: sc.pid, ptitle: sc.ptitle, bid: b.id, type: b.type, snippet: txt.slice(Math.max(0, i-25), i+45) });
+  }));
+  box.innerHTML = hits.length
+    ? hits.map(h => '<div onclick="_gsGo(\'' + (h.pid||'') + '\',\'' + h.bid + '\')" style="padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'\'">' +
+        (h.ptitle ? '<span style="color:var(--primary);font-weight:600">' + esc(h.ptitle) + '</span> · ' : '') +
+        '<span style="color:var(--text-muted)">' + esc(h.type) + '</span><br>…' + esc(h.snippet) + '…</div>').join('')
+    : '<div style="padding:8px;font-size:12px;color:var(--text-muted)">Sin resultados</div>';
+}
+function _gsGo(pid, bid) {
+  if (pid && STATE.activePage !== pid) switchPage(pid);
+  setTimeout(() => {
+    const el = document.querySelector('.block-wrap[data-id="' + bid + '"]');
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); selectBlock(bid); }
+  }, 60);
 }
 function duplicateSelectedBlock() {
   const b = STATE.blocks.find(x=>x.id===STATE.selectedBlockId);
@@ -1625,7 +1683,7 @@ async function loadManualesPanel(tab) {
     if (tab === 'papelera') {
       query = query.eq('estado', 'papelera');
     } else {
-      query = query.neq('estado', 'papelera');
+      query = query.neq('estado', 'papelera').neq('estado', 'plantilla');
     }
     const { data, error } = await query.order('updated_at', { ascending: false });
     if (error) throw error;
@@ -3865,7 +3923,50 @@ async function openVersionHistoryFor(manualId) {
 
 function deleteManual(id, titulo) { softDeleteManual(id, titulo); }
 
-function openTemplatesModal() { openModal('modal-templates'); }
+function openTemplatesModal() { openModal('modal-templates'); loadUserTemplates(); }
+async function saveAsTemplate() {
+  if (!STATE.user) { openAuthModal('Accede para guardar plantillas'); return; }
+  const nombre = prompt('Nombre de la plantilla:', q('#manual-titulo').value || 'Mi plantilla');
+  if (!nombre) return;
+  if (STATE.activePage && STATE.pages.length) {
+    const cur = STATE.pages.find(p => p.id === STATE.activePage);
+    if (cur) cur.blocks = [...STATE.blocks];
+  }
+  const contenido = STATE.pages.length > 0
+    ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage }
+    : STATE.blocks;
+  const { error } = await sb.from('manuales').insert({
+    titulo: nombre, empresa: q('#manual-empresa').value || '', color: STATE.manual.color,
+    contenido, estado: 'plantilla', user_id: STATE.user.id, created_by: STATE.user.id
+  });
+  if (error) { notify('\u274c ' + error.message); return; }
+  notify('\u2705 Plantilla guardada');
+  loadUserTemplates();
+}
+async function loadUserTemplates() {
+  const box = document.getElementById('user-templates');
+  if (!box || !STATE.user) return;
+  const { data } = await sb.from('manuales').select('id,titulo').eq('estado','plantilla').order('updated_at',{ascending:false}).limit(20);
+  box.innerHTML = (data && data.length)
+    ? data.map(t => '<button class="btn" style="text-align:left;padding:10px 16px" onclick="applyUserTemplate(\'' + t.id + '\')">\ud83d\udcc4 ' + esc(t.titulo) + '</button>').join('')
+    : '<small style="color:var(--text-muted)">A\u00fan no tienes plantillas propias.</small>';
+}
+async function applyUserTemplate(id) {
+  const { data, error } = await sb.from('manuales').select('contenido').eq('id', id).single();
+  if (error || !data) { notify('\u274c No se pudo cargar la plantilla'); return; }
+  pushHistory();
+  const c = data.contenido;
+  if (Array.isArray(c)) { STATE.blocks = c.map(b => ({...b, id: uid()})); STATE.pages = []; STATE.activePage = null; }
+  else {
+    STATE.pages = (c.pages||[]).map(pg => ({...pg, id: uid(), blocks: (pg.blocks||[]).map(b => ({...b, id: uid()}))}));
+    STATE.activePage = STATE.pages[0]?.id || null;
+    STATE.blocks = STATE.pages[0] ? [...STATE.pages[0].blocks] : [];
+  }
+  STATE.manual.id = null; // nuevo manual a partir de plantilla, no sobrescribe la original
+  render(); renderPagesPanel(); scheduleLocalSave();
+  closeModal('modal-templates');
+  notify('\u2705 Plantilla aplicada');
+}
 function applyTemplate(idx) {
   const T = [
     { name:'Manual de Proceso', blocks:() => [

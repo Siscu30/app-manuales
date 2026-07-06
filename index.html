@@ -348,6 +348,12 @@
         <button class="btn" style="text-align:left;padding:12px 16px" onclick="applyTemplate(3)">🚀 Nota de Versión<br><small style="color:var(--text-muted)">Changelog con lista y enlace</small></button>
         <button class="btn" style="text-align:left;padding:12px 16px" onclick="applyTemplate(4)">⚙️ Manual Técnico<br><small style="color:var(--text-muted)">Código + tabla de componentes</small></button>
       </div>
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <strong style="font-size:13px">Mis plantillas</strong>
+        <button class="btn btn-sm" onclick="saveAsTemplate()">+ Guardar manual actual como plantilla</button>
+      </div>
+      <div id="user-templates" style="display:flex;flex-direction:column;gap:8px"></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('modal-templates')">Cancelar</button>
