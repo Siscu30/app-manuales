@@ -1598,6 +1598,7 @@ async function guardar() {
   STATE.manual.empresa = q('#manual-empresa').value || '';
 
   const btn = q('#btn-guardar');
+  const _prevManualId = STATE.manual.id;
   btn.textContent = '⏳ Guardando...'; btn.disabled = true;
   setSaveStatus('');
 
@@ -1630,8 +1631,10 @@ async function guardar() {
     }
     if (result.error) throw result.error;
 
+    const _wasNew = !_prevManualId;
     STATE.manual.id = result.data.id;
     STATE.manual.estado = result.data.estado;
+    if (_wasNew) { const _all = STATE.pages.length ? STATE.pages.flatMap(p=>p.blocks||[]) : STATE.blocks; if (_all.some(b=>b._pendingBase64)) setTimeout(()=>uploadImportedImages(_all), 200); }
     try { localStorage.setItem('last_manual_id', STATE.manual.id); } catch(e){}
     localSave();
     setSaveStatus('✓ Guardado');
@@ -3038,13 +3041,214 @@ async function handleImportFileSelect(input) {
   }
 }
 
+// ═══════════════════════════════════════════════════════
+// DOCX IMPORT — parser directo (JSZip + document.xml)
+// mammoth solo emite <img> para imágenes inline; los manuales de Word reales
+// llevan las imágenes ANCLADAS dentro de grupos DrawingML y cuadros de texto,
+// que mammoth descarta. Este parser lee el .docx directamente para recuperar
+// imágenes flotantes, listas, avisos resaltados y títulos de sección.
+const _WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+const _ANS = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const _RNS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const _VNS = 'urn:schemas-microsoft-com:vml';
+const _IMG_MIME = { png:'image/png', jpeg:'image/jpeg', jpg:'image/jpeg', gif:'image/gif', webp:'image/webp', svg:'image/svg+xml' };
+const _STEP_RE = /^\s*\d{1,3}\s*[–—).:-]\s+/;
+
 async function parseDOCXtoBlocks(ab) {
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');
-  const imageConverter = mammoth.images.imgElement(img =>
-    img.read('base64').then(b64 => ({ src: 'data:' + img.contentType + ';base64,' + b64 }))
-  );
-  const result = await mammoth.convertToHtml({ arrayBuffer: ab }, { convertImage: imageConverter });
-  return htmlToImportBlocks(result.value);
+  if (!window.JSZip) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  if (!window.JSZip) throw new Error('No se pudo cargar JSZip. Verifica tu conexión a internet.');
+  const zip = await JSZip.loadAsync(ab);
+  const docFile = zip.file('word/document.xml');
+  if (!docFile) throw new Error('El .docx no contiene word/document.xml (archivo no válido).');
+
+  // rels: relId → ruta de media
+  const relmap = {};
+  const relsFile = zip.file('word/_rels/document.xml.rels');
+  if (relsFile) {
+    const relsXml = new DOMParser().parseFromString(await relsFile.async('string'), 'application/xml');
+    for (const r of relsXml.getElementsByTagName('Relationship')) {
+      relmap[r.getAttribute('Id')] = r.getAttribute('Target');
+    }
+  }
+
+  const xml = new DOMParser().parseFromString(await docFile.async('string'), 'application/xml');
+  const body = xml.getElementsByTagNameNS(_WNS, 'body')[0];
+  if (!body) throw new Error('El .docx no tiene cuerpo de documento legible.');
+
+  const DRAW = new Set(['drawing', 'txbxContent', 'pict']);
+  const underDrawing = (node) => {
+    let x = node.parentNode;
+    while (x && x.nodeType === 1) { if (DRAW.has(x.localName)) return true; x = x.parentNode; }
+    return false;
+  };
+  const paraText = (p) => {
+    let out = '';
+    for (const t of p.getElementsByTagNameNS(_WNS, 't')) if (!underDrawing(t)) out += t.textContent || '';
+    return out.trim();
+  };
+  const paraImgs = (p) => {
+    const out = [];
+    for (const blip of p.getElementsByTagNameNS(_ANS, 'blip')) {
+      const tgt = relmap[blip.getAttributeNS(_RNS, 'embed')];
+      if (tgt && !out.includes(tgt)) out.push(tgt);
+    }
+    for (const im of p.getElementsByTagNameNS(_VNS, 'imagedata')) {
+      const tgt = relmap[im.getAttributeNS(_RNS, 'id')];
+      if (tgt && !out.includes(tgt)) out.push(tgt);
+    }
+    return out;
+  };
+  const paraHL = (p) => {
+    for (const h of p.getElementsByTagNameNS(_WNS, 'highlight')) if (!underDrawing(h)) return h.getAttributeNS(_WNS, 'val');
+    return null;
+  };
+  const paraStyle = (p) => {
+    const ps = p.getElementsByTagNameNS(_WNS, 'pStyle')[0];
+    return ps ? (ps.getAttributeNS(_WNS, 'val') || '') : '';
+  };
+  const firstSentence = (t) => {
+    const clean = t.replace(_STEP_RE, '').trim();
+    const m = clean.match(/^(.+?[.:])\s+([\s\S]+)$/); // 1a frase / resto, sin lookbehind (compat. Safari)
+    if (m) return { titulo: m[1].slice(0, 90), descripcion: m[2] };
+    return { titulo: clean.slice(0, 90), descripcion: '' };
+  };
+
+  // media (ruta relativa a /word/) → dataURL, resolviendo bajo demanda y cacheado
+  const dataUrlCache = {};
+  const refMedia = new Set();      // todas las imágenes soportadas referenciadas en el cuerpo
+  const usedMedia = new Set();     // imágenes efectivamente asignadas a un bloque
+  async function mediaDataUrl(rel) {
+    if (dataUrlCache[rel] !== undefined) return dataUrlCache[rel];
+    const ext = (rel.split('.').pop() || '').toLowerCase();
+    const mime = _IMG_MIME[ext];
+    if (!mime) return (dataUrlCache[rel] = null); // emf/wmf: no renderizables en navegador
+    const f = zip.file('word/' + rel.replace(/^\/?word\//, '').replace(/^\.\.\//, ''));
+    if (!f) return (dataUrlCache[rel] = null);
+    const b64 = await f.async('base64');
+    return (dataUrlCache[rel] = 'data:' + mime + ';base64,' + b64);
+  }
+  const isSupported = (rel) => !!_IMG_MIME[(rel.split('.').pop() || '').toLowerCase()];
+
+  // ── Paso 1: recorrer el cuerpo y construir un stream de bloques (con rutas de media) ──
+  const raw = [];
+  let lastPaso = null;
+  let alertBuf = [];
+  const flushAlert = () => { if (alertBuf.length) { raw.push({ type: 'alerta', tipo: 'advertencia', texto: alertBuf.join(' ') }); alertBuf = []; } };
+
+  for (const node of Array.from(body.childNodes)) {
+    if (node.nodeType !== 1) continue;
+    const ln = node.localName;
+    if (ln === 'tbl') {
+      flushAlert();
+      const rows = Array.from(node.getElementsByTagNameNS(_WNS, 'tr')).map(tr =>
+        Array.from(tr.getElementsByTagNameNS(_WNS, 'tc')).map(tc => {
+          let txt = ''; for (const t of tc.getElementsByTagNameNS(_WNS, 't')) if (!underDrawing(t)) txt += t.textContent || '';
+          return txt.trim();
+        }));
+      if (rows.length) raw.push({ type: 'tabla', columnas: rows[0], filas: rows.slice(1) });
+      lastPaso = null;
+      continue;
+    }
+    if (ln !== 'p') continue;
+
+    const txt = paraText(node);
+    const imgs = paraImgs(node);
+    imgs.forEach(i => { if (isSupported(i)) refMedia.add(i); });
+    const disp = imgs.filter(isSupported);
+    const hl = paraHL(node);
+    const st = paraStyle(node).toLowerCase();
+    const numbered = !!node.getElementsByTagNameNS(_WNS, 'numPr').length;
+    const isSub = st.includes('ubt') || st.includes('tulo') || st.includes('heading');
+    const isHead = !numbered && txt && txt === txt.toUpperCase() && txt.length > 0 && txt.length < 70 && !imgs.length && !hl;
+
+    // Aviso resaltado en amarillo → alerta (fusiona párrafos consecutivos)
+    if (hl === 'yellow' && txt) { alertBuf.push(txt); continue; }
+    flushAlert();
+
+    // Encabezado de sección → titulo (el primero) / subtitulo (resto)
+    if (isSub || isHead) {
+      raw.push({ type: 'titulo', _first: raw.length === 0, titulo: txt, subtitulo: '', isSub });
+      lastPaso = null;
+      continue;
+    }
+
+    // Paso: lista Word (numPr) o párrafo numerado manualmente ("1 –", "2 -", "3)")
+    if (numbered || _STEP_RE.test(txt)) {
+      const { titulo, descripcion } = firstSentence(txt);
+      const paso = { type: 'paso', titulo, descripcion, media: disp[0] || null };
+      if (disp[0]) usedMedia.add(disp[0]);
+      raw.push(paso);
+      lastPaso = paso;
+      for (const extra of disp.slice(1)) { usedMedia.add(extra); raw.push({ type: 'imagen', media: extra }); }
+      continue;
+    }
+
+    // Párrafo solo-imagen → adjunta al paso previo si no tiene; si no, imagen suelta
+    if (!txt && disp.length) {
+      for (const m of disp) {
+        if (lastPaso && !lastPaso.media) { lastPaso.media = m; usedMedia.add(m); }
+        else { raw.push({ type: 'imagen', media: m }); usedMedia.add(m); }
+      }
+      continue;
+    }
+
+    // Resto → texto (saneado)
+    if (txt) { raw.push({ type: 'texto', html: esc(txt) }); lastPaso = null; }
+  }
+  flushAlert();
+
+  // ── Paso 2: materializar bloques y resolver dataURLs de media ──
+  const blocks = [];
+  let firstTitle = true;
+  for (const r of raw) {
+    if (r.type === 'titulo') {
+      // El primer encabezado es el título del manual (H1); los demás, subtítulos de sección
+      if (firstTitle && r._first) { blocks.push({ id: uid(), type: 'titulo', order: 0, emoji: '📋', titulo: r.titulo, subtitulo: '', _isH1: true }); firstTitle = false; }
+      else blocks.push({ id: uid(), type: 'subtitulo', order: 0, texto: r.titulo, blockBgColor: '#64748b' });
+    } else if (r.type === 'alerta') {
+      blocks.push({ id: uid(), type: 'alerta', order: 0, tipo: 'advertencia', texto: r.texto });
+    } else if (r.type === 'tabla') {
+      const cols = r.columnas.length ? r.columnas : (r.filas[0] || ['Columna 1']).map((_, i) => 'Columna ' + (i + 1));
+      blocks.push({ id: uid(), type: 'tabla', order: 0, columnas: cols, filas: r.filas });
+    } else if (r.type === 'paso') {
+      const blk = { id: uid(), type: 'paso', order: 0, titulo: r.titulo, descripcion: r.descripcion, storagePath: null, caption: '' };
+      if (r.media) { const du = await mediaDataUrl(r.media); if (du) { blk.src = du; blk._pendingBase64 = du; } }
+      blocks.push(blk);
+    } else if (r.type === 'imagen') {
+      const du = await mediaDataUrl(r.media);
+      if (du) blocks.push({ id: uid(), type: 'imagen', order: 0, src: du, _pendingBase64: du, storagePath: null, caption: '', width: '100%' });
+    } else if (r.type === 'texto') {
+      blocks.push({ id: uid(), type: 'texto', order: 0, html: r.html });
+    }
+  }
+
+  // ── Paso 3: validación post-importación (media referida vs. asignada) ──
+  const nRef = [...refMedia].length;
+  const nAssigned = blocks.filter(b => b.src).length;
+  if (nRef && nAssigned < nRef) {
+    notify(`⚠️ Importadas ${nAssigned} de ${nRef} imágenes del documento (${nRef - nAssigned} decorativas o no renderizables omitidas)`, 5000);
+  }
+  return blocks;
+}
+
+// Sube a Supabase Storage las imágenes de bloques importados (reutiliza el bucket
+// y el patrón de ruta de las imágenes manuales). No cambia el tipo de bloque.
+async function uploadImportedImages(blocks) {
+  if (!STATE.user || !STATE.manual.id) return;
+  for (const b of blocks) {
+    if (!b._pendingBase64 || b.storagePath) continue;
+    const dataUrl = b._pendingBase64;
+    try {
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/svg+xml' ? 'svg' : blob.type === 'image/gif' ? 'gif' : 'jpg';
+      const storagePath = `${STATE.user.id}/${STATE.manual.id}/${b.id}/${Date.now()}.${ext}`;
+      const { error } = await sb.storage.from('manual-images').upload(storagePath, blob, { contentType: blob.type, upsert: true });
+      if (!error) { b.storagePath = storagePath; delete b.src; delete b._pendingBase64; }
+      else { console.warn('uploadImportedImages:', error); }
+    } catch (e) { console.warn('uploadImportedImages:', e); }
+  }
+  renderPagesPanel(); render(); scheduleLocalSave();
 }
 
 async function parsePDFtoBlocks(ab) {
@@ -3358,7 +3562,7 @@ function renderImportPreview(blocks) {
     prev.innerHTML = '<div style="color:var(--text-muted);padding:16px;text-align:center">No se encontraron bloques reconocibles en el archivo</div>';
     btn.style.display = 'none'; return;
   }
-  const labels = {titulo:'📑 Título',alerta:'⚠️ Alerta',paso:'🔢 Paso',imagen:'🖼 Imagen',tabla:'📊 Tabla',callout:'💡 Callout',lista:'✅ Lista',separador:'— Sep.',texto:'📝 Texto',flujos:'🔀 Flujos',video:'🎬 Vídeo',enlace:'🔗 Enlace'};
+  const labels = {titulo:'📑 Título',subtitulo:'🔹 Subtítulo',alerta:'⚠️ Alerta',paso:'🔢 Paso',imagen:'🖼 Imagen',tabla:'📊 Tabla',callout:'💡 Callout',lista:'✅ Lista',separador:'— Sep.',texto:'📝 Texto',flujos:'🔀 Flujos',video:'🎬 Vídeo',enlace:'🔗 Enlace'};
   prev.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${blocks.length} bloques detectados — selecciona los que quieres importar:</div>
     <div style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
       ${blocks.map((b,i)=>`<label class="import-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px">
@@ -3377,6 +3581,7 @@ function renderImportPreview(blocks) {
 function getBlockPreviewText(b) {
   switch(b.type) {
     case 'titulo': return b.titulo||'';
+    case 'subtitulo': return b.texto||'';
     case 'paso':   return (b.titulo||'') + (b.descripcion ? ': '+b.descripcion : '');
     case 'texto':  { const d=document.createElement('div'); d.innerHTML=b.html||''; return d.textContent; }
     case 'alerta': case 'callout': return b.texto||'';
@@ -3403,10 +3608,12 @@ function confirmImport() {
   if (asPages) {
     importAsPages(selected);
   } else {
-    STATE.blocks.push(...selected.map((b,i)=>({...b, id:uid(), order:STATE.blocks.length+i, _isH1:undefined})));
+    const _added = selected.map((b,i)=>({...b, id:uid(), order:STATE.blocks.length+i, _isH1:undefined}));
+    STATE.blocks.push(..._added);
     render();
     scheduleLocalSave();
     notify(`✅ Importados ${selected.length} bloques`);
+    _postImportUpload(_added);
   }
   closeImportModal();
 }
@@ -3437,6 +3644,18 @@ function importAsPages(blocks) {
   render();
   scheduleLocalSave();
   notify(`✅ Importado como ${pages.length} página(s)`);
+  _postImportUpload(STATE.pages.flatMap(p=>p.blocks||[]));
+}
+
+// Sube a la nube las imágenes recién importadas; si el manual aún no está guardado, avisa.
+function _postImportUpload(blocks) {
+  const pend = blocks.filter(b=>b && b._pendingBase64);
+  if (!pend.length) return;
+  if (STATE.user && STATE.manual.id) {
+    setTimeout(()=>uploadImportedImages(STATE.pages.length ? STATE.pages.flatMap(p=>p.blocks||[]) : STATE.blocks), 400);
+  } else if (STATE.user) {
+    notify('💾 Guarda el manual para subir sus imágenes a la nube', 5000);
+  }
 }
 
 // ─── UNIFIED IMPORT MODAL ───────────────────────────────
@@ -3513,7 +3732,7 @@ function showUnifiedPreview(blocks) {
     btn.style.display = 'none';
     return;
   }
-  const typeNames = {titulo:'Título',paso:'Paso',texto:'Texto',callout:'Callout',alerta:'Alerta',lista:'Lista',tabla:'Tabla',imagen:'Imagen',separador:'Sep.',flujos:'Flujos',video:'Vídeo',enlace:'Enlace',codigo:'Código'};
+  const typeNames = {titulo:'Título',subtitulo:'Subtítulo',paso:'Paso',texto:'Texto',callout:'Callout',alerta:'Alerta',lista:'Lista',tabla:'Tabla',imagen:'Imagen',separador:'Sep.',flujos:'Flujos',video:'Vídeo',enlace:'Enlace',codigo:'Código'};
   const counts = {};
   blocks.forEach(b => { counts[b.type] = (counts[b.type]||0)+1; });
   const tags = Object.entries(counts).map(([t,n]) => `<span style="background:rgba(255,255,255,.1);padding:3px 10px;border-radius:12px;font-size:12px">${typeNames[t]||t} ×${n}</span>`).join('');
@@ -3537,6 +3756,7 @@ function confirmUnifiedImport() {
     render();
     scheduleLocalSave();
     notify(`✅ Importados ${clean.length} bloques`);
+    _postImportUpload(clean);
   }
   closeModal('modal-import-unified');
 }
