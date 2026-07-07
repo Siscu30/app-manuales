@@ -3393,7 +3393,7 @@ async function confirmImportMedia() {
 // ── Galería (modo gestionar / modo elegir para un bloque) ──
 function openMediaGallery() { _galleryMode = 'manage'; _galleryPickTarget = null; _renderGallery(); document.getElementById('modal-media-gallery').classList.remove('hidden'); }
 function openMediaPicker(blockId) { _galleryMode = 'pick'; _galleryPickTarget = blockId; _renderGallery(); document.getElementById('modal-media-gallery').classList.remove('hidden'); }
-function closeMediaGallery() { document.getElementById('modal-media-gallery').classList.add('hidden'); }
+function closeMediaGallery() { document.getElementById('modal-media-gallery').classList.add('hidden'); _galleryPickTarget = null; }
 
 function _renderGallery() {
   _recomputeMediaUsage();
@@ -3401,7 +3401,7 @@ function _renderGallery() {
   const grid = document.getElementById('media-gallery-grid');
   const unused = lib.filter(m => !m.usedInBlocks.length).length;
   document.getElementById('media-gallery-title').textContent = _galleryMode === 'pick'
-    ? '🗂 Elige una imagen para el bloque' : '🖼 Imágenes del manual';
+    ? '🗂 Elige una imagen para recortar y añadir' : '🖼 Imágenes del manual';
   document.getElementById('media-gallery-sub').textContent = `${lib.length} imágenes · ${unused} sin usar`;
   const cleanBtn = document.getElementById('media-clean-btn');
   if (cleanBtn) cleanBtn.style.display = (_galleryMode === 'manage' && unused > 0) ? '' : 'none';
@@ -3410,7 +3410,7 @@ function _renderGallery() {
     return;
   }
   grid.innerHTML = lib.map(m => `
-    <div class="mg-item" onclick="_galleryClick('${m.id}')" title="${_galleryMode==='pick'?'Asignar al bloque':'Recortar / editar'}">
+    <div class="mg-item" onclick="_galleryClick('${m.id}')" title="${_galleryMode==='pick'?'Recortar y añadir al bloque':'Recortar / editar'}">
       <div class="mg-thumb"><img src="" data-path="${m.storagePath}" class="lazy-img" alt=""></div>
       <div class="mg-meta">
         <span class="mg-fn" title="${esc(m.filename)}">${esc(m.filename)}${m.parentId?' ✂':''}</span>
@@ -3420,8 +3420,9 @@ function _renderGallery() {
   loadLazyImages();
 }
 function _galleryClick(id) {
-  if (_galleryMode === 'pick') assignMediaToBlock(id, _galleryPickTarget);
-  else openCropEditor(id);
+  // En ambos modos abrimos el recorte. En modo 'pick' el destino queda en
+  // _galleryPickTarget y applyCrop() asigna la parte recortada al bloque.
+  openCropEditor(id);
 }
 
 async function assignMediaToBlock(mediaId, blockId) {
@@ -3501,7 +3502,16 @@ async function applyCrop() {
       const base = parent ? parent.filename.replace(/\.[^.]+$/, '') : 'recorte';
       const entry = await _uploadMedia(blob, base + '-recorte.jpg', { parentId: _cropMediaId });
       closeCropEditor();
-      if (entry) { _renderGallery(); scheduleLocalSave(); notify('✅ Recorte guardado como nueva imagen (original intacta)'); }
+      if (entry) {
+        scheduleLocalSave();
+        if (_galleryPickTarget) {
+          const target = _galleryPickTarget; _galleryPickTarget = null;
+          await assignMediaToBlock(entry.id, target); // asigna la parte recortada y cierra la galería
+        } else {
+          _renderGallery();
+          notify('✅ Recorte guardado como nueva imagen (original intacta)');
+        }
+      }
     } finally { if (btn) { btn.textContent = 'Aplicar recorte'; btn.disabled = false; } }
   }, 'image/jpeg', 0.9);
 }
