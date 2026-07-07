@@ -198,11 +198,73 @@
       <div class="dropdown-item" onclick="window.print()">🖨 Imprimir / PDF</div>
     </div>
   </div>
+  <button class="tb-btn" onclick="openMediaGallery()" title="Repositorio de imágenes del manual">🖼 Imágenes</button>
   <button class="tb-btn primary" id="btn-guardar" onclick="guardar()">💾 Guardar</button>
   <button class="tb-btn" id="btn-cambiar-pass" onclick="showSetPasswordModal(false)" title="Cambiar contraseña" style="display:none">🔑</button>
   <button class="tb-btn danger" onclick="logout()" id="btn-logout" title="Cerrar sesión" style="display:none">⎋ Salir</button>
 </div>
 <input type="file" id="import-html-input" accept=".html,.htm" style="display:none" onchange="importHTMLFile(this)">
+
+<!-- ── REPOSITORIO DE IMÁGENES ── -->
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-media-gallery">
+  <div class="modal" style="width:min(900px,95vw);max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-header">
+      <div><h3 id="media-gallery-title">🖼 Imágenes del manual</h3><div id="media-gallery-sub" style="font-size:12px;color:var(--text-muted)"></div></div>
+      <button class="modal-close" onclick="closeMediaGallery()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto"><div id="media-gallery-grid" class="media-grid"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="media-clean-btn" onclick="deleteUnusedMedia()" style="margin-right:auto">🗑 Eliminar no usadas</button>
+      <button class="btn" onclick="closeMediaGallery()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-import-media">
+  <div class="modal" style="width:min(820px,95vw);max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-header"><h3>🖼 <span id="import-media-count">0</span> imágenes encontradas</h3><button class="modal-close" onclick="closeImportMediaDialog()" aria-label="Cerrar">×</button></div>
+    <div class="modal-body" style="overflow-y:auto">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Elige cuáles cargar al repositorio. <strong>No se insertan en el texto automáticamente</strong> — quedan disponibles en la galería.</p>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-sm" onclick="toggleAllImportMedia(true)">Seleccionar todas</button>
+        <button class="btn btn-sm" onclick="toggleAllImportMedia(false)">Ninguna</button>
+      </div>
+      <div id="import-media-grid" class="media-pick-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeImportMediaDialog()">No cargar ninguna</button>
+      <button class="btn btn-primary" id="import-media-confirm" onclick="confirmImportMedia()">Cargar seleccionadas</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-crop">
+  <div class="modal" style="width:min(860px,95vw);max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-header"><h3>✂ Recortar imagen</h3><button class="modal-close" onclick="closeCropEditor()" aria-label="Cerrar">×</button></div>
+    <div class="modal-body" style="overflow:auto">
+      <div class="crop-toolbar">
+        <button class="btn btn-sm" onclick="_cropRotate(-90)" title="Girar izquierda">↺ 90°</button>
+        <button class="btn btn-sm" onclick="_cropRotate(90)" title="Girar derecha">↻ 90°</button>
+        <button class="btn btn-sm" onclick="_cropRotate(180)">180°</button>
+        <button class="btn btn-sm" onclick="_cropZoom(0.1)">🔍 +</button>
+        <button class="btn btn-sm" onclick="_cropZoom(-0.1)">🔍 −</button>
+        <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+        <span id="crop-aspects" style="display:flex;gap:4px">
+          <button class="btn btn-sm active" data-aspect="free" onclick="_cropAspect('free')">Libre</button>
+          <button class="btn btn-sm" data-aspect="1" onclick="_cropAspect('1')">1:1</button>
+          <button class="btn btn-sm" data-aspect="1.7777" onclick="_cropAspect('1.7777')">16:9</button>
+          <button class="btn btn-sm" data-aspect="1.3333" onclick="_cropAspect('1.3333')">4:3</button>
+        </span>
+      </div>
+      <div class="crop-stage"><img id="crop-img" src="" alt=""></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeCropEditor()">Cancelar</button>
+      <button class="btn btn-primary" id="crop-apply-btn" onclick="applyCrop()">Aplicar recorte</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- ── REVISION BANNER ── -->
 <div id="revision-banner">

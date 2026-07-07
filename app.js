@@ -40,6 +40,7 @@ let STATE = {
   saveTimer: null,
   pages: [],
   activePage: null,
+  mediaLibrary: [],
   isDirty: false,
   autoSaveTimer: null,
 };
@@ -328,10 +329,13 @@ const BLOCK_TYPES = {
              <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
              ${_capRow}
            </div>`
-        : `<label class="paso-upload-btn" title="Añadir imagen">
-             📷 <span>Añadir imagen</span>
-             <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
-           </label>`;
+        : `<div class="img-src-actions">
+             <label class="paso-upload-btn" title="Subir imagen del equipo">
+               📷 <span>Subir</span>
+               <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
+             </label>
+             <button type="button" class="paso-upload-btn repo-btn" title="Elegir del repositorio del manual" onclick="event.stopPropagation();openMediaPicker('${b.id}')">🗂 <span>Repositorio</span></button>
+           </div>`;
       const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
@@ -373,6 +377,7 @@ const BLOCK_TYPES = {
           <span>Clic o arrastra una imagen</span>
           <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
         </label>
+        <button type="button" class="img-repo-btn" onclick="event.stopPropagation();openMediaPicker('${b.id}')" title="Elegir del repositorio del manual">🗂 Elegir del repositorio</button>
       </div>`;
     },
     toTeamsText(b) { return `📷 [Imagen: ${b.caption||''}]`; }
@@ -1322,6 +1327,7 @@ function removeBlockImage(blockId) {
   delete block.src;
   block.storagePath = null;
   render();
+  if (typeof _recomputeMediaUsage === 'function') _recomputeMediaUsage(); // queda "sin usar" en el repositorio
   scheduleLocalSave();
 }
 // Reinicia la numeración de pasos desde este bloque (clic en el número). Debe ser global para el onclick inline.
@@ -1559,6 +1565,7 @@ function localSave() {
     blocks: STATE.blocks,
     pages: STATE.pages,
     activePage: STATE.activePage,
+    mediaLibrary: STATE.mediaLibrary,
     titulo: q('#manual-titulo').value,
     empresa: q('#manual-empresa').value
   };
@@ -1609,9 +1616,11 @@ async function guardar() {
       if (cur) cur.blocks = [...STATE.blocks];
     }
     // Build contenido — multi-page format when pages exist, plain array otherwise (retrocompatible)
-    const contenido = STATE.pages.length > 0
-      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage }
-      : STATE.blocks;
+    const contenido = (STATE.pages.length > 0)
+      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage, mediaLibrary: STATE.mediaLibrary }
+      : ((STATE.mediaLibrary && STATE.mediaLibrary.length)
+          ? { blocks: STATE.blocks, mediaLibrary: STATE.mediaLibrary }
+          : STATE.blocks);
     const manualData = {
       titulo: STATE.manual.titulo,
       empresa: STATE.manual.empresa,
@@ -1778,8 +1787,10 @@ async function loadManual(id) {
       STATE.blocks = data.contenido.blocks || [];
       STATE.pages = data.contenido.pages || [];
       STATE.activePage = data.contenido.activePage || null;
+      STATE.mediaLibrary = data.contenido.mediaLibrary || [];
     } else {
-      STATE.blocks = Array.isArray(data.contenido) ? data.contenido : [];
+      STATE.blocks = Array.isArray(data.contenido) ? data.contenido : (data.contenido.blocks || []);
+      STATE.mediaLibrary = (!Array.isArray(data.contenido) && data.contenido.mediaLibrary) || [];
       STATE.pages = [];
       STATE.activePage = null;
     }
@@ -1806,6 +1817,7 @@ async function nuevoManual() {
   STATE.blocks = [];
   STATE.pages = [];
   STATE.activePage = null;
+  STATE.mediaLibrary = [];
   STATE.history = [];
   STATE.historyIdx = -1;
   STATE.isDirty = false;
@@ -3024,6 +3036,7 @@ async function handleImportFileSelect(input) {
   prev.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted)"><div class="spinner" style="margin:0 auto 10px"></div>Procesando…</div>';
   document.getElementById('import-confirm-btn').style.display = 'none';
   _importBlocks = [];
+  _docxExtractedMedia = [];
   try {
     const ab = await file.arrayBuffer();
     const ext = file.name.split('.').pop().toLowerCase();
@@ -3211,22 +3224,29 @@ async function parseDOCXtoBlocks(ab) {
       const cols = r.columnas.length ? r.columnas : (r.filas[0] || ['Columna 1']).map((_, i) => 'Columna ' + (i + 1));
       blocks.push({ id: uid(), type: 'tabla', order: 0, columnas: cols, filas: r.filas });
     } else if (r.type === 'paso') {
-      const blk = { id: uid(), type: 'paso', order: 0, titulo: r.titulo, descripcion: r.descripcion, storagePath: null, caption: '' };
-      if (r.media) { const du = await mediaDataUrl(r.media); if (du) { blk.src = du; blk._pendingBase64 = du; } }
-      blocks.push(blk);
+      // Desacoplado: el paso se importa SIN imagen; las imágenes van al repositorio.
+      blocks.push({ id: uid(), type: 'paso', order: 0, titulo: r.titulo, descripcion: r.descripcion, storagePath: null, caption: '' });
     } else if (r.type === 'imagen') {
-      const du = await mediaDataUrl(r.media);
-      if (du) blocks.push({ id: uid(), type: 'imagen', order: 0, src: du, _pendingBase64: du, storagePath: null, caption: '', width: '100%' });
+      // Desacoplado: no se crean bloques de imagen automáticos.
     } else if (r.type === 'texto') {
       blocks.push({ id: uid(), type: 'texto', order: 0, html: r.html });
     }
   }
 
-  // ── Paso 3: validación post-importación (media referida vs. asignada) ──
-  const nRef = [...refMedia].length;
-  const nAssigned = blocks.filter(b => b.src).length;
-  if (nRef && nAssigned < nRef) {
-    notify(`⚠️ Importadas ${nAssigned} de ${nRef} imágenes del documento (${nRef - nAssigned} decorativas o no renderizables omitidas)`, 5000);
+  // ── Paso 3: extraer TODAS las imágenes de /word/media/ al repositorio (no a los bloques) ──
+  _docxExtractedMedia = [];
+  const mediaFolder = zip.folder('word/media');
+  if (mediaFolder) {
+    const files = [];
+    mediaFolder.forEach((rel, file) => { if (!file.dir) files.push(file); });
+    files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    for (const file of files) {
+      const fn = file.name.split('/').pop();
+      const ext = (fn.split('.').pop() || '').toLowerCase();
+      if (!_IMG_MIME[ext]) continue; // emf/wmf: no renderizables en navegador
+      const b64 = await file.async('base64');
+      _docxExtractedMedia.push({ filename: fn, dataUrl: 'data:' + _IMG_MIME[ext] + ';base64,' + b64, size: Math.round(b64.length * 0.75) });
+    }
   }
   return blocks;
 }
@@ -3249,6 +3269,241 @@ async function uploadImportedImages(blocks) {
     } catch (e) { console.warn('uploadImportedImages:', e); }
   }
   renderPagesPanel(); render(); scheduleLocalSave();
+}
+
+// ═══════════════════════════════════════════════════════
+// REPOSITORIO DE IMÁGENES DEL MANUAL (galería + recorte)
+// Desacopla "extraer imágenes del docx" de "insertarlas en bloques".
+// STATE.mediaLibrary = [{id, storagePath, filename, size, w, h, usedInBlocks:[], parentId?}]
+// ═══════════════════════════════════════════════════════
+let _docxExtractedMedia = [];      // media extraída del último .docx, pendiente de decisión
+let _galleryMode = 'manage';       // 'manage' (recortar) | 'pick' (asignar a bloque)
+let _galleryPickTarget = null;     // blockId destino en modo pick
+let _cropper = null, _cropMediaId = null;
+
+function loadCSS(href) {
+  return new Promise(res => {
+    if ([...document.styleSheets].some(s => s.href === href)) return res();
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = href; l.onload = res; l.onerror = res;
+    document.head.appendChild(l);
+  });
+}
+function _fmtSize(bytes) {
+  if (!bytes) return '';
+  return bytes < 1024*1024 ? Math.round(bytes/1024) + ' KB' : (bytes/1048576).toFixed(1) + ' MB';
+}
+function _mediaExt(mime) {
+  return mime === 'image/png' ? 'png' : mime === 'image/svg+xml' ? 'svg'
+       : mime === 'image/gif' ? 'gif' : mime === 'image/webp' ? 'webp' : 'jpg';
+}
+
+// dataURL → {blob,w,h}; redimensiona a maxW con canvas (svg pasa tal cual)
+async function _resizeDataUrl(dataUrl, maxW = 1600) {
+  if (/^data:image\/svg/.test(dataUrl)) { const r = await fetch(dataUrl); return { blob: await r.blob(), w: 0, h: 0 }; }
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight, cw = w, ch = h;
+      if (w > maxW) { ch = Math.round(h * maxW / w); cw = maxW; }
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+      c.getContext('2d').drawImage(img, 0, 0, cw, ch);
+      c.toBlob(b => b ? resolve({ blob: b, w: cw, h: ch }) : reject(new Error('canvas vacío')), 'image/jpeg', 0.85);
+    };
+    img.onerror = () => reject(new Error('imagen no cargable'));
+    img.src = dataUrl;
+  });
+}
+
+// Asegura user + manual guardado (necesario para tener manualId en la ruta de Storage)
+async function _ensureManualSaved() {
+  if (!STATE.user) { notify('⚠️ Inicia sesión para usar el repositorio de imágenes'); return false; }
+  if (!STATE.manual.id) { const ok = await guardar(); if (!ok || !STATE.manual.id) { notify('❌ Guarda el manual primero'); return false; } }
+  return true;
+}
+
+// Sube una imagen (dataURL o Blob) al bucket como nueva entrada del repositorio
+async function _uploadMedia(blobOrDataUrl, filename, extra = {}) {
+  let blob, w = 0, h = 0;
+  if (typeof blobOrDataUrl === 'string') { const r = await _resizeDataUrl(blobOrDataUrl); blob = r.blob; w = r.w; h = r.h; }
+  else blob = blobOrDataUrl;
+  const id = uid();
+  const ext = _mediaExt(blob.type);
+  const storagePath = `${STATE.user.id}/${STATE.manual.id}/_library/${id}.${ext}`;
+  const { error } = await sb.storage.from('manual-images').upload(storagePath, blob, { contentType: blob.type, upsert: true });
+  if (error) { console.warn('_uploadMedia:', error); return null; }
+  const entry = { id, storagePath, filename: filename || ('imagen.' + ext), size: blob.size, w, h, usedInBlocks: [], ...extra };
+  STATE.mediaLibrary.push(entry);
+  return entry;
+}
+
+// Recalcula qué imágenes del repositorio están usadas y en qué bloques (todas las páginas)
+function _recomputeMediaUsage() {
+  if (!STATE.mediaLibrary) STATE.mediaLibrary = [];
+  if (STATE.activePage && STATE.pages.length) {
+    const cur = STATE.pages.find(p => p.id === STATE.activePage);
+    if (cur) cur.blocks = [...STATE.blocks];
+  }
+  const all = STATE.pages.length ? STATE.pages.flatMap(p => p.blocks || []) : STATE.blocks;
+  const used = {};
+  all.forEach(b => { if (b.storagePath) (used[b.storagePath] = used[b.storagePath] || []).push(b.id); });
+  STATE.mediaLibrary.forEach(m => { m.usedInBlocks = used[m.storagePath] || []; });
+}
+
+// ── Diálogo de selección tras importar un .docx ──
+function _afterImport() { if (_docxExtractedMedia.length) openImportMediaDialog(); }
+
+function openImportMediaDialog() {
+  if (!_docxExtractedMedia.length) return;
+  document.getElementById('import-media-count').textContent = _docxExtractedMedia.length;
+  document.getElementById('import-media-grid').innerHTML = _docxExtractedMedia.map((m, i) => `
+    <label class="mg-pick">
+      <input type="checkbox" checked data-midx="${i}">
+      <img src="${m.dataUrl}" alt="" loading="lazy">
+      <span class="mg-fn" title="${esc(m.filename)}">${esc(m.filename)}</span>
+      <span class="mg-sz">${_fmtSize(m.size)}</span>
+    </label>`).join('');
+  document.getElementById('modal-import-media').classList.remove('hidden');
+}
+function toggleAllImportMedia(state) {
+  document.querySelectorAll('#import-media-grid input[type=checkbox]').forEach(cb => cb.checked = state);
+}
+function closeImportMediaDialog() { document.getElementById('modal-import-media').classList.add('hidden'); _docxExtractedMedia = []; }
+
+async function confirmImportMedia() {
+  const chosen = [...document.querySelectorAll('#import-media-grid input[type=checkbox]')]
+    .filter(cb => cb.checked).map(cb => _docxExtractedMedia[+cb.dataset.midx]);
+  document.getElementById('modal-import-media').classList.add('hidden');
+  if (!chosen.length) { _docxExtractedMedia = []; return; }
+  if (!await _ensureManualSaved()) return;
+  const btn = document.getElementById('import-media-confirm');
+  let ok = 0, i = 0;
+  for (const m of chosen) {
+    i++; if (btn) btn.textContent = `Subiendo ${i}/${chosen.length}…`;
+    const e = await _uploadMedia(m.dataUrl, m.filename);
+    if (e) ok++;
+  }
+  if (btn) btn.textContent = 'Cargar seleccionadas';
+  _docxExtractedMedia = [];
+  scheduleLocalSave();
+  notify(`✅ ${ok} imágenes añadidas al repositorio`);
+  openMediaGallery();
+}
+
+// ── Galería (modo gestionar / modo elegir para un bloque) ──
+function openMediaGallery() { _galleryMode = 'manage'; _galleryPickTarget = null; _renderGallery(); document.getElementById('modal-media-gallery').classList.remove('hidden'); }
+function openMediaPicker(blockId) { _galleryMode = 'pick'; _galleryPickTarget = blockId; _renderGallery(); document.getElementById('modal-media-gallery').classList.remove('hidden'); }
+function closeMediaGallery() { document.getElementById('modal-media-gallery').classList.add('hidden'); }
+
+function _renderGallery() {
+  _recomputeMediaUsage();
+  const lib = STATE.mediaLibrary || [];
+  const grid = document.getElementById('media-gallery-grid');
+  const unused = lib.filter(m => !m.usedInBlocks.length).length;
+  document.getElementById('media-gallery-title').textContent = _galleryMode === 'pick'
+    ? '🗂 Elige una imagen para el bloque' : '🖼 Imágenes del manual';
+  document.getElementById('media-gallery-sub').textContent = `${lib.length} imágenes · ${unused} sin usar`;
+  const cleanBtn = document.getElementById('media-clean-btn');
+  if (cleanBtn) cleanBtn.style.display = (_galleryMode === 'manage' && unused > 0) ? '' : 'none';
+  if (!lib.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:36px">El repositorio está vacío.<br>Importa un .docx o sube imágenes desde un bloque.</div>';
+    return;
+  }
+  grid.innerHTML = lib.map(m => `
+    <div class="mg-item" onclick="_galleryClick('${m.id}')" title="${_galleryMode==='pick'?'Asignar al bloque':'Recortar / editar'}">
+      <div class="mg-thumb"><img src="" data-path="${m.storagePath}" class="lazy-img" alt=""></div>
+      <div class="mg-meta">
+        <span class="mg-fn" title="${esc(m.filename)}">${esc(m.filename)}${m.parentId?' ✂':''}</span>
+        <span class="mg-badge ${m.usedInBlocks.length ? 'used' : 'unused'}">${m.usedInBlocks.length ? 'usada' : 'sin usar'}</span>
+      </div>
+    </div>`).join('');
+  loadLazyImages();
+}
+function _galleryClick(id) {
+  if (_galleryMode === 'pick') assignMediaToBlock(id, _galleryPickTarget);
+  else openCropEditor(id);
+}
+
+async function assignMediaToBlock(mediaId, blockId) {
+  const m = STATE.mediaLibrary.find(x => x.id === mediaId);
+  const b = STATE.blocks.find(x => x.id === blockId);
+  if (!m || !b) { notify('No se pudo asignar la imagen'); return; }
+  delete b.src;
+  b.storagePath = m.storagePath;
+  closeMediaGallery();
+  renderBlock(blockId);
+  _recomputeMediaUsage();
+  scheduleLocalSave();
+  notify('✅ Imagen asignada desde el repositorio');
+}
+
+async function deleteUnusedMedia() {
+  _recomputeMediaUsage();
+  const unused = (STATE.mediaLibrary || []).filter(m => !m.usedInBlocks.length);
+  if (!unused.length) { notify('No hay imágenes sin usar'); return; }
+  if (!confirm(`¿Eliminar ${unused.length} imágenes SIN USAR del repositorio?\nSe borrarán de la nube y no se puede deshacer.`)) return;
+  try { await sb.storage.from('manual-images').remove(unused.map(m => m.storagePath)); }
+  catch (e) { console.warn('deleteUnusedMedia:', e); }
+  STATE.mediaLibrary = STATE.mediaLibrary.filter(m => m.usedInBlocks.length);
+  _renderGallery();
+  scheduleLocalSave();
+  notify(`🗑 ${unused.length} imágenes eliminadas`);
+}
+
+// ── Editor de recorte (Cropper.js) ──
+async function openCropEditor(mediaId) {
+  const m = STATE.mediaLibrary.find(x => x.id === mediaId);
+  if (!m) return;
+  _cropMediaId = mediaId;
+  if (!window.Cropper) {
+    await loadCSS('https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js');
+  }
+  if (!window.Cropper) { notify('❌ No se pudo cargar el editor de recorte'); return; }
+  document.getElementById('modal-crop').classList.remove('hidden');
+  const img = document.getElementById('crop-img');
+  let url = '';
+  try {
+    const { data } = await sb.storage.from('manual-images').createSignedUrl(m.storagePath, 3600);
+    const res = await fetch((data && data.signedUrl) || '');
+    url = URL.createObjectURL(await res.blob()); // blob: evita el "taint" del canvas
+  } catch (e) { console.warn('openCropEditor:', e); notify('❌ No se pudo cargar la imagen'); return; }
+  if (_cropper) { _cropper.destroy(); _cropper = null; }
+  img.onload = () => {
+    if (_cropper) _cropper.destroy();
+    _cropper = new Cropper(img, { viewMode: 1, autoCropArea: 1, background: false, responsive: true });
+  };
+  img.src = url;
+}
+function _cropRotate(deg) { if (_cropper) _cropper.rotate(deg); }
+function _cropZoom(delta) { if (_cropper) _cropper.zoom(delta); }
+function _cropAspect(v) {
+  if (!_cropper) return;
+  _cropper.setAspectRatio(v === 'free' ? NaN : Number(v));
+  document.querySelectorAll('#crop-aspects button').forEach(b => b.classList.toggle('active', b.dataset.aspect === v));
+}
+function closeCropEditor() {
+  if (_cropper) { _cropper.destroy(); _cropper = null; }
+  const img = document.getElementById('crop-img');
+  if (img && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  document.getElementById('modal-crop').classList.add('hidden');
+}
+async function applyCrop() {
+  if (!_cropper) return;
+  const parent = STATE.mediaLibrary.find(x => x.id === _cropMediaId);
+  const canvas = _cropper.getCroppedCanvas({ maxWidth: 1600 });
+  if (!canvas) { notify('Selecciona un área de recorte'); return; }
+  const btn = document.getElementById('crop-apply-btn');
+  if (btn) { btn.textContent = 'Guardando…'; btn.disabled = true; }
+  canvas.toBlob(async blob => {
+    try {
+      if (!blob || !await _ensureManualSaved()) return;
+      const base = parent ? parent.filename.replace(/\.[^.]+$/, '') : 'recorte';
+      const entry = await _uploadMedia(blob, base + '-recorte.jpg', { parentId: _cropMediaId });
+      closeCropEditor();
+      if (entry) { _renderGallery(); scheduleLocalSave(); notify('✅ Recorte guardado como nueva imagen (original intacta)'); }
+    } finally { if (btn) { btn.textContent = 'Aplicar recorte'; btn.disabled = false; } }
+  }, 'image/jpeg', 0.9);
 }
 
 async function parsePDFtoBlocks(ab) {
@@ -3613,9 +3868,9 @@ function confirmImport() {
     render();
     scheduleLocalSave();
     notify(`✅ Importados ${selected.length} bloques`);
-    _postImportUpload(_added);
   }
   closeImportModal();
+  _afterImport();
 }
 
 function importAsPages(blocks) {
@@ -3703,6 +3958,7 @@ async function handleUnifiedFileSelect(input, type) {
   prev.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ui-text-muted)"><div class="spinner" style="margin:0 auto 10px;border-top-color:var(--primary)"></div>Procesando…</div>';
   btn.style.display = 'none';
   _unifiedImportBlocks = [];
+  _docxExtractedMedia = [];
   try {
     const ab = await file.arrayBuffer();
     if (type === 'pdf') {
@@ -3756,9 +4012,9 @@ function confirmUnifiedImport() {
     render();
     scheduleLocalSave();
     notify(`✅ Importados ${clean.length} bloques`);
-    _postImportUpload(clean);
   }
   closeModal('modal-import-unified');
+  _afterImport();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -4026,6 +4282,7 @@ async function handleSession(session) {
       STATE.blocks = draft.blocks || [];
       STATE.pages = draft.pages || [];
       STATE.activePage = draft.activePage || null;
+      STATE.mediaLibrary = draft.mediaLibrary || [];
       STATE.manual = { ...STATE.manual, ...draft.manual };
       if (draft.titulo) q('#manual-titulo').value = draft.titulo;
       if (draft.empresa) q('#manual-empresa').value = draft.empresa;
@@ -4058,6 +4315,7 @@ async function handleSession(session) {
       STATE.blocks = draft.blocks || [];
       STATE.pages = draft.pages || [];
       STATE.activePage = draft.activePage || null;
+      STATE.mediaLibrary = draft.mediaLibrary || [];
       STATE.manual = { ...STATE.manual, ...draft.manual };
       if (draft.titulo) q('#manual-titulo').value = draft.titulo;
       if (draft.empresa) q('#manual-empresa').value = draft.empresa;
@@ -4095,9 +4353,11 @@ setTimeout(() => {
 async function saveVersion() {
   if (!STATE.manual.id || !STATE.user) return;
   try {
-    const contenido = STATE.pages.length > 0
-      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage }
-      : STATE.blocks;
+    const contenido = (STATE.pages.length > 0)
+      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage, mediaLibrary: STATE.mediaLibrary }
+      : ((STATE.mediaLibrary && STATE.mediaLibrary.length)
+          ? { blocks: STATE.blocks, mediaLibrary: STATE.mediaLibrary }
+          : STATE.blocks);
     await sb.from('manual_versions').insert({ manual_id: STATE.manual.id, user_id: STATE.user.id, contenido, titulo: STATE.manual.titulo });
     const { data } = await sb.from('manual_versions').select('id, created_at').eq('manual_id', STATE.manual.id).order('created_at', { ascending: false });
     if (data && data.length > 10) {
