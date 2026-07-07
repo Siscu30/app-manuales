@@ -1318,7 +1318,23 @@ function toggleLightboxZoom(e) {
 function _lightboxKey(e) { if (e.key === 'Escape') closeLightbox(); }
 // Control deslizante de tamaño de imagen (se muestra en la barra de pie de foto)
 function _imgResize(b, pct, slot) {
-  return `<span class="img-resize" title="Ajustar tamaño en el manual" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">↔<input type="range" min="20" max="100" step="5" value="${pct}" oninput="setImgWidth('${b.id}',this.value${slot?','+slot:''})"></span>`;
+  const s = slot || 1;
+  const arg = slot ? ',' + slot : '';
+  return `<span class="img-resize" title="Tamaño de la imagen" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">`
+    + `<button type="button" class="ir-btn" title="Reducir" onclick="stepImgWidth('${b.id}',-10${arg})">−</button>`
+    + `<span class="ir-val" id="irval-${b.id}-${s}">${pct}%</span>`
+    + `<button type="button" class="ir-btn" title="Aumentar" onclick="stepImgWidth('${b.id}',10${arg})">＋</button>`
+    + `</span>`;
+}
+// Aumenta/disminuye el ancho en pasos de 10% (más fácil que arrastrar una barra)
+function stepImgWidth(blockId, delta, slot) {
+  const b = STATE.blocks.find(x => x.id === blockId);
+  if (!b) return;
+  const cur = parseInt(b.type === 'paso' ? b[_slotFields(slot).w] : b.width) || 100;
+  const next = Math.max(20, Math.min(100, cur + delta));
+  setImgWidth(blockId, next, slot);
+  const lbl = document.getElementById(`irval-${blockId}-${slot || 1}`);
+  if (lbl) lbl.textContent = next + '%';
 }
 // Mapea la ranura de imagen (1 = principal, 2 = secundaria) a los campos del bloque
 function _slotFields(slot) {
