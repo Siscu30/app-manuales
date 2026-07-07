@@ -315,27 +315,21 @@ const BLOCK_TYPES = {
     label: 'Paso numerado',
     defaultData: () => ({ titulo:'Título del paso', descripcion:'Describe el paso...', storagePath:null, caption:'' }),
     render(b, pasoN) {
-      const _annBtn = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}')" style="background:#2563EB;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6" title="Anotar imagen">✏️</button>`;
-      const _delBtn = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕</button>`;
-      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 16px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_imgResize(b, parseInt(b.imgWidth)||100)}${_annBtn}${_delBtn}</div>`;
-      // b.src takes priority (annotated image), then storagePath (lazy-loaded), then upload prompt
-      const imgHTML = b.src
-        ? `<div class="b-paso-img-wrap">
-             <img src="${b.src}" class="b-paso-img" style="width:${b.imgWidth||'100%'};margin:0 auto;display:block" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
-             ${_capRow}
-           </div>`
-        : b.storagePath
-        ? `<div class="b-paso-img-wrap">
-             <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" style="width:${b.imgWidth||'100%'};margin:0 auto;display:block" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
-             ${_capRow}
-           </div>`
-        : `<div class="img-src-actions">
+      const _hasImg1 = b.src || b.storagePath;
+      const _hasImg2 = b.src2 || b.storagePath2;
+      const _uploadArea = (slot, label) => `<div class="img-src-actions">
              <label class="paso-upload-btn" title="Subir imagen del equipo">
-               📷 <span>Subir</span>
-               <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')">
+               📷 <span>${label}</span>
+               <input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}',${slot})">
              </label>
-             <button type="button" class="paso-upload-btn repo-btn" title="Elegir del repositorio del manual" onclick="event.stopPropagation();openMediaPicker('${b.id}')">🗂 <span>Repositorio</span></button>
+             <button type="button" class="paso-upload-btn repo-btn" title="Elegir del repositorio del manual" onclick="event.stopPropagation();openMediaPicker('${b.id}',${slot})">🗂 <span>Repositorio</span></button>
            </div>`;
+      // Hasta 2 imágenes: si hay dos, se muestran lado a lado (cada una redimensionable)
+      const imgHTML = (_hasImg1 && _hasImg2)
+        ? `<div class="paso-imgs-row">${_pasoImageSlotHTML(b, 1)}${_pasoImageSlotHTML(b, 2)}</div>`
+        : _hasImg1
+        ? `${_pasoImageSlotHTML(b, 1)}<div class="paso-add2">${_uploadArea(2, 'Añadir 2ª imagen')}</div>`
+        : _uploadArea(1, 'Subir');
       const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
@@ -1215,10 +1209,11 @@ async function resizeImage(file) {
   });
 }
 
-async function uploadBlockImage(input, blockId) {
+async function uploadBlockImage(input, blockId, slot) {
   const file = input.files[0]; if (!file) return;
   if (!STATE.user) { notify('⚠️ Guarda el manual primero para subir imágenes'); return; }
   const block = STATE.blocks.find(b=>b.id===blockId); if (!block) return;
+  const F = _slotFields(slot);
 
   const wrap = document.querySelector(`[data-id="${blockId}"]`);
   if (wrap) wrap.classList.add('img-uploading');
@@ -1238,7 +1233,7 @@ async function uploadBlockImage(input, blockId) {
     });
 
     // Step 3: show image right now
-    block.src = dataUrl;
+    block[F.src] = dataUrl;
     if (wrap) wrap.classList.remove('img-uploading');
     render();
     scheduleLocalSave();
@@ -1249,9 +1244,9 @@ async function uploadBlockImage(input, blockId) {
     try {
       const ext = file.type === 'image/png' ? 'png' : 'jpg';
       const manualId = STATE.manual.id || 'guest';
-      const storagePath = `${STATE.user.id}/${manualId}/${blockId}/${Date.now()}.${ext}`;
+      const storagePath = `${STATE.user.id}/${manualId}/${blockId}${slot===2?'_2':''}/${Date.now()}.${ext}`;
       const { error: upErr } = await sb.storage.from('manual-images').upload(storagePath, safeBlob, { contentType: safeBlob.type, upsert: true });
-      if (!upErr) { block.storagePath = storagePath; delete block.src; renderBlock(blockId); scheduleLocalSave(); }
+      if (!upErr) { block[F.path] = storagePath; delete block[F.src]; renderBlock(blockId); scheduleLocalSave(); }
       else { console.warn('Storage upload:', upErr); notify('⚠️ Imagen guardada solo en este equipo (fallo al subir a la nube)', 4000); }
     } catch(e) { console.warn('Storage upload:', e); notify('⚠️ Imagen guardada solo en este equipo (fallo al subir a la nube)', 4000); }
 
@@ -1322,26 +1317,52 @@ function toggleLightboxZoom(e) {
 }
 function _lightboxKey(e) { if (e.key === 'Escape') closeLightbox(); }
 // Control deslizante de tamaño de imagen (se muestra en la barra de pie de foto)
-function _imgResize(b, pct) {
-  return `<span class="img-resize" title="Ajustar tamaño en el manual" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">↔<input type="range" min="20" max="100" step="5" value="${pct}" oninput="setImgWidth('${b.id}',this.value)"></span>`;
+function _imgResize(b, pct, slot) {
+  return `<span class="img-resize" title="Ajustar tamaño en el manual" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">↔<input type="range" min="20" max="100" step="5" value="${pct}" oninput="setImgWidth('${b.id}',this.value${slot?','+slot:''})"></span>`;
 }
-// Redimensiona la imagen de un bloque en la vista general (paso: imgWidth, imagen: width)
-function setImgWidth(blockId, pct) {
+// Mapea la ranura de imagen (1 = principal, 2 = secundaria) a los campos del bloque
+function _slotFields(slot) {
+  return slot === 2 ? { src:'src2', path:'storagePath2', w:'imgWidth2', cap:'caption2' }
+                    : { src:'src',  path:'storagePath',  w:'imgWidth',  cap:'caption'  };
+}
+// Redimensiona la imagen de un bloque en la vista general (paso: imgWidth[2], imagen: width)
+function setImgWidth(blockId, pct, slot) {
   const b = STATE.blocks.find(x => x.id === blockId);
   if (!b) return;
   const w = pct + '%';
-  if (b.type === 'paso') b.imgWidth = w; else b.width = w;
   const wrap = document.querySelector(`.block-wrap[data-id="${blockId}"]`);
-  const img = wrap && wrap.querySelector(b.type === 'paso' ? 'img.b-paso-img' : '.b-imagen > img');
+  let img;
+  if (b.type === 'paso') {
+    const F = _slotFields(slot); b[F.w] = w;
+    img = wrap && wrap.querySelector(`img.b-paso-img[data-slot="${slot || 1}"]`);
+  } else {
+    b.width = w;
+    img = wrap && wrap.querySelector('.b-imagen > img');
+  }
   if (img) img.style.width = w; // en vivo, sin re-render, para que el deslizador sea fluido
   scheduleLocalSave();
 }
+// HTML de una ranura de imagen del paso (imagen + pie de foto + tamaño + anotar + quitar)
+function _pasoImageSlotHTML(b, slot) {
+  const F = _slotFields(slot);
+  const src = b[F.src], path = b[F.path], w = b[F.w] || '100%', cap = b[F.cap] || '';
+  const pct = parseInt(w) || 100;
+  const style = `width:${w};margin:0 auto;display:block;cursor:zoom-in`;
+  const img = src
+    ? `<img src="${src}" class="b-paso-img" data-slot="${slot}" style="${style}" alt="${esc(cap)}" onclick="openLightbox(this)">`
+    : `<img src="" data-path="${path}" class="b-paso-img lazy-img" data-slot="${slot}" style="${style}" alt="${esc(cap)}" onclick="openLightbox(this)">`;
+  const ann = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}',${slot})" style="background:#2563EB;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6" title="Anotar imagen">✏️</button>`;
+  const del = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}',${slot})" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕</button>`;
+  const capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="${F.cap}" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(cap)}</div>${_imgResize(b, pct, slot)}${ann}${del}</div>`;
+  return `<div class="paso-img-slot">${img}${capRow}</div>`;
+}
 
-function removeBlockImage(blockId) {
+function removeBlockImage(blockId, slot) {
   const block = STATE.blocks.find(b => b.id === blockId);
   if (!block) return;
-  delete block.src;
-  block.storagePath = null;
+  const F = _slotFields(slot);
+  delete block[F.src];
+  block[F.path] = null;
   render();
   if (typeof _recomputeMediaUsage === 'function') _recomputeMediaUsage(); // queda "sin usar" en el repositorio
   scheduleLocalSave();
@@ -1902,26 +1923,24 @@ async function exportHTML(preview) {
   }
 
   if (!STATE.blocks.length) { notify('El manual está vacío'); return; }
-  if (!navigator.onLine && STATE.blocks.some(b=>b.storagePath)) {
+  if (!navigator.onLine && STATE.blocks.some(b=>b.storagePath||b.storagePath2)) {
     notify('⚠️ Necesitas conexión para exportar con imágenes'); return;
   }
 
   const prog = q('#export-progress'); prog.classList.add('show');
   const bar = q('#export-bar'); const msg = q('#export-msg');
   // Only fetch from storage blocks that have no local src (annotated images already in block.src)
-  const imgBlocks = STATE.blocks.filter(b=>b.storagePath && !b.src);
+  const imgBlocks = STATE.blocks.filter(b=>(b.storagePath && !b.src) || (b.storagePath2 && !b.src2));
   let done = 0;
 
   const imgCache = {};
   for (const block of imgBlocks) {
     msg.textContent = `Descargando imagen ${done+1} de ${imgBlocks.length}...`;
     bar.style.width = Math.round((done/Math.max(imgBlocks.length,1))*80) + '%';
-    try {
-      const { data, error } = await sb.storage.from('manual-images').download(block.storagePath);
-      if (!error && data) {
-        imgCache[block.storagePath] = await blobToBase64(data);
-      }
-    } catch(e) { /* continue with broken img */ }
+    for (const _p of [block.storagePath, block.storagePath2]) {
+      if (!_p || imgCache[_p]) continue;
+      try { const { data, error } = await sb.storage.from('manual-images').download(_p); if (!error && data) imgCache[_p] = await blobToBase64(data); } catch(e) {}
+    }
     done++;
   }
 
@@ -1940,6 +1959,7 @@ async function exportHTML(preview) {
     const bCopy = {...b};
     // Only use storage download if no local src (preserves annotations)
     if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+      if (!bCopy.src2 && bCopy.storagePath2 && imgCache[bCopy.storagePath2]) bCopy.src2 = imgCache[bCopy.storagePath2];
     return renderBlockForExport(bCopy, pasoN);
   }).join('\n');
 
@@ -2035,7 +2055,12 @@ function renderBlockForExport(b, pasoN) {
       const _dHtml = _dLines.length > 0
         ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
-      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${b.src?`${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div>`:''}</div>`;
+      const _expSingle = (src,cap,w) => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(cap||'')}</div>` : '';
+      const _expCard = (src,cap,w) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden"><img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
+      const _imgArea = (b.src && b.src2)
+        ? `<div style="display:flex;gap:8px;padding:8px">${_expCard(b.src,b.caption,b.imgWidth)}${_expCard(b.src2,b.caption2,b.imgWidth2)}</div>`
+        : _expSingle(b.src,b.caption,b.imgWidth);
+      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
     }
     case 'imagen': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
@@ -2101,22 +2126,23 @@ async function exportPDF() {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     // Only fetch storage images without a local src (preserves annotations)
-    const imgBlocks = STATE.blocks.filter(b => b.storagePath && !b.src && b.type !== 'video');
+    const imgBlocks = STATE.blocks.filter(b => ((b.storagePath && !b.src) || (b.storagePath2 && !b.src2)) && b.type !== 'video');
     const imgCache = {};
     let done = 0;
     for (const block of imgBlocks) {
       msg.textContent = `Descargando imagen ${done+1} de ${imgBlocks.length}...`;
       bar.style.width = Math.round(10 + (done / Math.max(imgBlocks.length,1)) * 40) + '%';
-      try {
-        const { data, error } = await sb.storage.from('manual-images').download(block.storagePath);
-        if (!error && data) imgCache[block.storagePath] = await blobToBase64(data);
-      } catch(e) { /* continue */ }
+      for (const _p of [block.storagePath, block.storagePath2]) {
+        if (!_p || imgCache[_p]) continue;
+        try { const { data, error } = await sb.storage.from('manual-images').download(_p); if (!error && data) imgCache[_p] = await blobToBase64(data); } catch(e) {}
+      }
       done++;
     }
     let pasoN = 0;
     const body = STATE.blocks.map(b => {
       const bCopy = {...b};
       if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+      if (!bCopy.src2 && bCopy.storagePath2 && imgCache[bCopy.storagePath2]) bCopy.src2 = imgCache[bCopy.storagePath2];
       if (b.type === 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }
       return renderBlockForExport(bCopy, pasoN);
     }).join('\n');
@@ -3362,7 +3388,7 @@ function _recomputeMediaUsage() {
   }
   const all = STATE.pages.length ? STATE.pages.flatMap(p => p.blocks || []) : STATE.blocks;
   const used = {};
-  all.forEach(b => { if (b.storagePath) (used[b.storagePath] = used[b.storagePath] || []).push(b.id); });
+  all.forEach(b => { [b.storagePath, b.storagePath2].forEach(p => { if (p) (used[p] = used[p] || []).push(b.id); }); });
   STATE.mediaLibrary.forEach(m => { m.usedInBlocks = used[m.storagePath] || []; });
 }
 
@@ -3408,7 +3434,7 @@ async function confirmImportMedia() {
 
 // ── Galería (modo gestionar / modo elegir para un bloque) ──
 function openMediaGallery() { _galleryMode = 'manage'; _galleryPickTarget = null; _renderGallery(); document.getElementById('modal-media-gallery').classList.remove('hidden'); }
-function openMediaPicker(blockId) { _galleryMode = 'pick'; _galleryPickTarget = blockId; _renderGallery(); document.getElementById('modal-media-gallery').classList.remove('hidden'); }
+function openMediaPicker(blockId, slot) { _galleryMode = 'pick'; _galleryPickTarget = { blockId, slot: slot || 1 }; _renderGallery(); document.getElementById('modal-media-gallery').classList.remove('hidden'); }
 function closeMediaGallery() { document.getElementById('modal-media-gallery').classList.add('hidden'); _galleryPickTarget = null; }
 
 function _renderGallery() {
@@ -3441,14 +3467,16 @@ function _galleryClick(id) {
   openCropEditor(id);
 }
 
-async function assignMediaToBlock(mediaId, blockId) {
+async function assignMediaToBlock(mediaId, target) {
+  const t = (typeof target === 'string') ? { blockId: target, slot: 1 } : (target || {});
+  const F = _slotFields(t.slot);
   const m = STATE.mediaLibrary.find(x => x.id === mediaId);
-  const b = STATE.blocks.find(x => x.id === blockId);
+  const b = STATE.blocks.find(x => x.id === t.blockId);
   if (!m || !b) { notify('No se pudo asignar la imagen'); return; }
-  delete b.src;
-  b.storagePath = m.storagePath;
+  delete b[F.src];
+  b[F.path] = m.storagePath;
   closeMediaGallery();
-  renderBlock(blockId);
+  renderBlock(t.blockId);
   _recomputeMediaUsage();
   scheduleLocalSave();
   notify('✅ Imagen asignada desde el repositorio');
@@ -4054,7 +4082,7 @@ async function exportHTMLMultipage(preview) {
   // Collect only blocks without local src (annotated images stay in block.src)
   const allImageBlocks = [];
   for (const pg of STATE.pages) {
-    for (const b of (pg.blocks||[])) { if (b.storagePath && !b.src) allImageBlocks.push(b); }
+    for (const b of (pg.blocks||[])) { if ((b.storagePath && !b.src) || (b.storagePath2 && !b.src2)) allImageBlocks.push(b); }
   }
 
   const prog = q('#export-progress'); prog.classList.add('show');
@@ -4064,10 +4092,10 @@ async function exportHTMLMultipage(preview) {
   for (const block of allImageBlocks) {
     msg.textContent = `Descargando imagen ${done+1} de ${allImageBlocks.length}…`;
     bar.style.width = Math.round((done/Math.max(allImageBlocks.length,1))*80)+'%';
-    try {
-      const { data, error } = await sb.storage.from('manual-images').download(block.storagePath);
-      if (!error && data) imgCache[block.storagePath] = await blobToBase64(data);
-    } catch(e) {}
+    for (const _p of [block.storagePath, block.storagePath2]) {
+      if (!_p || imgCache[_p]) continue;
+      try { const { data, error } = await sb.storage.from('manual-images').download(_p); if (!error && data) imgCache[_p] = await blobToBase64(data); } catch(e) {}
+    }
     done++;
   }
 
@@ -4080,6 +4108,7 @@ async function exportHTMLMultipage(preview) {
       if (b.type==='paso') { if (b.resetStep) pasoN = 0; pasoN++; }
       const bCopy = {...b};
       if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
+      if (!bCopy.src2 && bCopy.storagePath2 && imgCache[bCopy.storagePath2]) bCopy.src2 = imgCache[bCopy.storagePath2];
       return renderBlockForExport(bCopy, pasoN);
     }).join('\n');
     return { id: pg.id, title: pg.title, html: blocksHTML };
@@ -4847,17 +4876,18 @@ function _rgbToHex(rgb) {
 // ══ MÓDULO ANOTACIONES EN IMÁGENES ═══════════════════════════════════════
 
 // Step 1: resolve image src — block.src > DOM lazy-loaded img > fresh signed URL
-async function _resolveAnnotationSrc(block) {
-  if (block.src) return block.src;
+async function _resolveAnnotationSrc(block, slot) {
+  const F = _slotFields(slot);
+  if (block[F.src]) return block[F.src];
   // DOM img already lazy-loaded?
-  const imgEl = document.querySelector(`[data-id="${block.id}"] img`);
+  const imgEl = document.querySelector(`[data-id="${block.id}"] img.b-paso-img[data-slot="${slot || 1}"]`) || document.querySelector(`[data-id="${block.id}"] img`);
   if (imgEl && imgEl.complete && imgEl.naturalWidth > 0 && imgEl.src && !imgEl.src.endsWith('/') && imgEl.src !== window.location.href) {
     return imgEl.src;
   }
   // Generate a fresh signed URL from storagePath
-  if (block.storagePath && window.sb) {
+  if (block[F.path] && window.sb) {
     try {
-      const { data } = await sb.storage.from('manual-images').createSignedUrl(block.storagePath, 3600);
+      const { data } = await sb.storage.from('manual-images').createSignedUrl(block[F.path], 3600);
       if (data && data.signedUrl) return data.signedUrl;
     } catch(e) { console.warn('signedUrl:', e); }
   }
@@ -4904,11 +4934,11 @@ function _loadImageToCanvas(src, canvas, ctx) {
   });
 }
 
-async function openAnnotationEditor(blockId) {
+async function openAnnotationEditor(blockId, slot) {
   const block = STATE.blocks.find(b => b.id === blockId);
   if (!block) return;
 
-  const imgSrc = await _resolveAnnotationSrc(block);
+  const imgSrc = await _resolveAnnotationSrc(block, slot);
   if (!imgSrc) { notify('⚠️ No hay imagen cargada para anotar'); return; }
 
   const existing = document.getElementById('annotationModal');
@@ -5136,7 +5166,7 @@ async function openAnnotationEditor(blockId) {
     let dataUrl;
     try { dataUrl = canvas.toDataURL('image/png'); }
     catch(err) { notify('⚠️ No se puede exportar: canvas tainted (' + err.message + ')'); return; }
-    block.src = dataUrl;
+    block[_slotFields(slot).src] = dataUrl;
     // Keep storagePath for reference; render() checks block.src first
     closeModal();
     render();
