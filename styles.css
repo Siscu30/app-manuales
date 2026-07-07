@@ -508,13 +508,14 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .ir-btn:active{transform:scale(.92)}
 .ir-val{font-size:11px;color:var(--text-muted);min-width:36px;text-align:center;font-variant-numeric:tabular-nums}
 
-.paso-imgs-row{display:flex;gap:10px;align-items:flex-start}
+.paso-imgs-row{display:flex;gap:10px;align-items:stretch}
 .paso-imgs-row .paso-img-slot{flex:1;min-width:0}
 .paso-img-slot{border-radius:6px;overflow:hidden}
 .paso-add2{display:flex;justify-content:center;padding:4px 0 10px}
 
-.paso-img-slot{display:flex;flex-direction:column;align-items:center}
-.paso-img-slot > img{margin:0 auto;display:block}
+.paso-img-slot{display:flex;flex-direction:column}
+.paso-img-holder{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+.paso-img-holder img{margin:auto;display:block}
 .paso-img-slot > div{width:100%}
 .b-imagen{display:flex;flex-direction:column;align-items:center}
 .b-imagen > img{margin:0 auto}

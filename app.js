@@ -1370,7 +1370,7 @@ function _pasoImageSlotHTML(b, slot) {
   const ann = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}',${slot})" style="background:#2563EB;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6" title="Anotar imagen">✏️</button>`;
   const del = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}',${slot})" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕</button>`;
   const capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="${F.cap}" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(cap)}</div>${_imgResize(b, pct, slot)}${ann}${del}</div>`;
-  return `<div class="paso-img-slot">${img}${capRow}</div>`;
+  return `<div class="paso-img-slot"><div class="paso-img-holder">${img}</div>${capRow}</div>`;
 }
 
 function removeBlockImage(blockId, slot) {
