@@ -317,16 +317,16 @@ const BLOCK_TYPES = {
     render(b, pasoN) {
       const _annBtn = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}')" style="background:#2563EB;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6" title="Anotar imagen">✏️</button>`;
       const _delBtn = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕</button>`;
-      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 16px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}${_delBtn}</div>`;
+      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 16px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_imgResize(b, parseInt(b.imgWidth)||100)}${_annBtn}${_delBtn}</div>`;
       // b.src takes priority (annotated image), then storagePath (lazy-loaded), then upload prompt
       const imgHTML = b.src
         ? `<div class="b-paso-img-wrap">
-             <img src="${b.src}" class="b-paso-img" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
+             <img src="${b.src}" class="b-paso-img" style="width:${b.imgWidth||'100%'};margin:0 auto;display:block" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
              ${_capRow}
            </div>`
         : b.storagePath
         ? `<div class="b-paso-img-wrap">
-             <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
+             <img src="" data-path="${b.storagePath}" class="b-paso-img lazy-img" style="width:${b.imgWidth||'100%'};margin:0 auto;display:block" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
              ${_capRow}
            </div>`
         : `<div class="img-src-actions">
@@ -358,16 +358,16 @@ const BLOCK_TYPES = {
     render(b) {
       const _annBtn = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}')" style="background:#2563EB;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✏️ Anotar</button>`;
       const _delBtn = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:3px 9px;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕ Quitar</button>`;
-      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-top:1px solid var(--border);background:#fafafa"><div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_annBtn}${_delBtn}</div>`;
+      const _capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-top:1px solid var(--border);background:#fafafa"><div class="img-caption" contenteditable="true" data-id="${b.id}" data-field="caption" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(b.caption||'')}</div>${_imgResize(b, parseInt(b.width)||100)}${_annBtn}${_delBtn}</div>`;
       if (b.src) {
         return `<div class="b-imagen block-inner">
-          <img src="${b.src}" style="width:${b.width||'100%'};display:block" alt="${esc(b.alt||b.caption||'')}" onclick="openLightbox(this)">
+          <img src="${b.src}" style="width:${b.width||'100%'};display:block;margin:0 auto" alt="${esc(b.alt||b.caption||'')}" onclick="openLightbox(this)">
           ${_capRow}
         </div>`;
       }
       if (b.storagePath) {
         return `<div class="b-imagen block-inner">
-          <img src="" data-path="${b.storagePath}" class="lazy-img" style="width:${b.width||'100%'}" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
+          <img src="" data-path="${b.storagePath}" class="lazy-img" style="width:${b.width||'100%'};display:block;margin:0 auto" alt="${esc(b.caption||'')}" onclick="openLightbox(this)">
           ${_capRow}
         </div>`;
       }
@@ -1321,6 +1321,22 @@ function toggleLightboxZoom(e) {
   if (hint) hint.style.display = zooming ? 'none' : '';
 }
 function _lightboxKey(e) { if (e.key === 'Escape') closeLightbox(); }
+// Control deslizante de tamaño de imagen (se muestra en la barra de pie de foto)
+function _imgResize(b, pct) {
+  return `<span class="img-resize" title="Ajustar tamaño en el manual" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">↔<input type="range" min="20" max="100" step="5" value="${pct}" oninput="setImgWidth('${b.id}',this.value)"></span>`;
+}
+// Redimensiona la imagen de un bloque en la vista general (paso: imgWidth, imagen: width)
+function setImgWidth(blockId, pct) {
+  const b = STATE.blocks.find(x => x.id === blockId);
+  if (!b) return;
+  const w = pct + '%';
+  if (b.type === 'paso') b.imgWidth = w; else b.width = w;
+  const wrap = document.querySelector(`.block-wrap[data-id="${blockId}"]`);
+  const img = wrap && wrap.querySelector(b.type === 'paso' ? 'img.b-paso-img' : '.b-imagen > img');
+  if (img) img.style.width = w; // en vivo, sin re-render, para que el deslizador sea fluido
+  scheduleLocalSave();
+}
+
 function removeBlockImage(blockId) {
   const block = STATE.blocks.find(b => b.id === blockId);
   if (!block) return;
