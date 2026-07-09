@@ -3426,9 +3426,17 @@ function _afterImport() {
     const _n = _importedTextFragments.length;
     _importedTextFragments = [];
     scheduleLocalSave();
-    notify(`📝 ${_n} fragmentos guardados en el Banco de Texto`, 3500);
+    _notifyOpenBank(_n);
   }
   if (_docxExtractedMedia.length) openImportMediaDialog();
+}
+// Aviso persistente con acceso directo al banco tras importar texto
+function _notifyOpenBank(n) {
+  const el = document.getElementById('notif');
+  el.innerHTML = `📝 ${n} fragmentos de texto guardados en el Banco de Texto. Ábrelo para revisarlos y añadirlos al manual. `
+    + `<button onclick="document.getElementById('notif').classList.remove('show');openTextBank()" style="margin-left:8px;background:#fff;color:#1e293b;border:none;border-radius:6px;padding:4px 11px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600">Abrir Banco de Texto</button>`;
+  el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 9000);
 }
 
 function openImportMediaDialog() {
@@ -4091,7 +4099,7 @@ function renderImportPreview(blocks) {
     btn.style.display = 'none'; return;
   }
   const labels = {titulo:'📑 Título',subtitulo:'🔹 Subtítulo',alerta:'⚠️ Alerta',paso:'🔢 Paso',imagen:'🖼 Imagen',tabla:'📊 Tabla',callout:'💡 Callout',lista:'✅ Lista',separador:'— Sep.',texto:'📝 Texto',flujos:'🔀 Flujos',video:'🎬 Vídeo',enlace:'🔗 Enlace'};
-  prev.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${blocks.length} bloques detectados — selecciona los que quieres importar:</div>
+  prev.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${blocks.length} fragmentos de texto detectados — se guardarán en el Banco de Texto para que los revises:</div>
     <div style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
       ${blocks.map((b,i)=>`<label class="import-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px">
         <input type="checkbox" checked data-bidx="${i}" style="flex-shrink:0">
@@ -4127,21 +4135,7 @@ function toggleAllImportBlocks(state) {
 }
 
 function confirmImport() {
-  const checkboxes = document.querySelectorAll('#import-preview input[type=checkbox]');
-  const asPages = document.getElementById('import-as-pages')?.checked;
-  const selected = [];
-  checkboxes.forEach(cb => { if (cb.checked) selected.push(_importBlocks[parseInt(cb.dataset.bidx)]); });
-  if (!selected.length) { notify('⚠️ Selecciona al menos un bloque'); return; }
-  pushHistory();
-  if (asPages) {
-    importAsPages(selected);
-  } else {
-    const _added = selected.map((b,i)=>({...b, id:uid(), order:STATE.blocks.length+i, _isH1:undefined}));
-    STATE.blocks.push(..._added);
-    render();
-    scheduleLocalSave();
-    notify(`✅ Importados ${selected.length} bloques`);
-  }
+  // NUEVO FLUJO: el texto importado NO se inserta en el manual; va solo al Banco de Texto.
   closeImportModal();
   _afterImport();
 }
@@ -4268,13 +4262,20 @@ function showUnifiedPreview(blocks) {
   blocks.forEach(b => { counts[b.type] = (counts[b.type]||0)+1; });
   const tags = Object.entries(counts).map(([t,n]) => `<span style="background:rgba(255,255,255,.1);padding:3px 10px;border-radius:12px;font-size:12px">${typeNames[t]||t} ×${n}</span>`).join('');
   prev.innerHTML = `<div style="background:rgba(255,255,255,.05);border:1px solid var(--panel-border);border-radius:8px;padding:14px 16px">
-    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--ui-text)">✅ ${blocks.length} bloques detectados</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--ui-text)">✅ ${blocks.length} fragmentos detectados → Banco de Texto</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px">${tags}</div>
   </div>`;
   btn.style.display = '';
 }
 
 function confirmUnifiedImport() {
+  // Word/PDF: el texto va SOLO al Banco de Texto (hay fragmentos capturados)
+  if (_importedTextFragments && _importedTextFragments.length) {
+    closeModal('modal-import-unified');
+    _afterImport();
+    return;
+  }
+  // HTML (re-importar un manual exportado por la app): comportamiento previo, restaura bloques
   const blocks = _unifiedImportBlocks;
   if (!blocks.length) { notify('No hay bloques para importar'); return; }
   const asPages = document.getElementById('ui-import-pages')?.checked;
