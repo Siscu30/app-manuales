@@ -3611,8 +3611,10 @@ async function applyCrop() {
 // ═══════════════════════════════════════════════════════
 let _importedTextFragments = [];   // fragmentos del último import, pendientes de volcar al banco
 let _importOrigin = '';            // nombre del documento de origen
-let _tbUndo = null;                // fragmento eliminado recientemente (undo 5s)
-let _tbDragId = null;              // fragmento arrastrado (drag&drop)
+let _tbUndoSnap = null;            // snapshot para deshacer (unir/eliminar/enviar)
+let _tbDragId = null;              // fragmento arrastrado (reordenar)
+let _tbSel = new Set();            // ids seleccionados
+let _tbAnchor = null;              // ancla para selección por rango (Shift)
 
 const _TB_LABELS = { titulo:'📑 Título', subtitulo:'🔹 Subtítulo', paso:'🔢 Paso', alerta:'⚠️ Alerta', lista:'✅ Lista', texto:'📝 Párrafo', tabla:'📊 Tabla', codigo:'</> Código', enlace:'🔗 Enlace' };
 
@@ -3645,17 +3647,21 @@ function _blocksToFragments(blocks, origen) {
 function openTextBank() { _renderTextBank(); document.getElementById('modal-text-bank').classList.remove('hidden'); }
 function closeTextBank() { document.getElementById('modal-text-bank').classList.add('hidden'); }
 
-function _tbSelectedIds() {
-  return [...document.querySelectorAll('#text-bank-list .tb-check:checked')].map(c => c.dataset.fid);
+function _tbFiltered() {
+  const list = STATE.textBank || [];
+  const sel = document.getElementById('tb-origin-filter');
+  return (sel && sel.value) ? list.filter(f => f.origen === sel.value) : list;
 }
+function _tbSelectedIds() { return _tbFiltered().filter(f => _tbSel.has(f.id)).map(f => f.id); }
 function _tbSep() { return (document.getElementById('tb-sep')?.value === 'space') ? ' ' : '\n'; }
+function _tbClearSel() { _tbSel.clear(); _tbAnchor = null; }
+function _tbBlockClass(tipo) { return 'tbb-' + (['titulo','subtitulo','paso','alerta','lista','texto'].includes(tipo) ? tipo : 'texto'); }
 
 function _renderTextBank() {
   if (!STATE.textBank) STATE.textBank = [];
   const list = STATE.textBank;
   const box = document.getElementById('text-bank-list');
   document.getElementById('text-bank-sub').textContent = `${list.length} fragmentos`;
-  // filtro por origen
   const origins = [...new Set(list.map(f => f.origen).filter(Boolean))];
   const sel = document.getElementById('tb-origin-filter');
   if (sel) {
@@ -3663,25 +3669,64 @@ function _renderTextBank() {
     sel.innerHTML = '<option value="">Todos los orígenes</option>' + origins.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
     if (origins.includes(cur)) sel.value = cur;
   }
-  const filt = (sel && sel.value) ? list.filter(f => f.origen === sel.value) : list;
+  const filt = _tbFiltered();
   if (!filt.length) {
     box.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:34px">El banco de texto está vacío.<br>Importa un documento Word o PDF para llenarlo.</div>';
-    return;
+    _tbUpdateBar(); return;
   }
   box.innerHTML = filt.map(f => `
-    <div class="tb-card" draggable="true" data-fid="${f.id}"
-         ondragstart="_tbDragStart(event,'${f.id}')" ondragover="event.preventDefault();this.classList.add('tb-dragover')" ondragleave="this.classList.remove('tb-dragover')" ondrop="this.classList.remove('tb-dragover');_tbDrop(event,'${f.id}')">
-      <input type="checkbox" class="tb-check" data-fid="${f.id}" title="Seleccionar">
-      <div class="tb-body">
-        <div class="tb-head"><span class="tb-badge">${_TB_LABELS[f.tipo] || f.tipo}</span>${f.origen ? `<span class="tb-origin">${esc(f.origen)}</span>` : ''}</div>
-        <div class="tb-text" contenteditable="true" data-fid="${f.id}" onblur="saveFragmentEdit('${f.id}', this.innerText)" spellcheck="false">${esc(f.texto)}</div>
+    <div class="tbb-card ${_tbBlockClass(f.tipo)}${_tbSel.has(f.id) ? ' selected' : ''}" data-fid="${f.id}" draggable="true"
+         ondragstart="_tbReorderStart(event,'${f.id}')" ondragover="_tbReorderOver(event)" ondragleave="this.classList.remove('tbb-dragover')"
+         ondrop="_tbReorderDrop(event,'${f.id}')" ondragend="_tbReorderEnd()">
+      <div class="tbb-side">
+        <input type="checkbox" class="tb-check" data-fid="${f.id}" ${_tbSel.has(f.id) ? 'checked' : ''} onclick="event.stopPropagation();_tbToggle('${f.id}',event)" title="Seleccionar (Shift = rango)">
+        <span class="tbb-badge">${_TB_LABELS[f.tipo] || f.tipo}</span>
+        <span class="tbb-handle" title="Arrastra para reordenar">⠿</span>
       </div>
-      <div class="tb-actions">
-        <button onclick="copyFragment('${f.id}')" title="Copiar al portapapeles">📋</button>
-        <button onclick="insertFragmentAsBlock('${f.id}')" title="Insertar como bloque en el manual">➕</button>
+      <div class="tbb-content" contenteditable="true" spellcheck="false" onmousedown="event.stopPropagation()" onblur="saveFragmentEdit('${f.id}', this.innerText)">${esc(f.texto)}</div>
+      <div class="tbb-row-actions">
+        <button onclick="copyFragment('${f.id}')" title="Copiar">📋</button>
+        <button onclick="sendOneToManual('${f.id}')" title="Enviar al manual">➕</button>
         <button onclick="deleteFragment('${f.id}')" title="Eliminar">🗑</button>
       </div>
     </div>`).join('');
+  _tbUpdateBar();
+}
+
+function _tbUpdateBar() {
+  const bar = document.getElementById('tb-actionbar');
+  if (!bar) return;
+  const n = _tbSelectedIds().length;
+  bar.style.display = n ? 'flex' : 'none';
+  const c = document.getElementById('tb-sel-count');
+  if (c) c.textContent = `${n} seleccionado${n === 1 ? '' : 's'}`;
+}
+
+function _tbToggle(id, ev) {
+  const disp = _tbFiltered().map(f => f.id);
+  if (ev && (ev.shiftKey) && _tbAnchor && disp.includes(_tbAnchor)) {
+    const a = disp.indexOf(_tbAnchor), b = disp.indexOf(id);
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    for (let i = lo; i <= hi; i++) _tbSel.add(disp[i]);
+  } else {
+    if (_tbSel.has(id)) _tbSel.delete(id); else _tbSel.add(id);
+    _tbAnchor = id;
+  }
+  _renderTextBank();
+}
+
+// Undo por snapshot (unir / eliminar / enviar-con-borrado)
+function _tbSnapshot() { return (STATE.textBank || []).map(f => ({ ...f })); }
+function _tbShowUndo(msg, snapshot) {
+  _tbUndoSnap = snapshot;
+  const n = document.getElementById('notif');
+  n.innerHTML = esc(msg) + ' <button onclick="_tbRestoreSnap()" style="margin-left:8px;background:none;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:5px;padding:2px 8px;cursor:pointer;font-family:inherit;font-size:12px">Deshacer</button>';
+  n.classList.add('show');
+  clearTimeout(n._t); n._t = setTimeout(() => { n.classList.remove('show'); _tbUndoSnap = null; }, 6000);
+}
+function _tbRestoreSnap() {
+  if (_tbUndoSnap) { STATE.textBank = _tbUndoSnap; _tbUndoSnap = null; _tbClearSel(); _renderTextBank(); scheduleLocalSave(); }
+  document.getElementById('notif').classList.remove('show');
 }
 
 function saveFragmentEdit(id, text) {
@@ -3701,13 +3746,14 @@ function copySelectedFragments() {
   navigator.clipboard.writeText(text).then(() => notify(`📋 Copiados ${ids.length} fragmentos`), () => notify('❌ No se pudo copiar'));
 }
 
-// Unir/fusionar seleccionados en un nuevo fragmento
+// Unir seleccionados en un nuevo fragmento (tipo del primero), con undo
 function mergeSelectedFragments() {
   const ids = _tbSelectedIds();
   if (ids.length < 2) { notify('Marca al menos 2 fragmentos para unir'); return; }
   const frags = ids.map(id => STATE.textBank.find(f => f.id === id)).filter(Boolean);
   const merged = frags.map(f => f.texto).join(_tbSep());
   const delOrig = document.getElementById('tb-del-orig')?.checked;
+  const snap = _tbSnapshot();
   const firstIdx = STATE.textBank.findIndex(f => f.id === ids[0]);
   const nuevo = { id: uid(), tipo: frags[0].tipo, texto: merged, orden: frags[0].orden, origen: frags[0].origen };
   if (delOrig) {
@@ -3716,44 +3762,47 @@ function mergeSelectedFragments() {
   } else {
     STATE.textBank.splice(firstIdx + 1, 0, nuevo);
   }
+  _tbClearSel(); _tbSel.add(nuevo.id);
   _renderTextBank(); scheduleLocalSave();
-  notify('✅ Fragmentos unidos' + (delOrig ? ' (originales eliminados)' : ''));
+  _tbShowUndo('✅ Fragmentos unidos', snap);
 }
 
-// Drag & drop: soltar un fragmento sobre otro los fusiona directamente
-function _tbDragStart(ev, id) { _tbDragId = id; ev.dataTransfer.effectAllowed = 'move'; }
-function _tbDrop(ev, targetId) {
+// Reordenar dentro del banco por drag & drop
+function _tbReorderStart(ev, id) { _tbDragId = id; ev.dataTransfer.effectAllowed = 'move'; }
+function _tbReorderOver(ev) { ev.preventDefault(); ev.currentTarget.classList.add('tbb-dragover'); }
+function _tbReorderEnd() { document.querySelectorAll('.tbb-card.tbb-dragover').forEach(c => c.classList.remove('tbb-dragover')); }
+function _tbReorderDrop(ev, targetId) {
   ev.preventDefault();
-  if (!_tbDragId || _tbDragId === targetId) return;
-  const a = STATE.textBank.find(f => f.id === _tbDragId);
-  const b = STATE.textBank.find(f => f.id === targetId);
+  _tbReorderEnd();
+  if (!_tbDragId || _tbDragId === targetId) { _tbDragId = null; return; }
+  const from = STATE.textBank.findIndex(f => f.id === _tbDragId);
+  let to = STATE.textBank.findIndex(f => f.id === targetId);
   _tbDragId = null;
-  if (!a || !b) return;
-  b.texto = b.texto + _tbSep() + a.texto;
-  STATE.textBank = STATE.textBank.filter(f => f.id !== a.id);
+  if (from < 0 || to < 0) return;
+  const [moved] = STATE.textBank.splice(from, 1);
+  to = STATE.textBank.findIndex(f => f.id === targetId);           // recalcula tras extraer
+  STATE.textBank.splice(from < to ? to + 1 : to, 0, moved);         // suelta junto al destino
   _renderTextBank(); scheduleLocalSave();
-  notify('✅ Fragmentos fusionados');
 }
 
-// Eliminar con deshacer de 5 segundos
+// Eliminar (individual y en lote) — con undo
 function deleteFragment(id) {
-  const idx = STATE.textBank.findIndex(f => f.id === id);
-  if (idx < 0) return;
-  const [removed] = STATE.textBank.splice(idx, 1);
-  _tbUndo = { frag: removed, idx };
+  const snap = _tbSnapshot();
+  STATE.textBank = STATE.textBank.filter(f => f.id !== id);
+  _tbSel.delete(id);
   _renderTextBank(); scheduleLocalSave();
-  const n = q('#notif');
-  n.innerHTML = '🗑 Fragmento eliminado <button onclick="restoreFragment()" style="margin-left:8px;background:none;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:5px;padding:2px 8px;cursor:pointer;font-family:inherit;font-size:12px">Deshacer</button>';
-  n.classList.add('show');
-  clearTimeout(n._t); n._t = setTimeout(() => { n.classList.remove('show'); _tbUndo = null; }, 5000);
+  _tbShowUndo('🗑 Fragmento eliminado', snap);
 }
-function restoreFragment() {
-  if (_tbUndo) {
-    STATE.textBank.splice(Math.min(_tbUndo.idx, STATE.textBank.length), 0, _tbUndo.frag);
-    _tbUndo = null; _renderTextBank(); scheduleLocalSave();
-  }
-  q('#notif').classList.remove('show');
+function deleteSelectedFragments() {
+  const ids = _tbSelectedIds();
+  if (!ids.length) { notify('Marca al menos un fragmento'); return; }
+  const snap = _tbSnapshot();
+  STATE.textBank = STATE.textBank.filter(f => !ids.includes(f.id));
+  _tbClearSel();
+  _renderTextBank(); scheduleLocalSave();
+  _tbShowUndo(`🗑 ${ids.length} fragmentos eliminados`, snap);
 }
+function restoreFragment() { _tbRestoreSnap(); } // compat
 
 function emptyTextBank() {
   const sel = document.getElementById('tb-origin-filter');
@@ -3762,14 +3811,13 @@ function emptyTextBank() {
   if (!n) { notify('El banco ya está vacío'); return; }
   if (!confirm(`¿Vaciar ${n} fragmentos${origen ? ` de "${origen}"` : ' del banco'}?\nNo se puede deshacer.`)) return;
   STATE.textBank = origen ? STATE.textBank.filter(f => f.origen !== origen) : [];
+  _tbClearSel();
   _renderTextBank(); scheduleLocalSave();
   notify(`🗑 ${n} fragmentos eliminados`);
 }
 
-// Insertar un fragmento como bloque en el manual (misma vía que el panel BLOQUES)
-function insertFragmentAsBlock(id) {
-  const f = STATE.textBank.find(x => x.id === id);
-  if (!f) return;
+// Convierte un fragmento en un bloque real del manual
+function _fragmentToBlock(f) {
   const type = ['titulo', 'subtitulo', 'paso', 'alerta', 'lista', 'texto'].includes(f.tipo) ? f.tipo : 'texto';
   const def = BLOCK_TYPES[type];
   const block = { id: uid(), type, order: STATE.blocks.length, ...(def && def.defaultData ? def.defaultData() : {}) };
@@ -3780,11 +3828,45 @@ function insertFragmentAsBlock(id) {
   else if (type === 'alerta') { block.texto = f.texto; block.tipo = block.tipo || 'info'; }
   else if (type === 'lista') { block.items = lines.filter(Boolean).map(t => ({ icono: 'check', texto: t })); }
   else { block.html = esc(f.texto).replace(/\n/g, '<br>'); }
-  pushHistory();
-  STATE.blocks.push(block);
-  render(); scheduleLocalSave();
-  notify(`✅ Insertado como ${_TB_LABELS[type] || type}`);
+  return block;
 }
+function _tbDeleteOnSend() { return !!document.getElementById('tb-send-del')?.checked; }
+
+// Enviar al manual (único punto donde el texto pasa del banco al manual)
+function sendOneToManual(id) {
+  const f = STATE.textBank.find(x => x.id === id);
+  if (!f) return;
+  pushHistory();
+  STATE.blocks.push(_fragmentToBlock(f));
+  render(); scheduleLocalSave();
+  if (_tbDeleteOnSend()) {
+    const snap = _tbSnapshot();
+    STATE.textBank = STATE.textBank.filter(x => x.id !== id);
+    _tbSel.delete(id); _renderTextBank(); scheduleLocalSave();
+    _tbShowUndo('✅ Enviado al manual (eliminado del banco)', snap);
+  } else {
+    notify(`✅ Enviado al manual como ${_TB_LABELS[f.tipo] || f.tipo}`);
+  }
+}
+function sendSelectedToManual() {
+  const ids = _tbSelectedIds();
+  if (!ids.length) { notify('Marca al menos un fragmento'); return; }
+  const frags = ids.map(id => STATE.textBank.find(f => f.id === id)).filter(Boolean);
+  pushHistory();
+  frags.forEach(f => STATE.blocks.push(_fragmentToBlock(f)));
+  render(); scheduleLocalSave();
+  if (_tbDeleteOnSend()) {
+    const snap = _tbSnapshot();
+    STATE.textBank = STATE.textBank.filter(f => !ids.includes(f.id));
+    _tbClearSel(); _renderTextBank(); scheduleLocalSave();
+    _tbShowUndo(`✅ ${frags.length} enviados al manual (eliminados del banco)`, snap);
+  } else {
+    _renderTextBank();
+    notify(`✅ ${frags.length} fragmentos enviados al manual`);
+  }
+}
+// compat: inserción individual conservando en el banco
+function insertFragmentAsBlock(id) { sendOneToManual(id); }
 
 async function parsePDFtoBlocks(ab) {
   if (!window.pdfjsLib) {
