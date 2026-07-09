@@ -1803,7 +1803,7 @@ async function loadManualesPanel(tab) {
         </div>
         <div class="mp2-card-actions">
           <button class="btn" style="font-size:12px" onclick="openVersionHistoryFor('${m.id}')">🕐 Versiones</button>
-                    <button class="btn" style="font-size:12px;color:#dc2626" onclick="showConfirm('Mover este manual a la papelera?',()=>softDeleteManual('${m.id}','${esc(m.titulo||'Sin titulo')}'))">🗑</button>
+                    <button class="btn" style="font-size:12px;color:#dc2626" onclick="softDeleteManual('${m.id}','${esc(m.titulo||'Sin titulo')}')">()=>softDeleteManual('${m.id}','${esc(m.titulo||'Sin titulo')}'))">🗑</button>
         </div>
       </div>`;
     }).join('');
@@ -1812,7 +1812,7 @@ async function loadManualesPanel(tab) {
   }
 }
 
-async function softDeleteManual(id, titulo) {
+function softDeleteManual(id, titulo) { showConfirm('Mover este manual a la papelera?', async function(){
    try { 
     const { error } = await sb.from('manuales').update({ estado: 'papelera' }).eq('id', id);
     if (error) throw error;
@@ -1827,7 +1827,7 @@ async function softDeleteManual(id, titulo) {
     notify('🗑 Movido a la papelera');
     loadManualesPanel('activos');
   } catch(e) { notify('❌ Error: ' + (e.message||e), 4000); }
-}
+  }); }
 
 async function restoreManual(id) {
   try {
@@ -1838,16 +1838,14 @@ async function restoreManual(id) {
   } catch(e) { notify('❌ Error: ' + (e.message||e), 4000); }
 }
 
-async function permanentDeleteManual(id, titulo) {
-  if (!confirm(`¿Eliminar definitivamente "${titulo}"?\n\nEsta acción NO se puede deshacer.`)) return;
-  if (!confirm('⚠️ Última advertencia — todos los datos se borrarán para siempre. ¿Continuar?')) return;
+function permanentDeleteManual(id, titulo) { showConfirm('Eliminar definitivamente este manual? Esta accion NO se puede deshacer.', async function(){
   try {
     const { error } = await sb.from('manuales').delete().eq('id', id);
     if (error) throw error;
     notify('🗑 Manual eliminado definitivamente');
     loadManualesPanel('papelera');
   } catch(e) { notify('❌ Error: ' + (e.message||e), 4000); }
-}
+  }); }
 
 async function loadManual(id) {
   closeModal('modal-manuales');
