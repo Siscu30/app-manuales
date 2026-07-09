@@ -726,6 +726,8 @@ const BLOCK_TYPES = {
 // ═══════════════════════════════════════════════════════
 function q(sel){ return document.querySelector(sel); }
 function esc(str){ const d=document.createElement('div');d.textContent=str;return d.innerHTML; }
+// Escapa una cadena para usarla como VALOR de atributo HTML (incluye comillas). Evita inyeccion en data-*.
+function escAttr(str){ return String(str==null?'':str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 // Quita scripts, iframes, atributos on* y URLs javascript: de HTML enriquecido
 function sanitizeRichHtml(html) {
   const tpl = document.createElement('template');
@@ -1789,7 +1791,7 @@ async function loadManualesPanel(tab) {
           </div>
           <div class="mp2-card-actions">
             <button class="btn" onclick="restoreManual('${m.id}')">♻️ Restaurar</button>
-            <button class="btn" style="color:#dc2626" onclick="permanentDeleteManual('${m.id}','${esc(m.titulo||'Sin título')}')">🗑 Eliminar definitivamente</button>
+            <button class="btn" style="color:#dc2626" data-id="${m.id}" data-titulo="${escAttr(m.titulo||'Sin título')}" onclick="permanentDeleteManual(this.dataset.id, this.dataset.titulo)">🗑 Eliminar definitivamente</button>
           </div>
         </div>`;
       }
@@ -1803,7 +1805,7 @@ async function loadManualesPanel(tab) {
         </div>
         <div class="mp2-card-actions">
           <button class="btn" style="font-size:12px" onclick="openVersionHistoryFor('${m.id}')">🕐 Versiones</button>
-          <button class="btn" style="font-size:12px;color:#dc2626" onclick="softDeleteManual('${m.id}','${esc(m.titulo||'Sin título')}')">🗑</button>
+          <button class="btn" style="font-size:12px;color:#dc2626" data-id="${m.id}" data-titulo="${escAttr(m.titulo||'Sin título')}" onclick="softDeleteManual(this.dataset.id, this.dataset.titulo)">🗑</button>
         </div>
       </div>`;
     }).join('');
