@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260707d">
+<link rel="stylesheet" href="styles.css?v=20260707e">
 </head>
 <body>
 
@@ -199,11 +199,42 @@
     </div>
   </div>
   <button class="tb-btn" onclick="openMediaGallery()" title="Repositorio de imágenes del manual">🖼 Imágenes</button>
+  <button class="tb-btn" onclick="openTextBank()" title="Banco de texto del manual">📝 Textos</button>
   <button class="tb-btn primary" id="btn-guardar" onclick="guardar()">💾 Guardar</button>
   <button class="tb-btn" id="btn-cambiar-pass" onclick="showSetPasswordModal(false)" title="Cambiar contraseña" style="display:none">🔑</button>
   <button class="tb-btn danger" onclick="logout()" id="btn-logout" title="Cerrar sesión" style="display:none">⎋ Salir</button>
 </div>
 <input type="file" id="import-html-input" accept=".html,.htm" style="display:none" onchange="importHTMLFile(this)">
+
+
+<!-- ── BANCO DE TEXTO ── -->
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-text-bank">
+  <div class="modal" style="width:min(860px,95vw);max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header">
+      <div><h3>📝 Banco de Texto</h3><div id="text-bank-sub" style="font-size:12px;color:var(--text-muted)"></div></div>
+      <button class="modal-close" onclick="closeTextBank()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+      <div class="tb-toolbar">
+        <label style="font-size:12px;color:var(--text-muted)">Separador
+          <select id="tb-sep" class="form-select" style="width:auto;display:inline-block;padding:4px 8px">
+            <option value="nl">Salto de línea</option>
+            <option value="space">Espacio</option>
+          </select>
+        </label>
+        <button class="btn btn-sm" onclick="copySelectedFragments()">📋 Copiar selección</button>
+        <button class="btn btn-sm btn-primary" onclick="mergeSelectedFragments()">🔗 Unir seleccionados</button>
+        <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px"><input type="checkbox" id="tb-del-orig"> eliminar originales al unir</label>
+        <span style="flex:1"></span>
+        <select id="tb-origin-filter" class="form-select" style="width:auto;display:inline-block;padding:4px 8px" onchange="_renderTextBank()"></select>
+        <button class="btn btn-sm btn-danger" onclick="emptyTextBank()">🗑 Vaciar</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted)">💡 Arrastra un fragmento sobre otro para fusionarlos. El texto es editable directamente.</div>
+      <div id="text-bank-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeTextBank()">Cerrar</button></div>
+  </div>
+</div>
 
 <!-- ── REPOSITORIO DE IMÁGENES ── -->
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-media-gallery">
@@ -544,7 +575,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260707d"></script>
+<script src="app.js?v=20260707e"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>
