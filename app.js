@@ -1803,7 +1803,7 @@ async function loadManualesPanel(tab) {
         </div>
         <div class="mp2-card-actions">
           <button class="btn" style="font-size:12px" onclick="openVersionHistoryFor('${m.id}')">🕐 Versiones</button>
-          <button class="btn" style="font-size:12px;color:#dc2626" onclick="softDeleteManual('${m.id}','${esc(m.titulo||'Sin título')}')">🗑</button>
+                    <button class="btn" style="font-size:12px;color:#dc2626" onclick="showConfirm('Mover este manual a la papelera?',()=>softDeleteManual('${m.id}','${esc(m.titulo||'Sin titulo')}'))">🗑</button>
         </div>
       </div>`;
     }).join('');
@@ -1813,8 +1813,7 @@ async function loadManualesPanel(tab) {
 }
 
 async function softDeleteManual(id, titulo) {
-  if (!confirm(`¿Mover "${titulo}" a la papelera?`)) return;
-  try {
+   try { 
     const { error } = await sb.from('manuales').update({ estado: 'papelera' }).eq('id', id);
     if (error) throw error;
     if (STATE.manual.id === id) {
