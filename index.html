@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260707g">
+<link rel="stylesheet" href="styles.css?v=20260707h">
 </head>
 <body>
 
@@ -200,12 +200,32 @@
   </div>
   <button class="tb-btn" onclick="openMediaGallery()" title="Repositorio de imágenes del manual">🖼 Imágenes</button>
   <button class="tb-btn" onclick="openTextBank()" title="Banco de texto del manual">📝 Textos</button>
+  <button class="tb-btn" onclick="openManualTrash()" title="Papelera del manual (bloques eliminados)">🗑</button>
   <button class="tb-btn primary" id="btn-guardar" onclick="guardar()">💾 Guardar</button>
   <button class="tb-btn" id="btn-cambiar-pass" onclick="showSetPasswordModal(false)" title="Cambiar contraseña" style="display:none">🔑</button>
   <button class="tb-btn danger" onclick="logout()" id="btn-logout" title="Cerrar sesión" style="display:none">⎋ Salir</button>
 </div>
 <input type="file" id="import-html-input" accept=".html,.htm" style="display:none" onchange="importHTMLFile(this)">
 
+
+<!-- ── PAPELERA DEL MANUAL ── -->
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-manual-trash">
+  <div class="modal" style="width:min(720px,95vw);max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-header">
+      <div><h3>🗑 Papelera del manual</h3><div id="manual-trash-sub" style="font-size:12px;color:var(--text-muted)"></div></div>
+      <button class="modal-close" onclick="closeManualTrash()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:11px;color:var(--text-muted)">Bloques eliminados del manual. Restáuralos o vacía la papelera.</div>
+      <div id="manual-trash-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="manual-trash-restore-btn" class="btn btn-sm" style="display:none;margin-right:auto" onclick="restoreAllManualTrash()">♻ Restaurar todos</button>
+      <button id="manual-trash-empty-btn" class="btn btn-danger" style="display:none" onclick="emptyManualTrash()">🗑 Vaciar papelera</button>
+      <button class="btn" onclick="closeManualTrash()">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── BANCO DE TEXTO ── -->
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-text-bank">
@@ -215,6 +235,12 @@
       <button class="modal-close" onclick="closeTextBank()" aria-label="Cerrar">×</button>
     </div>
     <div class="modal-body" style="overflow-y:auto;display:flex;flex-direction:column;gap:10px;position:relative">
+      <div class="tb-tabs">
+        <button id="tb-tab-activos" class="tb-tab active" onclick="_tbSetView('activos')">Fragmentos (<span id="tb-count-act">0</span>)</button>
+        <button id="tb-tab-papelera" class="tb-tab" onclick="_tbSetView('papelera')">🗑 Papelera (<span id="tb-count-pap">0</span>)</button>
+        <span style="flex:1"></span>
+        <button id="tb-restore-all" class="btn btn-sm" style="display:none" onclick="restoreAllTrash()">♻ Restaurar todos</button>
+      </div>
       <div class="tb-toolbar">
         <label style="font-size:12px;color:var(--text-muted)">Separador
           <select id="tb-sep" class="form-select" style="width:auto;display:inline-block;padding:4px 8px">
@@ -225,7 +251,8 @@
         <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px"><input type="checkbox" id="tb-del-orig"> eliminar originales al unir</label>
         <span style="flex:1"></span>
         <select id="tb-origin-filter" class="form-select" style="width:auto;display:inline-block;padding:4px 8px" onchange="_tbClearSel();_renderTextBank()"></select>
-        <button class="btn btn-sm btn-danger" onclick="emptyTextBank()">🗑 Vaciar</button>
+        <button id="tb-vaciar" class="btn btn-sm btn-danger" onclick="emptyTextBank()">🗑 Vaciar</button>
+        <button id="tb-empty-trash" class="btn btn-sm btn-danger" style="display:none" onclick="emptyTrash()">🗑 Vaciar papelera</button>
       </div>
       <div style="font-size:11px;color:var(--text-muted)">💡 Marca fragmentos (Shift = rango) y usa la barra de acciones. Arrastra ⠿ para reordenar. El texto es editable.</div>
       <div id="text-bank-list" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -581,7 +608,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260707g"></script>
+<script src="app.js?v=20260707h"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>

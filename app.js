@@ -42,6 +42,7 @@ let STATE = {
   activePage: null,
   mediaLibrary: [],
   textBank: [],
+  trash: [],
   isDirty: false,
   autoSaveTimer: null,
 };
@@ -1012,13 +1013,30 @@ function addBlock(type) {
 
 function deleteBlock(id, ev) {
   if (ev) ev.stopPropagation();
-  if (!confirm('¿Eliminar este bloque?')) return;
-  pushHistory();
-  STATE.blocks = STATE.blocks.filter(b=>b.id!==id);
+  const idx = STATE.blocks.findIndex(b => b.id === id);
+  if (idx < 0) return;
+  const [removed] = STATE.blocks.splice(idx, 1);
+  if (!STATE.trash) STATE.trash = [];
+  STATE.trash.unshift({ ...removed, _delTs: Date.now() });
+  _manualDelUndo = { block: removed, idx };
   if (STATE.selectedBlockId === id) STATE.selectedBlockId = null;
   render();
   scheduleLocalSave();
-  notifyUndo('🗑 Bloque eliminado');
+  if (typeof _recomputeMediaUsage === 'function') _recomputeMediaUsage();
+  const n = q('#notif');
+  n.innerHTML = '🗑 Bloque movido a la papelera <button onclick="_undoDeleteBlock()" style="margin-left:8px;background:none;border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:5px;padding:2px 8px;cursor:pointer;font-family:inherit;font-size:12px">Deshacer</button>';
+  n.classList.add('show');
+  clearTimeout(n._t); n._t = setTimeout(() => n.classList.remove('show'), 5000);
+}
+function _undoDeleteBlock() {
+  if (_manualDelUndo) {
+    STATE.blocks.splice(Math.min(_manualDelUndo.idx, STATE.blocks.length), 0, _manualDelUndo.block);
+    STATE.trash = (STATE.trash || []).filter(b => b.id !== _manualDelUndo.block.id);
+    _manualDelUndo = null;
+    render(); scheduleLocalSave();
+    if (typeof _recomputeMediaUsage === 'function') _recomputeMediaUsage();
+  }
+  q('#notif').classList.remove('show');
 }
 // Restaura el snapshot tomado justo antes de la ultima accion destructiva
 function undoLastAction() {
@@ -1621,6 +1639,7 @@ function localSave() {
     activePage: STATE.activePage,
     mediaLibrary: STATE.mediaLibrary,
     textBank: STATE.textBank,
+    trash: STATE.trash,
     titulo: q('#manual-titulo').value,
     empresa: q('#manual-empresa').value
   };
@@ -1671,11 +1690,11 @@ async function guardar() {
       if (cur) cur.blocks = [...STATE.blocks];
     }
     // Build contenido — multi-page format when pages exist, plain array otherwise (retrocompatible)
-    const _hasExtras = (STATE.mediaLibrary && STATE.mediaLibrary.length) || (STATE.textBank && STATE.textBank.length);
+    const _hasExtras = (STATE.mediaLibrary && STATE.mediaLibrary.length) || (STATE.textBank && STATE.textBank.length) || (STATE.trash && STATE.trash.length);
     const contenido = (STATE.pages.length > 0)
-      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank }
+      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank, trash: STATE.trash }
       : (_hasExtras
-          ? { blocks: STATE.blocks, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank }
+          ? { blocks: STATE.blocks, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank, trash: STATE.trash }
           : STATE.blocks);
     const manualData = {
       titulo: STATE.manual.titulo,
@@ -1845,10 +1864,12 @@ async function loadManual(id) {
       STATE.activePage = data.contenido.activePage || null;
       STATE.mediaLibrary = data.contenido.mediaLibrary || [];
       STATE.textBank = data.contenido.textBank || [];
+      STATE.trash = data.contenido.trash || [];
     } else {
       STATE.blocks = Array.isArray(data.contenido) ? data.contenido : (data.contenido.blocks || []);
       STATE.mediaLibrary = (!Array.isArray(data.contenido) && data.contenido.mediaLibrary) || [];
       STATE.textBank = (!Array.isArray(data.contenido) && data.contenido.textBank) || [];
+      STATE.trash = (!Array.isArray(data.contenido) && data.contenido.trash) || [];
       STATE.pages = [];
       STATE.activePage = null;
     }
@@ -1877,6 +1898,7 @@ async function nuevoManual() {
   STATE.activePage = null;
   STATE.mediaLibrary = [];
   STATE.textBank = [];
+  STATE.trash = [];
   STATE.history = [];
   STATE.historyIdx = -1;
   STATE.isDirty = false;
@@ -3615,6 +3637,8 @@ let _tbUndoSnap = null;            // snapshot para deshacer (unir/eliminar/envi
 let _tbDragId = null;              // fragmento arrastrado (reordenar)
 let _tbSel = new Set();            // ids seleccionados
 let _tbAnchor = null;              // ancla para selección por rango (Shift)
+let _tbView = 'activos';           // 'activos' | 'papelera'
+let _manualDelUndo = null;         // bloque del manual recién enviado a papelera
 
 const _TB_LABELS = { titulo:'📑 Título', subtitulo:'🔹 Subtítulo', paso:'🔢 Paso', alerta:'⚠️ Alerta', lista:'✅ Lista', texto:'📝 Párrafo', tabla:'📊 Tabla', codigo:'</> Código', enlace:'🔗 Enlace' };
 
@@ -3650,7 +3674,8 @@ function closeTextBank() { document.getElementById('modal-text-bank').classList.
 function _tbFiltered() {
   const list = STATE.textBank || [];
   const sel = document.getElementById('tb-origin-filter');
-  return (sel && sel.value) ? list.filter(f => f.origen === sel.value) : list;
+  const byOrigin = (sel && sel.value) ? list.filter(f => f.origen === sel.value) : list;
+  return byOrigin.filter(f => _tbView === 'papelera' ? f.eliminado : !f.eliminado);
 }
 function _tbSelectedIds() { return _tbFiltered().filter(f => _tbSel.has(f.id)).map(f => f.id); }
 function _tbSep() { return (document.getElementById('tb-sep')?.value === 'space') ? ' ' : '\n'; }
@@ -3661,7 +3686,16 @@ function _renderTextBank() {
   if (!STATE.textBank) STATE.textBank = [];
   const list = STATE.textBank;
   const box = document.getElementById('text-bank-list');
-  document.getElementById('text-bank-sub').textContent = `${list.length} fragmentos`;
+  const nAct = list.filter(f => !f.eliminado).length;
+  const nPap = list.filter(f => f.eliminado).length;
+  const pap = _tbView === 'papelera';
+  document.getElementById('text-bank-sub').textContent = pap ? `${nPap} en papelera` : `${nAct} fragmentos`;
+  const cAct = document.getElementById('tb-count-act'); if (cAct) cAct.textContent = nAct;
+  const cPap = document.getElementById('tb-count-pap'); if (cPap) cPap.textContent = nPap;
+  document.getElementById('tb-tab-activos')?.classList.toggle('active', !pap);
+  document.getElementById('tb-tab-papelera')?.classList.toggle('active', pap);
+  const showIf = (id, cond) => { const e = document.getElementById(id); if (e) e.style.display = cond ? '' : 'none'; };
+  showIf('tb-vaciar', !pap); showIf('tb-empty-trash', pap); showIf('tb-restore-all', pap);
   const origins = [...new Set(list.map(f => f.origen).filter(Boolean))];
   const sel = document.getElementById('tb-origin-filter');
   if (sel) {
@@ -3671,32 +3705,30 @@ function _renderTextBank() {
   }
   const filt = _tbFiltered();
   if (!filt.length) {
-    box.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:34px">El banco de texto está vacío.<br>Importa un documento Word o PDF para llenarlo.</div>';
+    box.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:34px">${pap ? 'La papelera está vacía.' : 'El banco de texto está vacío.<br>Importa un documento Word o PDF para llenarlo.'}</div>`;
     _tbUpdateBar(); return;
   }
-  box.innerHTML = filt.map(f => `
-    <div class="tbb-card ${_tbBlockClass(f.tipo)}${_tbSel.has(f.id) ? ' selected' : ''}" data-fid="${f.id}" draggable="true"
-         ondragstart="_tbReorderStart(event,'${f.id}')" ondragover="_tbReorderOver(event)" ondragleave="this.classList.remove('tbb-dragover')"
-         ondrop="_tbReorderDrop(event,'${f.id}')" ondragend="_tbReorderEnd()">
-      <div class="tbb-side">
-        <input type="checkbox" class="tb-check" data-fid="${f.id}" ${_tbSel.has(f.id) ? 'checked' : ''} onclick="event.stopPropagation();_tbToggle('${f.id}',event)" title="Seleccionar (Shift = rango)">
-        <span class="tbb-badge">${_TB_LABELS[f.tipo] || f.tipo}</span>
-        <span class="tbb-handle" title="Arrastra para reordenar">⠿</span>
-      </div>
-      <div class="tbb-content" contenteditable="true" spellcheck="false" onmousedown="event.stopPropagation()" onblur="saveFragmentEdit('${f.id}', this.innerText)">${esc(f.texto)}</div>
-      <div class="tbb-row-actions">
-        <button onclick="copyFragment('${f.id}')" title="Copiar">📋</button>
-        <button onclick="sendOneToManual('${f.id}')" title="Enviar al manual">➕</button>
-        <button onclick="deleteFragment('${f.id}')" title="Eliminar">🗑</button>
-      </div>
-    </div>`).join('');
+  box.innerHTML = filt.map(f => {
+    const actions = pap
+      ? `<button onclick="restoreFromTrash('${f.id}')" title="Restaurar">♻</button><button onclick="deletePermanent('${f.id}')" title="Borrar permanentemente">🗑</button>`
+      : `<button onclick="copyFragment('${f.id}')" title="Copiar">📋</button><button onclick="sendOneToManual('${f.id}')" title="Enviar al manual">➕</button><button onclick="deleteFragment('${f.id}')" title="Enviar a papelera">🗑</button>`;
+    const side = pap
+      ? `<span class="tbb-badge">${_TB_LABELS[f.tipo] || f.tipo}</span>`
+      : `<input type="checkbox" class="tb-check" data-fid="${f.id}" ${_tbSel.has(f.id) ? 'checked' : ''} onclick="event.stopPropagation();_tbToggle('${f.id}',event)" title="Seleccionar (Shift = rango)"><span class="tbb-badge">${_TB_LABELS[f.tipo] || f.tipo}</span><span class="tbb-handle" title="Arrastra para reordenar">⠿</span>`;
+    const dnd = pap ? '' : `draggable="true" ondragstart="_tbReorderStart(event,'${f.id}')" ondragover="_tbReorderOver(event)" ondragleave="this.classList.remove('tbb-dragover')" ondrop="_tbReorderDrop(event,'${f.id}')" ondragend="_tbReorderEnd()"`;
+    return `<div class="tbb-card ${_tbBlockClass(f.tipo)}${_tbSel.has(f.id) ? ' selected' : ''}${pap ? ' tbb-trashed' : ''}" data-fid="${f.id}" ${dnd}>
+      <div class="tbb-side">${side}</div>
+      <div class="tbb-content" contenteditable="${pap ? 'false' : 'true'}" spellcheck="false" onmousedown="event.stopPropagation()" onblur="saveFragmentEdit('${f.id}', this.innerText)">${esc(f.texto)}</div>
+      <div class="tbb-row-actions">${actions}</div>
+    </div>`;
+  }).join('');
   _tbUpdateBar();
 }
 
 function _tbUpdateBar() {
   const bar = document.getElementById('tb-actionbar');
   if (!bar) return;
-  const n = _tbSelectedIds().length;
+  const n = _tbView === 'papelera' ? 0 : _tbSelectedIds().length;
   bar.style.display = n ? 'flex' : 'none';
   const c = document.getElementById('tb-sel-count');
   if (c) c.textContent = `${n} seleccionado${n === 1 ? '' : 's'}`;
@@ -3787,21 +3819,26 @@ function _tbReorderDrop(ev, targetId) {
 
 // Eliminar (individual y en lote) — con undo
 function deleteFragment(id) {
+  const f = STATE.textBank.find(x => x.id === id);
+  if (!f) return;
   const snap = _tbSnapshot();
-  STATE.textBank = STATE.textBank.filter(f => f.id !== id);
+  f.eliminado = true; f.delTs = Date.now();
   _tbSel.delete(id);
   _renderTextBank(); scheduleLocalSave();
-  _tbShowUndo('🗑 Fragmento eliminado', snap);
+  _tbShowUndo('🗑 Fragmento movido a la papelera', snap);
 }
+
 function deleteSelectedFragments() {
   const ids = _tbSelectedIds();
   if (!ids.length) { notify('Marca al menos un fragmento'); return; }
   const snap = _tbSnapshot();
-  STATE.textBank = STATE.textBank.filter(f => !ids.includes(f.id));
+  const now = Date.now();
+  STATE.textBank.forEach(f => { if (ids.includes(f.id)) { f.eliminado = true; f.delTs = now; } });
   _tbClearSel();
   _renderTextBank(); scheduleLocalSave();
-  _tbShowUndo(`🗑 ${ids.length} fragmentos eliminados`, snap);
+  _tbShowUndo(`🗑 ${ids.length} fragmentos a la papelera`, snap);
 }
+
 function restoreFragment() { _tbRestoreSnap(); } // compat
 
 function emptyTextBank() {
@@ -3810,10 +3847,80 @@ function emptyTextBank() {
   const n = origen ? STATE.textBank.filter(f => f.origen === origen).length : STATE.textBank.length;
   if (!n) { notify('El banco ya está vacío'); return; }
   if (!confirm(`¿Vaciar ${n} fragmentos${origen ? ` de "${origen}"` : ' del banco'}?\nNo se puede deshacer.`)) return;
-  STATE.textBank = origen ? STATE.textBank.filter(f => f.origen !== origen) : [];
+  STATE.textBank = origen ? STATE.textBank.filter(f => f.origen !== origen && !f.eliminado) : STATE.textBank.filter(f => f.eliminado);
   _tbClearSel();
   _renderTextBank(); scheduleLocalSave();
   notify(`🗑 ${n} fragmentos eliminados`);
+}
+
+// ── Papelera del banco ──
+function _tbSetView(v) { _tbView = v; _tbClearSel(); _renderTextBank(); }
+function restoreFromTrash(id) {
+  const f = STATE.textBank.find(x => x.id === id);
+  if (f) { delete f.eliminado; delete f.delTs; _renderTextBank(); scheduleLocalSave(); notify('♻ Fragmento restaurado'); }
+}
+function restoreAllTrash() {
+  (STATE.textBank || []).forEach(f => { if (f.eliminado) { delete f.eliminado; delete f.delTs; } });
+  _renderTextBank(); scheduleLocalSave(); notify('♻ Papelera restaurada');
+}
+function deletePermanent(id) {
+  if (!confirm('¿Borrar este fragmento permanentemente?')) return;
+  STATE.textBank = STATE.textBank.filter(f => f.id !== id);
+  _renderTextBank(); scheduleLocalSave();
+}
+function emptyTrash() {
+  const n = (STATE.textBank || []).filter(f => f.eliminado).length;
+  if (!n) { notify('La papelera está vacía'); return; }
+  if (!confirm(`¿Vaciar la papelera? Se borrarán ${n} fragmentos permanentemente.`)) return;
+  STATE.textBank = STATE.textBank.filter(f => !f.eliminado);
+  _renderTextBank(); scheduleLocalSave();
+  notify(`🗑 ${n} fragmentos borrados permanentemente`);
+}
+
+// ── Papelera del MANUAL (bloques eliminados) ──
+function openManualTrash() { _renderManualTrash(); document.getElementById('modal-manual-trash').classList.remove('hidden'); }
+function closeManualTrash() { document.getElementById('modal-manual-trash').classList.add('hidden'); }
+function _renderManualTrash() {
+  const box = document.getElementById('manual-trash-list');
+  const t = STATE.trash || [];
+  document.getElementById('manual-trash-sub').textContent = `${t.length} bloques`;
+  const eb = document.getElementById('manual-trash-empty-btn'); if (eb) eb.style.display = t.length ? '' : 'none';
+  const rb = document.getElementById('manual-trash-restore-btn'); if (rb) rb.style.display = t.length ? '' : 'none';
+  if (!t.length) { box.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:30px">La papelera del manual está vacía.</div>'; return; }
+  box.innerHTML = t.map(b => `
+    <div class="tbb-card ${_tbBlockClass(b.type)} tbb-trashed" data-fid="${b.id}">
+      <div class="tbb-side"><span class="tbb-badge">${_TB_LABELS[b.type] || b.type}</span></div>
+      <div class="tbb-content" style="cursor:default" contenteditable="false">${esc((_fragmentText(b) || '(bloque sin texto)')).slice(0, 240) || '(bloque sin texto)'}</div>
+      <div class="tbb-row-actions"><button onclick="restoreManualBlock('${b.id}')" title="Restaurar al manual">♻</button></div>
+    </div>`).join('');
+}
+function restoreManualBlock(id) {
+  const i = (STATE.trash || []).findIndex(b => b.id === id);
+  if (i < 0) return;
+  const [b] = STATE.trash.splice(i, 1);
+  delete b._delTs;
+  b.order = STATE.blocks.length;
+  STATE.blocks.push(b);
+  render(); _renderManualTrash(); scheduleLocalSave();
+  if (typeof _recomputeMediaUsage === 'function') _recomputeMediaUsage();
+  notify('♻ Bloque restaurado en el manual');
+}
+function restoreAllManualTrash() {
+  const t = STATE.trash || [];
+  if (!t.length) return;
+  t.forEach(b => { delete b._delTs; b.order = STATE.blocks.length; STATE.blocks.push(b); });
+  STATE.trash = [];
+  render(); _renderManualTrash(); scheduleLocalSave();
+  if (typeof _recomputeMediaUsage === 'function') _recomputeMediaUsage();
+  notify('♻ Bloques restaurados');
+}
+function emptyManualTrash() {
+  const n = (STATE.trash || []).length;
+  if (!n) { notify('La papelera está vacía'); return; }
+  if (!confirm(`¿Vaciar la papelera del manual? Se borrarán ${n} bloques permanentemente.`)) return;
+  STATE.trash = [];
+  _renderManualTrash(); scheduleLocalSave();
+  notify(`🗑 ${n} bloques borrados permanentemente`);
 }
 
 // Convierte un fragmento en un bloque real del manual
@@ -4643,6 +4750,7 @@ async function handleSession(session) {
       STATE.activePage = draft.activePage || null;
       STATE.mediaLibrary = draft.mediaLibrary || [];
       STATE.textBank = draft.textBank || [];
+      STATE.trash = draft.trash || [];
       STATE.manual = { ...STATE.manual, ...draft.manual };
       if (draft.titulo) q('#manual-titulo').value = draft.titulo;
       if (draft.empresa) q('#manual-empresa').value = draft.empresa;
@@ -4677,6 +4785,7 @@ async function handleSession(session) {
       STATE.activePage = draft.activePage || null;
       STATE.mediaLibrary = draft.mediaLibrary || [];
       STATE.textBank = draft.textBank || [];
+      STATE.trash = draft.trash || [];
       STATE.manual = { ...STATE.manual, ...draft.manual };
       if (draft.titulo) q('#manual-titulo').value = draft.titulo;
       if (draft.empresa) q('#manual-empresa').value = draft.empresa;
@@ -4714,11 +4823,11 @@ setTimeout(() => {
 async function saveVersion() {
   if (!STATE.manual.id || !STATE.user) return;
   try {
-    const _hasExtras = (STATE.mediaLibrary && STATE.mediaLibrary.length) || (STATE.textBank && STATE.textBank.length);
+    const _hasExtras = (STATE.mediaLibrary && STATE.mediaLibrary.length) || (STATE.textBank && STATE.textBank.length) || (STATE.trash && STATE.trash.length);
     const contenido = (STATE.pages.length > 0)
-      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank }
+      ? { blocks: STATE.blocks, pages: STATE.pages, activePage: STATE.activePage, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank, trash: STATE.trash }
       : (_hasExtras
-          ? { blocks: STATE.blocks, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank }
+          ? { blocks: STATE.blocks, mediaLibrary: STATE.mediaLibrary, textBank: STATE.textBank, trash: STATE.trash }
           : STATE.blocks);
     await sb.from('manual_versions').insert({ manual_id: STATE.manual.id, user_id: STATE.user.id, contenido, titulo: STATE.manual.titulo });
     const { data } = await sb.from('manual_versions').select('id, created_at').eq('manual_id', STATE.manual.id).order('created_at', { ascending: false });

@@ -561,3 +561,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .tbb-titulo .tbb-content:focus,.tbb-subtitulo .tbb-content:focus{color:#fff}
 .tb-actionbar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#1e293b;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.28);margin-top:4px}
 .tb-actionbar .btn{white-space:nowrap}
+
+/* ── BANCO: pestañas y papelera (fase 3) ── */
+.tb-tabs{display:flex;gap:6px;align-items:center;border-bottom:1px solid var(--border);padding-bottom:8px}
+.tb-tab{border:1px solid var(--border);background:var(--surface);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ui-text,#0f172a)}
+.tb-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.tbb-trashed{opacity:.72}
+.tbb-trashed .tbb-content{filter:grayscale(.25)}
