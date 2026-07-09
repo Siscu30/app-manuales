@@ -3640,6 +3640,10 @@ let _tbDragId = null;              // fragmento arrastrado (reordenar)
 let _tbSel = new Set();            // ids seleccionados
 let _tbAnchor = null;              // ancla para selección por rango (Shift)
 let _tbView = 'activos';           // 'activos' | 'papelera'
+let _tbDragFragId = null;          // fragmento arrastrado hacia el manual
+let _tbCanvasInsert = null;        // posición de inserción calculada en el canvas
+let _tbCanvasDndInit = false;      // handlers de drop en el canvas ya montados
+let _tbResizeInit = false;         // handle de redimensionar ya montado
 let _manualDelUndo = null;         // bloque del manual recién enviado a papelera
 
 const _TB_LABELS = { titulo:'📑 Título', subtitulo:'🔹 Subtítulo', paso:'🔢 Paso', alerta:'⚠️ Alerta', lista:'✅ Lista', texto:'📝 Párrafo', tabla:'📊 Tabla', codigo:'</> Código', enlace:'🔗 Enlace' };
@@ -3670,8 +3674,91 @@ function _blocksToFragments(blocks, origen) {
 }
 
 // ── Panel ──
-function openTextBank() { _renderTextBank(); document.getElementById('modal-text-bank').classList.remove('hidden'); }
-function closeTextBank() { document.getElementById('modal-text-bank').classList.add('hidden'); }
+function openTextBank() {
+  const m = document.getElementById('modal-text-bank');
+  m.classList.add('tb-dock');
+  m.classList.remove('hidden');
+  document.body.classList.add('tb-dock-open');
+  _tbInitDockResize();
+  _tbInitCanvasDnd();
+  _renderTextBank();
+}
+function closeTextBank() {
+  const m = document.getElementById('modal-text-bank');
+  m.classList.add('hidden');
+  m.classList.remove('tb-dock');
+  document.body.classList.remove('tb-dock-open');
+}
+function toggleTextBank() {
+  const m = document.getElementById('modal-text-bank');
+  if (m.classList.contains('hidden')) openTextBank(); else closeTextBank();
+}
+// Redimensionar el panel acoplado arrastrando su borde izquierdo
+function _tbInitDockResize() {
+  if (_tbResizeInit) return;
+  const h = document.getElementById('tb-dock-resize');
+  if (!h) return;
+  h.addEventListener('mousedown', ev => {
+    ev.preventDefault();
+    const move = e => {
+      let w = window.innerWidth - e.clientX;
+      w = Math.max(300, Math.min(window.innerWidth * 0.85, w));
+      document.documentElement.style.setProperty('--tb-dock-w', w + 'px');
+    };
+    const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = ''; };
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+  _tbResizeInit = true;
+}
+// Soltar un fragmento del banco en el manual, en la posición donde se suelte
+function _tbInitCanvasDnd() {
+  if (_tbCanvasDndInit) return;
+  const c = document.getElementById('canvas');
+  if (!c) return;
+  c.addEventListener('dragover', _tbCanvasDragOver);
+  c.addEventListener('drop', _tbCanvasDrop);
+  _tbCanvasDndInit = true;
+}
+function _tbCanvasDragOver(ev) {
+  if (!_tbDragFragId) return;              // solo para arrastres del banco
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'copy';
+  document.querySelectorAll('#canvas .block-wrap').forEach(el => el.classList.remove('tb-insert-top', 'tb-insert-bottom'));
+  const wraps = [...document.querySelectorAll('#canvas .block-wrap')];
+  if (!wraps.length) { _tbCanvasInsert = { end: true }; return; }
+  let target = null, after = false;
+  for (const w of wraps) {
+    const r = w.getBoundingClientRect();
+    if (ev.clientY < r.top + r.height / 2) { target = w; after = false; break; }
+    target = w; after = true;
+  }
+  target.classList.add(after ? 'tb-insert-bottom' : 'tb-insert-top');
+  _tbCanvasInsert = { id: target.dataset.id, after };
+}
+function _tbCanvasDrop(ev) {
+  if (!_tbDragFragId) return;
+  ev.preventDefault();
+  const frag = STATE.textBank.find(f => f.id === _tbDragFragId);
+  const ins = _tbCanvasInsert;
+  const delOnSend = _tbDeleteOnSend && _tbDeleteOnSend();
+  _tbReorderEnd(); // limpia indicadores + _tbDragFragId
+  if (!frag) return;
+  let idx = STATE.blocks.length;
+  if (ins && !ins.end) {
+    const ti = STATE.blocks.findIndex(b => b.id === ins.id);
+    if (ti >= 0) idx = ins.after ? ti + 1 : ti;
+  }
+  pushHistory();
+  STATE.blocks.splice(Math.max(0, Math.min(STATE.blocks.length, idx)), 0, _fragmentToBlock(frag));
+  render(); scheduleLocalSave();
+  if (delOnSend) {
+    STATE.textBank = STATE.textBank.filter(f => f.id !== frag.id);
+    _renderTextBank();
+  }
+  notify('✅ Insertado en el manual');
+}
 
 function _tbFiltered() {
   const list = STATE.textBank || [];
@@ -3802,9 +3889,13 @@ function mergeSelectedFragments() {
 }
 
 // Reordenar dentro del banco por drag & drop
-function _tbReorderStart(ev, id) { _tbDragId = id; ev.dataTransfer.effectAllowed = 'move'; }
+function _tbReorderStart(ev, id) { _tbDragId = id; _tbDragFragId = id; ev.dataTransfer.effectAllowed = 'copyMove'; try { ev.dataTransfer.setData('text/plain', id); } catch(e){} }
 function _tbReorderOver(ev) { ev.preventDefault(); ev.currentTarget.classList.add('tbb-dragover'); }
-function _tbReorderEnd() { document.querySelectorAll('.tbb-card.tbb-dragover').forEach(c => c.classList.remove('tbb-dragover')); }
+function _tbReorderEnd() {
+  document.querySelectorAll('.tbb-card.tbb-dragover').forEach(c => c.classList.remove('tbb-dragover'));
+  document.querySelectorAll('#canvas .block-wrap').forEach(el => el.classList.remove('tb-insert-top', 'tb-insert-bottom'));
+  _tbDragFragId = null; _tbCanvasInsert = null;
+}
 function _tbReorderDrop(ev, targetId) {
   ev.preventDefault();
   _tbReorderEnd();
