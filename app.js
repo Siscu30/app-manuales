@@ -3450,7 +3450,9 @@ function _afterImport() {
     const _n = _importedTextFragments.length;
     _importedTextFragments = [];
     scheduleLocalSave();
-    _notifyOpenBank(_n);
+    // Persistir en la nube para poder continuar tras recargar o en otro dispositivo
+    if (STATE.user && STATE.role !== 'visualizador') guardar().then(() => _notifyOpenBank(_n));
+    else _notifyOpenBank(_n);
   }
   if (_docxExtractedMedia.length) openImportMediaDialog();
 }
@@ -3496,6 +3498,7 @@ async function confirmImportMedia() {
   if (btn) btn.textContent = 'Cargar seleccionadas';
   _docxExtractedMedia = [];
   scheduleLocalSave();
+  if (STATE.user && STATE.role !== 'visualizador') await guardar(); // persistir el repositorio en la nube
   notify(`✅ ${ok} imágenes añadidas al repositorio`);
   openMediaGallery();
 }
@@ -4814,6 +4817,7 @@ function shadeColorHex(hex, pct) {
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
+let _sessionInitialized = false; // evita que TOKEN_REFRESHED recargue y pise el trabajo en memoria
 async function handleSession(session) {
   if (session?.user) {
     hideAuthScreen();
@@ -4834,34 +4838,40 @@ async function handleSession(session) {
     loadUserPrefs();
             loadManualesPanel('activos');
 
-    // Load local draft for the current manual if any
-    const lastId = localStorage.getItem('last_manual_id');
-    const draft = loadLocalDraft(lastId || STATE.manual.id || 'guest');
-    if (draft && !STATE.blocks.length) {
-      STATE.blocks = draft.blocks || [];
-      STATE.pages = draft.pages || [];
-      STATE.activePage = draft.activePage || null;
-      STATE.mediaLibrary = draft.mediaLibrary || [];
-      STATE.textBank = draft.textBank || [];
-      STATE.trash = draft.trash || [];
-      STATE.manual = { ...STATE.manual, ...draft.manual };
-      if (draft.titulo) q('#manual-titulo').value = draft.titulo;
-      if (draft.empresa) q('#manual-empresa').value = draft.empresa;
-      if (draft.manual?.color) setColor(draft.manual.color);
-      pushHistory();
-      render();
-      renderPagesPanel();
-    } else if (!draft && !STATE.blocks.length) {
-      // No local draft (e.g. localStorage cleared) — silently restore last manual from Supabase
-      const restoreId = lastId;
-      if (restoreId) {
-        loadManual(restoreId).catch(() => {});
-      } else {
-        sb.from('manuales').select('id').neq('estado','papelera').order('updated_at',{ascending:false}).limit(1)
-          .then(({ data }) => { if (data?.length) loadManual(data[0].id).catch(()=>{}); });
+    // Restaurar SOLO en el arranque inicial. En TOKEN_REFRESHED o re-SIGNED_IN (cambio de
+    // pestaña, refresco de token) NO se recarga: pisaría el trabajo en memoria (banco de
+    // texto, imágenes, bloques) — era la causa de que "desapareciera al poco tiempo".
+    if (!_sessionInitialized) {
+      _sessionInitialized = true;
+      const lastId = localStorage.getItem('last_manual_id');
+      const draft = loadLocalDraft(lastId || STATE.manual.id || 'guest');
+      const _noWork = !STATE.blocks.length && !(STATE.textBank||[]).length && !(STATE.mediaLibrary||[]).length && !(STATE.pages||[]).length;
+      if (draft && _noWork) {
+        STATE.blocks = draft.blocks || [];
+        STATE.pages = draft.pages || [];
+        STATE.activePage = draft.activePage || null;
+        STATE.mediaLibrary = draft.mediaLibrary || [];
+        STATE.textBank = draft.textBank || [];
+        STATE.trash = draft.trash || [];
+        STATE.manual = { ...STATE.manual, ...draft.manual };
+        if (draft.titulo) q('#manual-titulo').value = draft.titulo;
+        if (draft.empresa) q('#manual-empresa').value = draft.empresa;
+        if (draft.manual?.color) setColor(draft.manual.color);
+        pushHistory();
+        render();
+        renderPagesPanel();
+      } else if (!draft && _noWork) {
+        const restoreId = lastId;
+        if (restoreId) {
+          loadManual(restoreId).catch(() => {});
+        } else {
+          sb.from('manuales').select('id').neq('estado','papelera').order('updated_at',{ascending:false}).limit(1)
+            .then(({ data }) => { if (data?.length) loadManual(data[0].id).catch(()=>{}); });
+        }
       }
     }
   } else {
+    _sessionInitialized = false;
     STATE.user = null; STATE.role = null;
     q('#btn-logout').style.display = 'none';
     q('#btn-cambiar-pass').style.display = 'none';
