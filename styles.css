@@ -90,7 +90,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
 
 /* ── BLOCKS ── */
 .block-wrap{position:relative;margin-bottom:6px;border-radius:var(--radius)}
-.block-wrap:hover .block-bar,.block-wrap.selected .block-bar{opacity:1}
+.block-wrap.selected .block-bar{opacity:1}
 .block-wrap.selected{box-shadow:0 0 0 2px var(--primary)}
 .block-bar{position:absolute;top:0;left:-46px;right:auto;display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.98);border:1px solid var(--border);border-radius:8px;padding:3px;opacity:0;transition:opacity .12s;z-index:10;box-shadow:var(--shadow-md)}
 .block-bar button{width:30px;height:28px;display:flex;align-items:center;justify-content:center}
@@ -365,7 +365,7 @@ input,textarea,select{font-family:inherit;font-size:14px}
   #manual-empresa{display:none}
 }
 @media(hover:none){
-  .block-bar{opacity:1} /* sin hover en tactil: mostrar siempre los controles */
+  .block-wrap.selected .block-bar{opacity:1} /* tactil: mostrar solo en el bloque seleccionado */
 }
 
 @media print{
