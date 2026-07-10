@@ -92,7 +92,10 @@ input,textarea,select{font-family:inherit;font-size:14px}
 .block-wrap{position:relative;margin-bottom:6px;border-radius:var(--radius)}
 .block-wrap:hover .block-bar,.block-wrap.selected .block-bar{opacity:1}
 .block-wrap.selected{box-shadow:0 0 0 2px var(--primary)}
-.block-bar{position:absolute;top:6px;right:6px;display:flex;gap:2px;background:rgba(255,255,255,.97);border:1px solid var(--border);border-radius:7px;padding:2px;opacity:0;transition:opacity .15s;z-index:10;box-shadow:var(--shadow-md)}
+.block-bar{position:absolute;top:0;left:-46px;right:auto;display:flex;flex-direction:column;gap:2px;background:rgba(255,255,255,.98);border:1px solid var(--border);border-radius:8px;padding:3px;opacity:0;transition:opacity .12s;z-index:10;box-shadow:var(--shadow-md)}
+.block-bar button{width:30px;height:28px;display:flex;align-items:center;justify-content:center}
+/* En pantallas estrechas (o poco margen izquierdo) vuelve dentro, arriba-derecha, en fila */
+@media(max-width:1080px){ .block-bar{left:auto;right:6px;top:6px;flex-direction:row} .block-bar button{width:auto;height:auto} }
 .block-bar button{background:none;border:none;padding:4px 6px;border-radius:5px;font-size:12px;cursor:pointer;color:var(--text-muted);line-height:1;transition:all .12s}
 .block-bar button:hover{background:var(--bg);color:var(--text)}
 .block-bar button.del:hover{background:#fee2e2;color:#dc2626}
