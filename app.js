@@ -1395,7 +1395,9 @@ function _pasoImageSlotHTML(b, slot) {
   const ann = `<button onmousedown="event.stopPropagation()" onclick="openAnnotationEditor('${b.id}',${slot})" style="background:#2563EB;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6" title="Anotar imagen">✏️</button>`;
   const del = `<button onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}',${slot})" title="Quitar imagen" style="background:#ef4444;color:#fff;border:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;white-space:nowrap;flex-shrink:0;line-height:1.6">✕</button>`;
   const capRow = `<div style="display:flex;align-items:center;gap:6px;padding:4px 12px;border-top:1px solid var(--border);background:#fafafa"><div class="paso-caption" contenteditable="true" data-id="${b.id}" data-field="${F.cap}" data-placeholder="Pie de foto..." onblur="saveInlineEdit(this)" style="flex:1;border:none;padding:2px 0;background:transparent">${esc(cap)}</div>${_imgResize(b, pct, slot)}${ann}${del}</div>`;
-  return `<div class="paso-img-slot"><div class="paso-img-holder">${img}</div>${capRow}</div>`;
+  const _two = (b.src || b.storagePath) && (b.src2 || b.storagePath2);
+  const _numB = _two ? `<span class="paso-imgnum">${slot}</span>` : '';
+  return `<div class="paso-img-slot"><div class="paso-img-holder">${_numB}${img}</div>${capRow}</div>`;
 }
 
 function removeBlockImage(blockId, slot) {
@@ -1631,6 +1633,7 @@ function startAutoSave() {
     }
   }, 60000);
 }
+let _quotaWarned = false;
 function localSave() {
   if (STATE.isDragging) return;
   // Sync active page before saving
@@ -1638,23 +1641,31 @@ function localSave() {
     const cur = STATE.pages.find(p => p.id === STATE.activePage);
     if (cur) cur.blocks = [...STATE.blocks];
   }
-  const data = {
+  // versión ligera: quita las imágenes base64 (viven en la nube vía storagePath) para no llenar localStorage
+  const _stripB64 = b => {
+    const c = { ...b };
+    if (typeof c.src === 'string' && c.src.startsWith('data:')) delete c.src;
+    if (typeof c.src2 === 'string' && c.src2.startsWith('data:')) delete c.src2;
+    delete c._pendingBase64;
+    return c;
+  };
+  const build = lite => ({
     manual: STATE.manual,
-    blocks: STATE.blocks,
-    pages: STATE.pages,
+    blocks: lite ? STATE.blocks.map(_stripB64) : STATE.blocks,
+    pages: lite ? STATE.pages.map(p => ({ ...p, blocks: (p.blocks || []).map(_stripB64) })) : STATE.pages,
     activePage: STATE.activePage,
     mediaLibrary: STATE.mediaLibrary,
     textBank: STATE.textBank,
-    trash: STATE.trash,
+    trash: lite ? (STATE.trash || []).map(_stripB64) : STATE.trash,
     titulo: q('#manual-titulo').value,
     empresa: q('#manual-empresa').value
-  };
-  try { localStorage.setItem('manual_draft_' + (STATE.manual.id||'guest'), JSON.stringify(data)); }
-  catch(e) {
-    console.warn('localSave:', e);
-    if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
-      notify('\u26a0\ufe0f Sin espacio local: guarda en la nube (\ud83d\udcbe) para liberar las imagenes incrustadas', 5000);
-    }
+  });
+  const _key = 'manual_draft_' + (STATE.manual.id || 'guest');
+  try {
+    localStorage.setItem(_key, JSON.stringify(build(false)));
+  } catch(e) {
+    try { localStorage.setItem(_key, JSON.stringify(build(true))); } catch(e2) { console.warn('localSave quota:', e2); }
+    if (!_quotaWarned) { _quotaWarned = true; notify('⚠️ Espacio local casi lleno. Guarda en la nube (💾); el borrador local seguira funcionando sin las imagenes sin subir.', 6000); }
   }
   if (STATE.manual.id) { try { localStorage.setItem('last_manual_id', STATE.manual.id); } catch(e){} }
 }
@@ -2108,9 +2119,9 @@ function renderBlockForExport(b, pasoN) {
         ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
       const _expSingle = (src,cap,w) => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(cap||'')}</div>` : '';
-      const _expCard = (src,cap,w) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center"><img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
+      const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
       const _imgArea = (b.src && b.src2)
-        ? `<div style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth)}${_expCard(b.src2,b.caption2,b.imgWidth2)}</div>`
+        ? `<div style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
         : _expSingle(b.src,b.caption,b.imgWidth);
       return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
     }
