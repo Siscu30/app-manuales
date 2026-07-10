@@ -762,6 +762,10 @@ function notify(msg, duration=2500) {
   setTimeout(()=>n.classList.remove('show'), duration);
 }
 function setSaveStatus(txt){ q('#save-status').textContent=txt; }
+let _lastSavedAt = 0;
+function _relTime(ms){ const s=Math.round((Date.now()-ms)/1000); if(s<10)return 'ahora mismo'; if(s<60)return 'hace '+s+' s'; const m=Math.round(s/60); if(m<60)return 'hace '+m+' min'; const h=Math.round(m/60); if(h<24)return 'hace '+h+' h'; return 'hace '+Math.round(h/24)+' d'; }
+function _tickSavedAgo(){ if(_lastSavedAt && !STATE.isDirty){ const el=q('#save-status'); if(el) el.textContent='✓ Guardado '+_relTime(_lastSavedAt); } }
+setInterval(_tickSavedAgo, 20000);
 function openModal(id){ q('#'+id).classList.remove('hidden'); }
 function closeModal(id){ q('#'+id).classList.add('hidden'); }
 function setLoading(v){ q('#loading').classList.toggle('hidden',!v); }
@@ -1723,6 +1727,7 @@ async function guardar() {
     if (_wasNew) { const _all = STATE.pages.length ? STATE.pages.flatMap(p=>p.blocks||[]) : STATE.blocks; if (_all.some(b=>b._pendingBase64)) setTimeout(()=>uploadImportedImages(_all), 200); }
     try { localStorage.setItem('last_manual_id', STATE.manual.id); } catch(e){}
     localSave();
+    _lastSavedAt = Date.now();
     setSaveStatus('✓ Guardado');
     STATE.isDirty = false;
     saveVersion();
@@ -1805,6 +1810,7 @@ async function loadManualesPanel(tab) {
         </div>
         <div class="mp2-card-actions">
           <button class="btn" style="font-size:12px" onclick="openVersionHistoryFor('${m.id}')">🕐 Versiones</button>
+          <button class="btn" style="font-size:12px" data-id="${m.id}" data-titulo="${escAttr(m.titulo||'Sin título')}" onclick="duplicateManual(this.dataset.id, this.dataset.titulo)">⧉ Duplicar</button>
           <button class="btn" style="font-size:12px;color:#dc2626" data-id="${m.id}" data-titulo="${escAttr(m.titulo||'Sin título')}" onclick="softDeleteManual(this.dataset.id, this.dataset.titulo)">🗑</button>
         </div>
       </div>`;
@@ -4943,12 +4949,31 @@ async function openVersionHistory() {
   if (!STATE.manual.id || !STATE.user) { notify('⚠ Guarda el manual primero'); return; }
   openModal('modal-versions');
   const body = q('#versions-body');
+  const pv = q('#versions-preview'); if (pv) { pv.style.display='none'; pv.innerHTML=''; }
   body.innerHTML = '<p>Cargando...</p>';
   try {
     const { data, error } = await sb.from('manual_versions').select('id, titulo, created_at').eq('manual_id', STATE.manual.id).order('created_at', { ascending: false }).limit(20);
     if (error || !data?.length) { body.innerHTML = '<p style="color:var(--text-muted)">No hay versiones guardadas aún. Guarda el manual para crear la primera versión.</p>'; return; }
-    body.innerHTML = data.map((v, i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:12px"><div style="min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i===0?'<span style="background:#dcfce7;color:#16a34a;font-size:10px;padding:1px 6px;border-radius:8px;margin-right:6px">Actual</span>':''}${esc(v.titulo||'Sin título')}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${new Date(v.created_at).toLocaleString('es',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div><button class="btn btn-sm" style="flex-shrink:0" onclick="restoreVersion('${v.id}')">${i===0?'Revertir':'Restaurar'}</button></div>`).join('');
+    body.innerHTML = data.map((v, i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);gap:12px"><div style="min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i===0?'<span style="background:#dcfce7;color:#16a34a;font-size:10px;padding:1px 6px;border-radius:8px;margin-right:6px">Actual</span>':''}${esc(v.titulo||'Sin título')}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${new Date(v.created_at).toLocaleString('es',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div><div style="font-size:11px;color:var(--text-muted);margin-top:1px">${_relTime(new Date(v.created_at).getTime())}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm" onclick="previewVersionInline('${v.id}')" title="Ver esta versión">👁</button><button class="btn btn-sm" onclick="restoreVersion('${v.id}')">${i===0?'Revertir':'Restaurar'}</button></div></div>`).join('');
   } catch(e) { body.innerHTML = '<p style="color:#dc2626">Error al cargar.</p>'; }
+}
+async function previewVersionInline(id) {
+  const box = q('#versions-preview'); if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = '<p style="color:var(--text-muted);padding:8px">Cargando vista previa…</p>';
+  try {
+    const { data, error } = await sb.from('manual_versions').select('contenido').eq('id', id).single();
+    if (error || !data) throw new Error('no');
+    const c = data.contenido;
+    const blocks = Array.isArray(c) ? c : (c.blocks || []);
+    let pasoN = 0;
+    box.innerHTML = '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Vista previa de la versión seleccionada</div>' + blocks.map(b => {
+      const def = BLOCK_TYPES[b.type]; if (!def) return '';
+      if (b.type === 'paso') { if (b.resetStep) pasoN = 0; pasoN++; }
+      return `<div class="block-wrap" style="pointer-events:none;margin-bottom:8px">${def.render(b, pasoN)}</div>`;
+    }).join('') || '<p style="color:var(--text-muted)">(versión vacía)</p>';
+    loadLazyImages();
+  } catch(e) { box.innerHTML = '<p style="color:#dc2626">No se pudo cargar la vista previa.</p>'; }
 }
 async function restoreVersion(id) {
   if (!confirm('¿Restaurar esta versión? Los cambios actuales se perderán.')) return;
@@ -4957,8 +4982,10 @@ async function restoreVersion(id) {
     if (error || !data) throw new Error('Versión no encontrada');
     pushHistory();
     const c = data.contenido;
-    if (Array.isArray(c)) { STATE.blocks = c; }
+    if (Array.isArray(c)) { STATE.blocks = c; STATE.pages = []; STATE.activePage = null; }
     else if (c && c.pages) { STATE.blocks = c.blocks || []; STATE.pages = c.pages; STATE.activePage = c.activePage; }
+    else if (c && c.blocks) { STATE.blocks = c.blocks; STATE.pages = []; STATE.activePage = null; }
+    if (c && !Array.isArray(c)) { STATE.mediaLibrary = c.mediaLibrary || []; STATE.textBank = c.textBank || []; STATE.trash = c.trash || []; }
     render(); renderPagesPanel(); scheduleLocalSave();
     closeModal('modal-versions');
     notify('✅ Versión restaurada');
@@ -4976,6 +5003,27 @@ async function openVersionHistoryFor(manualId) {
 }
 
 function deleteManual(id, titulo) { softDeleteManual(id, titulo); }
+
+// Duplica un manual completo como uno nuevo (ids de bloque regenerados)
+async function duplicateManual(id, titulo) {
+  if (!STATE.user) { openAuthModal('Accede para duplicar'); return; }
+  try {
+    const { data, error } = await sb.from('manuales').select('titulo,empresa,color,contenido').eq('id', id).single();
+    if (error || !data) throw new Error('Manual no encontrado');
+    const reid = bs => (bs || []).map(b => ({ ...b, id: uid() }));
+    const c = data.contenido;
+    let contenido;
+    if (Array.isArray(c)) contenido = reid(c);
+    else contenido = { ...c, blocks: reid(c.blocks), pages: (c.pages || []).map(p => ({ ...p, id: uid(), blocks: reid(p.blocks) })) };
+    const ins = await sb.from('manuales').insert({
+      titulo: (data.titulo || 'Manual') + ' (copia)', empresa: data.empresa || '', color: data.color || '#2563EB',
+      contenido, estado: 'borrador', user_id: STATE.user.id, created_by: STATE.user.id
+    }).select().single();
+    if (ins.error) throw ins.error;
+    notify('✅ Manual duplicado');
+    loadManualesPanel('activos');
+  } catch(e) { notify('❌ Error al duplicar: ' + (e.message || e), 4000); }
+}
 
 function openTemplatesModal() { openModal('modal-templates'); loadUserTemplates(); }
 async function saveAsTemplate() {
