@@ -1219,14 +1219,16 @@ async function resizeImage(file) {
   return new Promise(resolve=>{
     const img=new Image(), url=URL.createObjectURL(file);
     img.onload=()=>{
-      const MAX_W=1280; let w=img.width,h=img.height;
+      const MAX_W=2000; let w=img.width,h=img.height;
       if(w>MAX_W){h=Math.round(h*MAX_W/w);w=MAX_W;}
       const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
-      const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+      const ctx=canvas.getContext('2d'); ctx.imageSmoothingQuality='high'; ctx.drawImage(img,0,0,w,h);
       // check transparency
       let hasAlpha=false;
       try{const d=ctx.getImageData(0,0,Math.min(w,50),Math.min(h,50)).data;for(let i=3;i<d.length;i+=4)if(d[i]<255){hasAlpha=true;break;}}catch(e){}
-      const mime=hasAlpha?'image/png':'image/jpeg', q=hasAlpha?1:.85;
+      // PNG sin pérdida para capturas de pantalla (PNG o con transparencia); JPEG alta calidad para fotos
+      const isPng = hasAlpha || (file.type === 'image/png');
+      const mime = isPng ? 'image/png' : 'image/jpeg', q = isPng ? 1 : .92;
       canvas.toBlob(b=>{URL.revokeObjectURL(url);resolve(b);},mime,q);
     };
     img.onerror=()=>{URL.revokeObjectURL(url);resolve(file);};
@@ -3409,7 +3411,7 @@ function _mediaExt(mime) {
 }
 
 // dataURL → {blob,w,h}; redimensiona a maxW con canvas (svg pasa tal cual)
-async function _resizeDataUrl(dataUrl, maxW = 1600) {
+async function _resizeDataUrl(dataUrl, maxW = 2000) {
   if (/^data:image\/svg/.test(dataUrl)) { const r = await fetch(dataUrl); return { blob: await r.blob(), w: 0, h: 0 }; }
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -3417,8 +3419,9 @@ async function _resizeDataUrl(dataUrl, maxW = 1600) {
       let w = img.naturalWidth, h = img.naturalHeight, cw = w, ch = h;
       if (w > maxW) { ch = Math.round(h * maxW / w); cw = maxW; }
       const c = document.createElement('canvas'); c.width = cw; c.height = ch;
-      c.getContext('2d').drawImage(img, 0, 0, cw, ch);
-      c.toBlob(b => b ? resolve({ blob: b, w: cw, h: ch }) : reject(new Error('canvas vacío')), 'image/jpeg', 0.85);
+      const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, cw, ch);
+      const isPng = /^data:image\/png/.test(dataUrl); // capturas de pantalla → PNG sin pérdida
+      c.toBlob(b => b ? resolve({ blob: b, w: cw, h: ch }) : reject(new Error('canvas vacío')), isPng ? 'image/png' : 'image/jpeg', isPng ? 1 : 0.92);
     };
     img.onerror = () => reject(new Error('imagen no cargable'));
     img.src = dataUrl;
@@ -3624,7 +3627,7 @@ function closeCropEditor() {
 async function applyCrop() {
   if (!_cropper) return;
   const parent = STATE.mediaLibrary.find(x => x.id === _cropMediaId);
-  const canvas = _cropper.getCroppedCanvas({ maxWidth: 1600 });
+  const canvas = _cropper.getCroppedCanvas({ maxWidth: 2000, imageSmoothingQuality: 'high' });
   if (!canvas) { notify('Selecciona un área de recorte'); return; }
   const btn = document.getElementById('crop-apply-btn');
   if (btn) { btn.textContent = 'Guardando…'; btn.disabled = true; }
@@ -3645,7 +3648,7 @@ async function applyCrop() {
         }
       }
     } finally { if (btn) { btn.textContent = 'Aplicar recorte'; btn.disabled = false; } }
-  }, 'image/jpeg', 0.9);
+  }, 'image/jpeg', 0.92);
 }
 
 // ═══════════════════════════════════════════════════════
