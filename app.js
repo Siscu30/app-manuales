@@ -18,6 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('btn-theme-toggle');
   const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   if (btn) { btn.textContent = cur === 'light' ? '☀️' : '🌙'; btn.title = cur === 'light' ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'; }
+  loadBlockPaletteOrderLocal();
+  renderBlockPalette();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -64,7 +66,69 @@ let STATE = {
   trash: [],
   isDirty: false,
   autoSaveTimer: null,
+  blockPaletteOrder: null,
 };
+
+// ═══════════════════════════════════════════════════════
+// PALETA DE BLOQUES (sidebar) — orden reordenable y persistente por usuario
+// ═══════════════════════════════════════════════════════
+const BLOCK_PALETTE_META = {
+  titulo:     { icon: 'i-titulo',     label: 'Título' },
+  subtitulo:  { icon: 'i-subtitulo',  label: 'Subtítulo' },
+  alerta:     { icon: 'i-alerta',     label: 'Alerta' },
+  paso:       { icon: 'i-paso',       label: 'Paso' },
+  imagen:     { icon: 'i-imagen',     label: 'Imagen' },
+  tabla:      { icon: 'i-tabla',      label: 'Tabla' },
+  lista:      { icon: 'i-lista',      label: 'Lista' },
+  separador:  { icon: 'i-separador',  label: 'Separador' },
+  texto:      { icon: 'i-texto',      label: 'Texto' },
+  flujos:     { icon: 'i-flujos',     label: 'Flujos' },
+  video:      { icon: 'i-video',      label: 'Vídeo' },
+  enlace:     { icon: 'i-enlace',     label: 'Enlace' },
+  codigo:     { icon: 'i-codigo',     label: 'Código' },
+};
+const DEFAULT_BLOCK_ORDER = ['titulo','subtitulo','alerta','paso','imagen','tabla','lista','separador','texto','flujos','video','enlace','codigo'];
+
+function renderBlockPalette() {
+  const cont = document.getElementById('sid-chips-bloques');
+  if (!cont) return;
+  const search = document.getElementById('block-search');
+  const order = (STATE.blockPaletteOrder && STATE.blockPaletteOrder.length === DEFAULT_BLOCK_ORDER.length)
+    ? STATE.blockPaletteOrder : DEFAULT_BLOCK_ORDER;
+  const chips = order.map((type, i) => {
+    const meta = BLOCK_PALETTE_META[type];
+    if (!meta) return '';
+    return `<button class="block-btn" onclick="addBlock('${type}')" draggable="true" data-type="${type}">
+      <span class="bp-reorder">
+        <span class="bp-arrow" onclick="event.stopPropagation();event.preventDefault();moveBlockPalette('${type}',-1)" onmousedown="event.stopPropagation()" title="Mover antes">▲</span>
+        <span class="bp-arrow" onclick="event.stopPropagation();event.preventDefault();moveBlockPalette('${type}',1)" onmousedown="event.stopPropagation()" title="Mover después">▼</span>
+      </span>
+      <svg class="icon-svg"><use href="#${meta.icon}"></use></svg>${meta.label}
+    </button>`;
+  }).join('');
+  cont.innerHTML = `<input id="block-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar bloque…" aria-label="Buscar tipo de bloque" oninput="filterBlockBtns(this.value)" value="${search ? search.value.replace(/"/g,'&quot;') : ''}">` + chips;
+}
+
+function moveBlockPalette(type, dir) {
+  const order = (STATE.blockPaletteOrder && STATE.blockPaletteOrder.length === DEFAULT_BLOCK_ORDER.length)
+    ? STATE.blockPaletteOrder.slice() : DEFAULT_BLOCK_ORDER.slice();
+  const i = order.indexOf(type);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  STATE.blockPaletteOrder = order;
+  renderBlockPalette();
+  try { localStorage.setItem('block_palette_order', JSON.stringify(order)); } catch(e) {}
+  saveUserPrefs();
+}
+function loadBlockPaletteOrderLocal() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('block_palette_order') || 'null');
+    if (Array.isArray(saved) && saved.length === DEFAULT_BLOCK_ORDER.length && saved.every(t => BLOCK_PALETTE_META[t])) {
+      STATE.blockPaletteOrder = saved;
+    }
+  } catch(e) {}
+}
 
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36); }
 
@@ -205,6 +269,22 @@ function iconSVG(key, size, color) {
   const s = size || 20;
   const c = color || 'currentColor';
   return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;flex-shrink:0">${ic[3]}</svg>`;
+}
+// Icono de un elemento de lista: mantiene compat con los valores antiguos 'check'/'cross'
+// (emoji), y usa iconSVG() para cualquier clave de ICON_LIB elegida en el picker.
+function _liIconHTML(icono) {
+  if (icono === 'check') return '✅';
+  if (icono === 'cross') return '❌';
+  return iconSVG(icono || 'check', 18, 'currentColor') || '✅';
+}
+function _liPickIcon(idx) {
+  openIconPicker(key => {
+    const row = document.querySelector(`#lista-items [data-li="${idx}"]`);
+    if (!row) return;
+    row.dataset.icono = key;
+    const preview = row.querySelector('.li-icon-preview');
+    if (preview) preview.innerHTML = _liIconHTML(key);
+  });
 }
 
 let _ipCurCat = 'all', _ipCurSearch = '', _ipCallback = null;
@@ -399,10 +479,11 @@ const BLOCK_TYPES = {
   },
   tabla: {
     label: 'Tabla de referencia',
-    defaultData: () => ({ columnas:['Columna 1','Columna 2'], filas:[['',''],['','']] }),
+    defaultData: () => ({ columnas:['Columna 1','Columna 2'], filas:[['',''],['','']], align:['left','left'] }),
     render(b) {
-      const headers = (b.columnas||[]).map(c=>`<th>${esc(c)}</th>`).join('');
-      const rows = (b.filas||[]).map(row=>`<tr>${(row||[]).map(cell=>`<td>${esc(cell)}</td>`).join('')}</tr>`).join('');
+      const align = b.align||[];
+      const headers = (b.columnas||[]).map((c,ci)=>`<th style="text-align:${align[ci]||'left'}">${esc(c)}</th>`).join('');
+      const rows = (b.filas||[]).map(row=>`<tr>${(row||[]).map((cell,ci)=>`<td style="text-align:${align[ci]||'left'}">${esc(cell)}</td>`).join('')}</tr>`).join('');
       return `<div class="b-tabla block-inner editable-dbl" title="Doble clic para editar" ondblclick="openBlockEditor('${b.id}')">
         <table><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table>
       </div>`;
@@ -410,9 +491,15 @@ const BLOCK_TYPES = {
     editorHTML(b) {
       const cols = b.columnas||['Columna 1','Columna 2'];
       const rows = b.filas||[['',''],['','']];
+      const align = b.align||[];
+      const alignSel = (i) => `<select class="form-select" style="margin-top:2px;font-size:11px;padding:3px" data-align-ci="${i}" title="Alineación">
+        <option value="left" ${(align[i]||'left')==='left'?'selected':''}>⬅ Izquierda</option>
+        <option value="center" ${align[i]==='center'?'selected':''}>↔ Centro</option>
+        <option value="right" ${align[i]==='right'?'selected':''}>➡ Derecha</option>
+      </select>`;
       return `<div class="tabla-editor">
         <div class="form-group"><label class="form-label">Columnas (${cols.length})</label>
-          <div id="cols-editor">${cols.map((c,i)=>`<input class="form-input" style="margin-bottom:4px" value="${esc(c)}" data-ci="${i}" placeholder="Nombre columna">`).join('')}</div>
+          <div id="cols-editor">${cols.map((c,i)=>`<div style="display:flex;gap:6px;margin-bottom:4px"><input class="form-input" style="flex:1" value="${esc(c)}" data-ci="${i}" placeholder="Nombre columna">${alignSel(i)}</div>`).join('')}</div>
           <button class="tabla-add-btn" onclick="addTablaCol()">+ Añadir columna</button>
         </div>
         <div class="form-group"><label class="form-label">Filas</label>
@@ -427,8 +514,9 @@ const BLOCK_TYPES = {
       </div>`;
     },
     saveEditor(b) {
-      const colInputs = document.querySelectorAll('#cols-editor input');
+      const colInputs = document.querySelectorAll('#cols-editor input[data-ci]');
       b.columnas = Array.from(colInputs).map(i=>i.value||'');
+      b.align = Array.from(document.querySelectorAll('#cols-editor [data-align-ci]')).map(s=>s.value);
       const rowInputs = document.querySelectorAll('#rows-body input');
       const nCols = b.columnas.length;
       const nRows = Math.ceil(rowInputs.length / nCols);
@@ -447,8 +535,8 @@ const BLOCK_TYPES = {
     label: 'Lista verificación',
     defaultData: () => ({ items:[{icono:'check',texto:'Elemento 1'},{icono:'cross',texto:'Elemento 2'}] }),
     render(b) {
-      const items = (b.items||[]).map(it=>`<div class="lista-item">
-        <span class="li-icon">${it.icono==='check'?'✅':'❌'}</span>
+      const items = (b.items||[]).map(it=>`<div class="lista-item" style="text-align:${it.align||'left'}">
+        <span class="li-icon">${_liIconHTML(it.icono)}</span>
         <span class="li-text">${esc(it.texto||'')}</span>
       </div>`).join('');
       return `<div class="b-lista block-inner editable-dbl" title="Doble clic para editar" ondblclick="openBlockEditor('${b.id}')">${items||'<em style="color:var(--text-muted)">Sin elementos</em>'}</div>`;
@@ -456,12 +544,14 @@ const BLOCK_TYPES = {
     editorHTML(b) {
       const items = b.items||[];
       return `<div id="lista-items">
-        ${items.map((it,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px" data-li="${i}">
-          <select class="form-select" style="width:100px" data-field="icono">
-            <option value="check" ${it.icono==='check'?'selected':''}>✅ Check</option>
-            <option value="cross" ${it.icono==='cross'?'selected':''}>❌ Cruz</option>
-          </select>
+        ${items.map((it,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center" data-li="${i}" data-icono="${esc(it.icono||'check')}">
+          <button type="button" class="btn btn-sm" onmousedown="event.preventDefault();_liPickIcon(${i})" style="flex-shrink:0;padding:6px;width:34px;height:34px;display:flex;align-items:center;justify-content:center" title="Elegir icono"><span class="li-icon-preview">${_liIconHTML(it.icono)}</span></button>
           <input class="form-input" style="flex:1" value="${esc(it.texto||'')}" data-field="texto" placeholder="Texto del elemento">
+          <select class="form-select" style="width:92px;flex-shrink:0" data-field="align" title="Alineación">
+            <option value="left" ${(it.align||'left')==='left'?'selected':''}>Izquierda</option>
+            <option value="center" ${it.align==='center'?'selected':''}>Centro</option>
+            <option value="right" ${it.align==='right'?'selected':''}>Derecha</option>
+          </select>
           <button class="btn btn-sm" onclick="this.closest('[data-li]').remove()" style="flex-shrink:0">🗑</button>
         </div>`).join('')}
       </div>
@@ -470,12 +560,13 @@ const BLOCK_TYPES = {
     saveEditor(b) {
       const rows = document.querySelectorAll('#lista-items [data-li]');
       b.items = Array.from(rows).map(row=>({
-        icono: row.querySelector('[data-field="icono"]').value,
-        texto: row.querySelector('[data-field="texto"]').value
+        icono: row.dataset.icono || 'check',
+        texto: row.querySelector('[data-field="texto"]').value,
+        align: row.querySelector('[data-field="align"]').value
       }));
     },
     toTeamsText(b) {
-      return (b.items||[]).map(it=>`${it.icono==='check'?'✅':'❌'} ${it.texto||''}`).join('\n');
+      return (b.items||[]).map(it=>`${it.icono==='check'?'✅':it.icono==='cross'?'❌':'•'} ${it.texto||''}`).join('\n');
     }
   },
   separador: {
@@ -639,16 +730,24 @@ const BLOCK_TYPES = {
   },
   flujos: {
     label: 'Tabla de flujos',
-    defaultData: () => ({ filas:[{condicion:'Condición de ejemplo',accion:'Acción a tomar'},{condicion:'',accion:''}] }),
+    defaultData: () => ({ filas:[{condicion:'Condición de ejemplo',accion:'Acción a tomar'},{condicion:'',accion:''}], align:['left','left'] }),
     render(b) {
-      const rows = (b.filas||[]).map(r=>`<tr><td>${esc(r.condicion||'')}</td><td>${esc(r.accion||'')}</td></tr>`).join('');
+      const a = b.align||[];
+      const rows = (b.filas||[]).map(r=>`<tr><td style="text-align:${a[0]||'left'}">${esc(r.condicion||'')}</td><td style="text-align:${a[1]||'left'}">${esc(r.accion||'')}</td></tr>`).join('');
       return `<div class="b-flujos block-inner" ondblclick="openBlockEditor('${b.id}')">
-        <table><thead><tr><th>Condición</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table>
+        <table><thead><tr><th style="text-align:${a[0]||'left'}">Condición</th><th style="text-align:${a[1]||'left'}">Acción</th></tr></thead><tbody>${rows}</tbody></table>
       </div>`;
     },
     editorHTML(b) {
       const rows = b.filas||[];
-      return `<div id="flujos-rows">
+      const a = b.align||['left','left'];
+      const alignSel = (i,lbl) => `<div><label class="form-label" style="font-size:11px">${lbl}</label><select class="form-select" style="font-size:12px;padding:4px" data-flujo-align="${i}">
+        <option value="left" ${(a[i]||'left')==='left'?'selected':''}>⬅ Izquierda</option>
+        <option value="center" ${a[i]==='center'?'selected':''}>↔ Centro</option>
+        <option value="right" ${a[i]==='right'?'selected':''}>➡ Derecha</option>
+      </select></div>`;
+      return `<div style="display:flex;gap:10px;margin-bottom:10px">${alignSel(0,'Alinear Condición')}${alignSel(1,'Alinear Acción')}</div>
+      <div id="flujos-rows">
         ${rows.map((r,i)=>`<div style="display:grid;grid-template-columns:1fr 1fr 32px;gap:6px;margin-bottom:6px" data-ri="${i}">
           <input class="form-input" value="${esc(r.condicion||'')}" placeholder="Condición" data-field="condicion">
           <input class="form-input" value="${esc(r.accion||'')}" placeholder="Acción" data-field="accion">
@@ -663,6 +762,7 @@ const BLOCK_TYPES = {
         condicion: row.querySelector('[data-field="condicion"]').value,
         accion: row.querySelector('[data-field="accion"]').value
       }));
+      b.align = [document.querySelector('[data-flujo-align="0"]')?.value||'left', document.querySelector('[data-flujo-align="1"]')?.value||'left'];
     },
     toTeamsText(b) {
       const header = 'Condición | Acción';
@@ -945,9 +1045,10 @@ function openBlockColorPicker(blockId, ev) {
       <button class="reset-btn" onclick="clearBlockColor('${blockId}','bg')">Quitar</button>
     </div>
     <label style="margin-top:8px">Borde / acento</label>
-    <div class="color-row">
+    <div class="bcp-grid">${BLOCK_PALETTE.map(c=>`<span class="bcp-sw" style="background:${c}" title="${c}" onclick="setBlockBorder('${blockId}','${c}')"></span>`).join('')}</div>
+    <div class="color-row" style="margin-top:8px">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
       <input type="color" id="bcp-border" value="${block.blockBorderColor||'#2563EB'}" oninput="setBlockBorder('${blockId}',this.value)">
-      <span style="font-size:11px;flex:1;color:var(--text-muted)">${block.blockBorderColor||'Por defecto'}</span>
       <button class="reset-btn" onclick="clearBlockColor('${blockId}','border')">Quitar</button>
     </div>
     <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove()">Cerrar</button></div>`;
@@ -1164,11 +1265,16 @@ function saveBlockEditor() {
 
 // Editor helpers
 function addTablaCol() {
-  const n = document.querySelectorAll('#cols-editor input').length;
-  const inp = document.createElement('input');
-  inp.className='form-input'; inp.style.marginBottom='4px';
-  inp.placeholder='Nombre columna'; inp.setAttribute('data-ci', n);
-  q('#cols-editor').appendChild(inp);
+  const n = document.querySelectorAll('#cols-editor input[data-ci]').length;
+  const row = document.createElement('div');
+  row.style = 'display:flex;gap:6px;margin-bottom:4px';
+  row.innerHTML = `<input class="form-input" style="flex:1" placeholder="Nombre columna" data-ci="${n}">
+    <select class="form-select" style="margin-top:2px;font-size:11px;padding:3px" data-align-ci="${n}" title="Alineación">
+      <option value="left" selected>⬅ Izquierda</option>
+      <option value="center">↔ Centro</option>
+      <option value="right">➡ Derecha</option>
+    </select>`;
+  q('#cols-editor').appendChild(row);
   // add cell to each row
   document.querySelectorAll('#rows-body tr').forEach((tr,ri)=>{
     const td=document.createElement('td');
@@ -1197,9 +1303,10 @@ function addTablaRow() {
 function addListaItem() {
   const n = document.querySelectorAll('#lista-items [data-li]').length;
   const div=document.createElement('div');
-  div.style='display:flex;gap:8px;margin-bottom:8px';
+  div.style='display:flex;gap:8px;margin-bottom:8px;align-items:center';
   div.setAttribute('data-li',n);
-  div.innerHTML=`<select class="form-select" style="width:100px" data-field="icono"><option value="check">✅ Check</option><option value="cross">❌ Cruz</option></select><input class="form-input" style="flex:1" data-field="texto" placeholder="Texto del elemento"><button class="btn btn-sm" onclick="this.closest('[data-li]').remove()">🗑</button>`;
+  div.setAttribute('data-icono','check');
+  div.innerHTML=`<button type="button" class="btn btn-sm" onmousedown="event.preventDefault();_liPickIcon(${n})" style="flex-shrink:0;padding:6px;width:34px;height:34px;display:flex;align-items:center;justify-content:center" title="Elegir icono"><span class="li-icon-preview">${_liIconHTML('check')}</span></button><input class="form-input" style="flex:1" data-field="texto" placeholder="Texto del elemento"><select class="form-select" style="width:92px;flex-shrink:0" data-field="align" title="Alineación"><option value="left" selected>Izquierda</option><option value="center">Centro</option><option value="right">Derecha</option></select><button class="btn btn-sm" onclick="this.closest('[data-li]').remove()" style="flex-shrink:0">🗑</button>`;
   q('#lista-items').appendChild(div);
 }
 function addFlujoRow() {
@@ -2038,6 +2145,7 @@ async function exportHTML(preview) {
   const color = STATE.manual.color || '#2563EB';
 
   let pasoN = 0;
+  const sections = [];
   const body = STATE.blocks.map(b=>{
     const def = BLOCK_TYPES[b.type];
     if (!def) return '';
@@ -2046,10 +2154,18 @@ async function exportHTML(preview) {
     // Only use storage download if no local src (preserves annotations)
     if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
       if (!bCopy.src2 && bCopy.storagePath2 && imgCache[bCopy.storagePath2]) bCopy.src2 = imgCache[bCopy.storagePath2];
-    return renderBlockForExport(bCopy, pasoN);
+    const rendered = renderBlockForExport(bCopy, pasoN);
+    if (b.type === 'titulo' || b.type === 'subtitulo') {
+      const text = (b.type === 'titulo' ? b.titulo : b.texto) || '';
+      if (text.trim()) {
+        sections.push({ anchorId: 'anchor-' + b.id, text, level: b.type === 'titulo' ? 1 : 2 });
+        return `<div id="anchor-${b.id}" class="mp-anchor">${rendered}</div>`;
+      }
+    }
+    return rendered;
   }).join('\n');
 
-  const html = buildExportHTML(titulo, empresa, color, body);
+  const html = buildExportHTMLMultipage(titulo, empresa, color, [{ id: 'main', title: titulo, html: body, sections }]);
 
   bar.style.width = '100%';
   setTimeout(()=>{
@@ -2150,8 +2266,9 @@ function renderBlockForExport(b, pasoN) {
     }
     case 'imagen': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
-      const headers=(b.columnas||[]).map(c=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">${esc(c)}</th>`).join('');
-      const rows=(b.filas||[]).map(row=>`<tr>${(row||[]).map(cell=>`<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0">${esc(cell)}</td>`).join('')}</tr>`).join('');
+      const _tAlign = b.align||[];
+      const headers=(b.columnas||[]).map((c,ci)=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_tAlign[ci]||'left'};border-bottom:2px solid #e2e8f0">${esc(c)}</th>`).join('');
+      const rows=(b.filas||[]).map(row=>`<tr>${(row||[]).map((cell,ci)=>`<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_tAlign[ci]||'left'}">${esc(cell)}</td>`).join('')}</tr>`).join('');
       return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'callout': {
@@ -2164,15 +2281,16 @@ function renderBlockForExport(b, pasoN) {
         : '';
       return `<div style="padding:14px 16px;border-radius:8px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'tip']||styles.tip};margin-bottom:12px"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_caIcon}</span><div>${_caHtml}</div></div>`;
     }
-    case 'lista': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;margin-bottom:12px">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0"><span style="font-size:16px">${it.icono==='check'?'✅':'❌'}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
+    case 'lista': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;margin-bottom:12px">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0;text-align:${it.align||'left'}"><span style="font-size:16px;flex-shrink:0">${_liIconHTML(it.icono)}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
     case 'separador': return `<div style="padding:8px 0;margin-bottom:12px"><hr style="border:none;border-top:2px solid #e2e8f0"></div>`;
     case 'texto': {
       const _tImg = b.src ? `<img src="${b.src}" style="width:100%;display:block;border-radius:6px;margin-top:10px" alt="">` : '';
       return `<div style="padding:12px 16px;background:#fff;border-radius:8px;font-size:14px;line-height:1.6;margin-bottom:12px">${b.html||''}${_tImg}</div>`;
     }
     case 'flujos': {
-      const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0">${esc(r.accion||'')}</td></tr>`).join('');
-      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:left;border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      const _fAlign = b.align||['left','left'];
+      const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500;text-align:${_fAlign[0]}">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_fAlign[1]}">${esc(r.accion||'')}</td></tr>`).join('');
+      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[0]};border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[1]};border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'video': {
       if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
@@ -2309,40 +2427,6 @@ function _lbJS() {
 function _lbClose(){document.getElementById('lb-ov').classList.remove('open','zoomed');document.getElementById('lb-img').classList.remove('zoomed');document.removeEventListener('keydown',_lbKey);}
 function _lbZoom(){const z=document.getElementById('lb-img').classList.toggle('zoomed');document.getElementById('lb-ov').classList.toggle('zoomed',z);document.getElementById('lb-hint').textContent=z?'Clic para reducir · Esc para cerrar':'Clic para ampliar · Esc para cerrar';}
 function _lbKey(e){if(e.key==='Escape')_lbClose();}`;
-}
-
-function buildExportHTML(titulo, empresa, color, body) {
-  return `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(titulo)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a;padding:0}
-.header{background:${color};color:#fff;padding:32px 40px}
-.header h1{font-size:28px;font-weight:700}
-.header .empresa{opacity:.85;margin-top:4px}
-.content{max-width:800px;margin:0 auto;padding:32px 24px}
-@media print{body{background:#fff}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-${_lbCSS()}
-</style>
-</head>
-<body>
-<div class="header">
-  <h1>${esc(titulo)}</h1>
-  ${empresa?`<div class="empresa">${esc(empresa)}</div>`:''}
-  <div style="font-size:12px;opacity:.7;margin-top:8px">Generado el ${new Date().toLocaleDateString('es')}</div>
-</div>
-<div class="content">
-${body}
-</div>
-${_lbHTML()}
-<script>${_lbJS()}<\/script>
-</body>
-</html>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3003,24 +3087,31 @@ async function loadUserPrefs() {
   if (!STATE.user) return;
   try {
     const { data } = await sb.from('user_prefs').select('prefs').eq('user_id', STATE.user.id).single();
-    if (!data?.prefs?.sidebar) return;
+    if (!data?.prefs) return;
     const s = data.prefs.sidebar;
-    _SIDEBAR_PANELS.forEach(({ id, arrowId }) => {
-      if (s[id] === undefined) return;
-      const panel = document.getElementById(id);
-      const arrow = document.getElementById(arrowId);
-      if (!panel) return;
-      const open = s[id];
-      panel.style.display = open ? '' : 'none';
-      if (arrow) { arrow.textContent = open ? '▼' : '▶'; arrow.style.transform = open ? '' : 'rotate(-90deg)'; }
-    });
-    if (s['pages-panel'] !== undefined) {
-      const panel = document.getElementById('pages-panel-body');
-      const arrow = document.getElementById('pages-toggle-arrow');
-      if (panel) {
-        panel.style.display = s['pages-panel'] ? 'block' : 'none';
-        if (arrow) arrow.textContent = s['pages-panel'] ? '▼' : '▶';
+    if (s) {
+      _SIDEBAR_PANELS.forEach(({ id, arrowId }) => {
+        if (s[id] === undefined) return;
+        const panel = document.getElementById(id);
+        const arrow = document.getElementById(arrowId);
+        if (!panel) return;
+        const open = s[id];
+        panel.style.display = open ? '' : 'none';
+        if (arrow) { arrow.textContent = open ? '▼' : '▶'; arrow.style.transform = open ? '' : 'rotate(-90deg)'; }
+      });
+      if (s['pages-panel'] !== undefined) {
+        const panel = document.getElementById('pages-panel-body');
+        const arrow = document.getElementById('pages-toggle-arrow');
+        if (panel) {
+          panel.style.display = s['pages-panel'] ? 'block' : 'none';
+          if (arrow) arrow.textContent = s['pages-panel'] ? '▼' : '▶';
+        }
       }
+    }
+    if (Array.isArray(data.prefs.blockOrder) && data.prefs.blockOrder.length === DEFAULT_BLOCK_ORDER.length && data.prefs.blockOrder.every(t => BLOCK_PALETTE_META[t])) {
+      STATE.blockPaletteOrder = data.prefs.blockOrder;
+      try { localStorage.setItem('block_palette_order', JSON.stringify(data.prefs.blockOrder)); } catch(e) {}
+      renderBlockPalette();
     }
   } catch(e) { console.warn('loadUserPrefs:', e); }
 }
@@ -3037,7 +3128,7 @@ function saveUserPrefs() {
     const pagesPanel = document.getElementById('pages-panel-body');
     if (pagesPanel) s['pages-panel'] = pagesPanel.style.display !== 'none';
     try {
-      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s }, updated_at: new Date().toISOString() });
+      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s, blockOrder: STATE.blockPaletteOrder || DEFAULT_BLOCK_ORDER }, updated_at: new Date().toISOString() });
     } catch(e) { console.warn('saveUserPrefs:', e); }
   }, 500);
 }
@@ -4656,14 +4747,23 @@ async function exportHTMLMultipage(preview) {
 
   const pagesHTML = STATE.pages.map(pg => {
     let pasoN = 0;
+    const sections = [];
     const blocksHTML = (pg.blocks||[]).map(b => {
       if (b.type==='paso') { if (b.resetStep) pasoN = 0; pasoN++; }
       const bCopy = {...b};
       if (!bCopy.src && bCopy.storagePath && imgCache[bCopy.storagePath]) bCopy.src = imgCache[bCopy.storagePath];
       if (!bCopy.src2 && bCopy.storagePath2 && imgCache[bCopy.storagePath2]) bCopy.src2 = imgCache[bCopy.storagePath2];
-      return renderBlockForExport(bCopy, pasoN);
+      const rendered = renderBlockForExport(bCopy, pasoN);
+      if (b.type === 'titulo' || b.type === 'subtitulo') {
+        const text = (b.type === 'titulo' ? b.titulo : b.texto) || '';
+        if (text.trim()) {
+          sections.push({ anchorId: 'anchor-' + b.id, text, level: b.type === 'titulo' ? 1 : 2 });
+          return `<div id="anchor-${b.id}" class="mp-anchor">${rendered}</div>`;
+        }
+      }
+      return rendered;
     }).join('\n');
-    return { id: pg.id, title: pg.title, html: blocksHTML };
+    return { id: pg.id, title: pg.title, html: blocksHTML, sections };
   });
 
   const html = buildExportHTMLMultipage(titulo, empresa, color, pagesHTML);
@@ -4683,9 +4783,26 @@ async function exportHTMLMultipage(preview) {
 }
 
 function buildExportHTMLMultipage(titulo, empresa, color, pages) {
-  const navItems = pages.map((p,i) => `<li data-page="${p.id}" class="${i===0?'active':''}" onclick="showPage('${p.id}',this)">${esc(p.title)}</li>`).join('');
+  const showNav = pages.length > 1 || (pages[0] && pages[0].sections && pages[0].sections.length > 0);
+  const navItems = pages.map((p,i) => {
+    const hasSubs = (p.sections||[]).length > 0;
+    const subItems = hasSubs ? `<ul class="mp-nav-subul">${p.sections.map(s=>`<li class="mp-nav-sub mp-nav-sub-lvl${s.level}" onclick="event.stopPropagation();goToSection('${p.id}','${s.anchorId}',this)">${esc(s.text)}</li>`).join('')}</ul>` : '';
+    return `<li class="mp-nav-item${hasSubs?' has-subs':''}">
+      <div class="mp-nav-row${i===0?' active':''}" data-page="${p.id}" onclick="showPage('${p.id}',this)">
+        <span>${esc(p.title)}</span>
+        ${hasSubs?`<span class="mp-nav-expand" onclick="event.stopPropagation();toggleNavExpand(this)">▸</span>`:''}
+      </div>
+      ${subItems}
+    </li>`;
+  }).join('');
   const sections = pages.map((p,i) => `<section class="mp-page${i===0?' active':''}" id="${p.id}">${p.html}</section>`).join('\n');
   const dark = shadeColorHex(color, -40);
+  const fecha = new Date().toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' });
+  const logoSVG = `<svg width="56" height="56" viewBox="0 0 24 24" style="display:block;margin:0 auto 20px">
+    <rect x="3" y="4" width="18" height="4" rx="1.5" fill="${color}"/>
+    <rect x="3" y="10" width="18" height="4" rx="1.5" fill="${color}" opacity=".65"/>
+    <rect x="3" y="16" width="13" height="4" rx="1.5" fill="${color}" opacity=".4"/>
+  </svg>`;
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -4696,8 +4813,20 @@ function buildExportHTMLMultipage(titulo, empresa, color, pages) {
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
+/* ── Portada ── */
+.mp-cover{position:fixed;inset:0;z-index:500;background:linear-gradient(160deg,${color},${dark});display:flex;align-items:center;justify-content:center;padding:24px}
+.mp-cover.closed{display:none}
+.mp-cover-card{background:#fff;border-radius:20px;padding:56px 48px;max-width:460px;width:100%;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.mp-cover-titulo{font-size:26px;font-weight:700;color:#0f172a;line-height:1.25;margin-bottom:6px}
+.mp-cover-empresa{font-size:15px;color:#64748b;margin-bottom:22px}
+.mp-cover-fecha{font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:28px}
+.mp-cover-btn{display:inline-flex;align-items:center;gap:8px;background:${color};color:#fff;border:none;padding:13px 28px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.mp-cover-btn:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(0,0,0,.28)}
+.mp-cover-count{font-size:12px;color:#94a3b8;margin-top:18px}
+.mp-shell{display:none}
+.mp-shell.open{display:block}
 .mp-header{position:sticky;top:0;z-index:100;background:${color};color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
-.mp-header h1{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.mp-header h1{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;cursor:pointer}
 .mp-header .empresa{font-size:12px;opacity:.75;white-space:nowrap}
 .mp-search-wrap{position:relative;flex-shrink:0}
 #searchInput{padding:7px 14px;border-radius:20px;border:none;font-size:13px;width:220px;background:rgba(255,255,255,.18);color:#fff;outline:none}
@@ -4713,18 +4842,29 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 .sr-ctx mark{background:#fef08a;border-radius:2px;padding:0 2px}
 .sr-empty{padding:14px;text-align:center;color:#94a3b8;font-size:13px}
 .mp-layout{display:flex;min-height:calc(100vh - 52px);height:calc(100vh - 52px);overflow:hidden}
-.mp-nav{width:240px;flex-shrink:0;background:#0f1729;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;padding:12px 0}
+.mp-nav{width:250px;flex-shrink:0;background:#0f1729;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;padding:12px 0}
 .mp-nav ul{list-style:none}
-.mp-nav li{padding:9px 18px;font-size:13px;color:rgba(255,255,255,.65);cursor:pointer;border-radius:6px;margin:1px 8px;transition:all .15s}
-.mp-nav li:hover{background:rgba(255,255,255,.08);color:#fff}
-.mp-nav li.active{background:rgba(255,255,255,.13);color:#fff;font-weight:500}
+.mp-nav-item{margin:1px 0}
+.mp-nav-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 10px 9px 18px;font-size:13px;color:rgba(255,255,255,.65);cursor:pointer;border-radius:6px;margin:0 8px;transition:all .15s}
+.mp-nav-row:hover{background:rgba(255,255,255,.08);color:#fff}
+.mp-nav-row.active{background:rgba(255,255,255,.13);color:#fff;font-weight:500}
+.mp-nav-expand{font-size:10px;color:rgba(255,255,255,.4);padding:2px 6px;transition:transform .15s;flex-shrink:0}
+.mp-nav-expand:hover{color:#fff}
+.mp-nav-item.expanded .mp-nav-expand{transform:rotate(90deg)}
+.mp-nav-subul{list-style:none;max-height:0;overflow:hidden;transition:max-height .2s ease}
+.mp-nav-item.expanded .mp-nav-subul{max-height:600px}
+.mp-nav-sub{padding:7px 18px 7px 32px;font-size:12px;color:rgba(255,255,255,.45);cursor:pointer;border-radius:6px;margin:0 8px;transition:all .15s}
+.mp-nav-sub-lvl2{padding-left:42px;font-size:11.5px}
+.mp-nav-sub:hover{background:rgba(255,255,255,.06);color:#fff}
 .mp-content{flex:1;padding:32px 28px;display:flex;flex-direction:column;align-items:center;overflow-y:auto;min-height:0}
 .mp-page{width:100%;max-width:760px;display:none}
 .mp-page.active{display:block}
+.mp-anchor{scroll-margin-top:16px}
 /* hamburger for mobile nav */
 .mp-nav-toggle{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:2px 6px;margin-right:4px}
 @media(max-width:768px){
-  .mp-nav{position:fixed;left:-260px;top:0;bottom:0;z-index:300;transition:left .25s;height:100vh}
+  .mp-cover-card{padding:40px 28px}
+  .mp-nav{position:fixed;left:-260px;top:0;bottom:0;z-index:300;transition:left .25s;height:100vh;width:270px}
   .mp-nav.open{left:0;box-shadow:4px 0 20px rgba(0,0,0,.3)}
   .mp-content{padding:20px 16px}
   .mp-page{max-width:100%}
@@ -4733,14 +4873,25 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
   .mp-layout{flex-direction:column}
 }
 /* block styles (same as single-page export) */
-@media print{.mp-header,.mp-nav,.mp-nav-toggle{display:none!important}.mp-content{padding:0}.mp-page{display:block!important}}
+@media print{.mp-cover,.mp-header,.mp-nav,.mp-nav-toggle{display:none!important}.mp-shell{display:block!important}.mp-content{padding:0}.mp-page{display:block!important}}
 ${_lbCSS()}
 </style>
 </head>
 <body>
+<div class="mp-cover" id="mpCover">
+  <div class="mp-cover-card">
+    ${logoSVG}
+    <div class="mp-cover-titulo">${esc(titulo)}</div>
+    ${empresa ? `<div class="mp-cover-empresa">${esc(empresa)}</div>` : ''}
+    <div class="mp-cover-fecha">Generado el ${fecha}</div>
+    <button class="mp-cover-btn" onclick="closeCover()">Empezar →</button>
+    ${pages.length > 1 ? `<div class="mp-cover-count">${pages.length} página${pages.length===1?'':'s'} · Manualia</div>` : ''}
+  </div>
+</div>
+<div class="mp-shell" id="mpShell">
 <header class="mp-header">
-  ${pages.length > 1 ? '<button class="mp-nav-toggle" onclick="toggleMobileNav()" title="Menú">☰</button>' : ''}
-  <div style="flex:1;min-width:0">
+  ${showNav ? '<button class="mp-nav-toggle" onclick="toggleMobileNav()" title="Menú">☰</button>' : ''}
+  <div style="flex:1;min-width:0" onclick="openCover()" title="Volver a la portada">
     <h1>${esc(titulo)}</h1>
     ${empresa ? `<div class="empresa">${esc(empresa)}</div>` : ''}
   </div>
@@ -4750,21 +4901,44 @@ ${_lbCSS()}
   </div>
 </header>
 <div class="mp-layout">
-  ${pages.length > 1 ? `<nav class="mp-nav" id="mpNav"><ul>${navItems}</ul></nav>` : ''}
+  ${showNav ? `<nav class="mp-nav" id="mpNav"><ul>${navItems}</ul></nav>` : ''}
   <main class="mp-content">
     ${sections}
   </main>
 </div>
+</div>
 <script>
+// ── Portada ──
+function closeCover() {
+  document.getElementById('mpCover').classList.add('closed');
+  document.getElementById('mpShell').classList.add('open');
+}
+function openCover() {
+  document.getElementById('mpCover').classList.remove('closed');
+  document.getElementById('mpShell').classList.remove('open');
+}
 // ── Navigation ──
-function showPage(id, liEl) {
+function showPage(id, rowEl) {
   document.querySelectorAll('.mp-page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('#mpNav li').forEach(l=>l.classList.remove('active'));
+  document.querySelectorAll('.mp-nav-row').forEach(l=>l.classList.remove('active'));
   const pg = document.getElementById(id);
   if (pg) pg.classList.add('active');
-  if (liEl) liEl.classList.add('active');
+  if (rowEl) rowEl.classList.add('active');
   window.location.hash = id; const mc=document.querySelector('.mp-content');if(mc)mc.scrollTop=0;
   document.querySelector('.mp-nav')?.classList.remove('open');
+}
+function toggleNavExpand(arrowEl) {
+  arrowEl.closest('.mp-nav-item')?.classList.toggle('expanded');
+}
+function goToSection(pageId, anchorId, subEl) {
+  const row = document.querySelector('.mp-nav-row[data-page="'+pageId+'"]');
+  showPage(pageId, row);
+  document.querySelectorAll('.mp-nav-sub').forEach(s=>s.style.fontWeight='');
+  if (subEl) subEl.style.fontWeight = '700';
+  setTimeout(() => {
+    const el = document.getElementById(anchorId);
+    if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+  }, 30);
 }
 function toggleMobileNav() {
   document.getElementById('mpNav')?.classList.toggle('open');
@@ -4778,8 +4952,9 @@ document.addEventListener('click', e => {
 (function(){
   const h = window.location.hash.slice(1);
   if (h) {
-    const li = document.querySelector('#mpNav li[data-page="'+h+'"]');
-    if (li) showPage(h, li);
+    closeCover();
+    const row = document.querySelector('.mp-nav-row[data-page="'+h+'"]');
+    if (row) showPage(h, row);
   }
 })();
 
@@ -4800,7 +4975,7 @@ function doSearch(term) {
   const re = new RegExp(term.replace(/[.*+?^\${}()|[\\]\\\\]/g,'\\\\$&'), 'gi');
   const results = [];
   document.querySelectorAll('.mp-page').forEach(pg => {
-    const pageTitle = (document.querySelector('#mpNav li[data-page="'+pg.id+'"]')?.textContent || '');
+    const pageTitle = (document.querySelector('.mp-nav-row[data-page="'+pg.id+'"] span')?.textContent || '');
     const walker = document.createTreeWalker(pg, NodeFilter.SHOW_TEXT, null, false);
     let node;
     while ((node = walker.nextNode())) {
@@ -4832,8 +5007,8 @@ function doSearch(term) {
 function goToResult(i) {
   const res = window._searchResults?.[i];
   if (!res) return;
-  const li = document.querySelector('#mpNav li[data-page="'+res.pageId+'"]');
-  showPage(res.pageId, li);
+  const row = document.querySelector('.mp-nav-row[data-page="'+res.pageId+'"]');
+  showPage(res.pageId, row);
   closeSearch();
   // Scroll to node and highlight
   try {

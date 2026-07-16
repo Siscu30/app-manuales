@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260716d">
+<link rel="stylesheet" href="styles.css?v=20260717b">
 </head>
 <body>
 
@@ -198,19 +198,6 @@
   </div>
   <div class="sid-chips" id="sid-chips-bloques">
     <input id="block-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar bloque…" aria-label="Buscar tipo de bloque" oninput="filterBlockBtns(this.value)">
-    <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><svg class="icon-svg"><use href="#i-titulo"></use></svg>Título</button>
-    <button class="block-btn" onclick="addBlock('subtitulo')" draggable="true" data-type="subtitulo"><svg class="icon-svg"><use href="#i-subtitulo"></use></svg>Subtítulo</button>
-    <button class="block-btn" onclick="addBlock('alerta')" draggable="true" data-type="alerta"><svg class="icon-svg"><use href="#i-alerta"></use></svg>Alerta</button>
-    <button class="block-btn" onclick="addBlock('paso')" draggable="true" data-type="paso"><svg class="icon-svg"><use href="#i-paso"></use></svg>Paso</button>
-    <button class="block-btn" onclick="addBlock('imagen')" draggable="true" data-type="imagen"><svg class="icon-svg"><use href="#i-imagen"></use></svg>Imagen</button>
-    <button class="block-btn" onclick="addBlock('tabla')" draggable="true" data-type="tabla"><svg class="icon-svg"><use href="#i-tabla"></use></svg>Tabla</button>
-    <button class="block-btn" onclick="addBlock('lista')" draggable="true" data-type="lista"><svg class="icon-svg"><use href="#i-lista"></use></svg>Lista</button>
-    <button class="block-btn" onclick="addBlock('separador')" draggable="true" data-type="separador"><svg class="icon-svg"><use href="#i-separador"></use></svg>Separador</button>
-    <button class="block-btn" onclick="addBlock('texto')" draggable="true" data-type="texto"><svg class="icon-svg"><use href="#i-texto"></use></svg>Texto</button>
-    <button class="block-btn" onclick="addBlock('flujos')" draggable="true" data-type="flujos"><svg class="icon-svg"><use href="#i-flujos"></use></svg>Flujos</button>
-    <button class="block-btn" onclick="addBlock('video')" draggable="true" data-type="video"><svg class="icon-svg"><use href="#i-video"></use></svg>Vídeo</button>
-    <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><svg class="icon-svg"><use href="#i-enlace"></use></svg>Enlace</button>
-    <button class="block-btn" onclick="addBlock('codigo')" draggable="true" data-type="codigo"><svg class="icon-svg"><use href="#i-codigo"></use></svg>Código</button>
   </div>
 
   <hr class="sid-divider">
@@ -759,7 +746,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260716d"></script>
+<script src="app.js?v=20260717b"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>
