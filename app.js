@@ -798,9 +798,9 @@ function renderColorPicker() {
 }
 function setColor(hex) {
   STATE.manual.color = hex;
-  document.documentElement.style.setProperty('--primary', hex);
-  document.documentElement.style.setProperty('--primary-dark', shadeColor(hex,-15));
-  document.documentElement.style.setProperty('--primary-light', hexToLight(hex));
+  document.documentElement.style.setProperty('--manual-color', hex);
+  document.documentElement.style.setProperty('--manual-color-dark', shadeColor(hex,-15));
+  document.documentElement.style.setProperty('--manual-color-light', hexToLight(hex));
   renderColorPicker();
   scheduleLocalSave();
 }
@@ -1785,6 +1785,8 @@ function openManualesPanel() {
   if (!STATE.user) { openAuthModal('Accede para ver tus manuales guardados'); return; }
   document.getElementById('manuales-panel').style.display = 'block';
   document.body.style.overflow = 'hidden';
+  const closeBtn = document.getElementById('mp2-close-btn');
+  if (closeBtn) closeBtn.style.display = (STATE.manual.id || STATE.blocks.length) ? 'inline-flex' : 'none';
   loadManualesPanel('activos');
 }
 
@@ -2140,7 +2142,7 @@ function renderBlockForExport(b, pasoN) {
         ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
       const _expSingle = (src,cap,w) => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(cap||'')}</div>` : '';
-      const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:#7C3AED;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
+      const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:${borderAccent};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
       const _imgArea = (b.src && b.src2)
         ? `<div style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
         : _expSingle(b.src,b.caption,b.imgWidth);
@@ -2175,15 +2177,15 @@ function renderBlockForExport(b, pasoN) {
     case 'video': {
       if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
       if (b.videoType === 'file' && b.storagePath) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls class="lazy-video" data-vpath="${b.storagePath}" style="width:100%;border-radius:6px"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
-      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#7C3AED">${esc(b.url)}</a></div></div>`;
+      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
       const embed = getVideoEmbedUrl(b.url);
       if (embed) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
-      if (b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#7C3AED">${esc(b.url)}</a></div></div>`;
+      if (b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
       return '';
     }
     case 'enlace': {
       const title = b.titulo || b.url || 'Enlace';
-      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:#7C3AED">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
+      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:${color}">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
     }
     case 'codigo': {
       const lang = esc(b.language||'');
@@ -2377,6 +2379,18 @@ function toggleShareMenu() {
 document.addEventListener('click', ev=>{
   if (!ev.target.closest('#share-dropdown')) q('#share-menu')?.classList.remove('open');
 });
+function toggleResourcesMenu() {
+  q('#resources-menu').classList.toggle('open');
+}
+document.addEventListener('click', ev=>{
+  if (!ev.target.closest('#resources-dropdown')) q('#resources-menu')?.classList.remove('open');
+});
+function toggleAccountMenu() {
+  q('#account-menu').classList.toggle('open');
+}
+document.addEventListener('click', ev=>{
+  if (!ev.target.closest('#account-dropdown')) q('#account-menu')?.classList.remove('open');
+});
 
 // ═══════════════════════════════════════════════════════
 // AUTH
@@ -2459,9 +2473,8 @@ async function logout() {
   if (!confirm('¿Cerrar sesión?')) return;
   await sb.auth.signOut();
   STATE.user = null; STATE.role = null;
-  q('#btn-logout').style.display = 'none';
-  q('#btn-cambiar-pass').style.display = 'none';
-  q('#role-btns').innerHTML = '';
+  q('#account-dropdown').style.display = 'none';
+  q('#account-menu')?.classList.remove('open');
   q('#sidebar').style.display = '';
   q('#canvas-wrap').style.marginLeft = '';
   q('#app').style.display = '';
@@ -2490,17 +2503,10 @@ async function ensureAdminExists(userId) {
 }
 
 function applyRoleUI(role) {
-  const btns = q('#role-btns');
-  btns.innerHTML = '';
-  q('#btn-logout').style.display = 'flex';
-  q('#btn-cambiar-pass').style.display = 'flex';
-
-  if (role === 'admin') {
-    btns.innerHTML = `<button class="tb-btn" onclick="openModal('modal-users')">👥 Usuarios</button><a href="admin.html" class="tb-btn" style="text-decoration:none">⚙️ Admin</a>`;
-  }
-  if (role === 'editor') {
-    btns.innerHTML = `<button class="tb-btn" onclick="enviarRevision()">📤 Enviar revisión</button>`;
-  }
+  q('#account-dropdown').style.display = 'block';
+  q('#acc-usuarios').style.display = role === 'admin' ? 'flex' : 'none';
+  q('#acc-admin').style.display = role === 'admin' ? 'flex' : 'none';
+  q('#acc-revision').style.display = role === 'editor' ? 'flex' : 'none';
   if (role === 'admin' && STATE.manual.id && STATE.manual.estado === 'en_revision') {
     // Already handled by revision banner
   }
@@ -4900,21 +4906,16 @@ async function handleSession(session) {
         render();
         renderPagesPanel();
       } else if (!draft && _noWork) {
-        const restoreId = lastId;
-        if (restoreId) {
-          loadManual(restoreId).catch(() => {});
-        } else {
-          sb.from('manuales').select('id').neq('estado','papelera').order('updated_at',{ascending:false}).limit(1)
-            .then(({ data }) => { if (data?.length) loadManual(data[0].id).catch(()=>{}); });
-        }
+        // Sin trabajo en curso: aterriza en Gestión (Mis Manuales) en vez de
+        // abrir directo el último manual editado.
+        openManualesPanel();
       }
     }
   } else {
     _sessionInitialized = false;
     STATE.user = null; STATE.role = null;
-    q('#btn-logout').style.display = 'none';
-    q('#btn-cambiar-pass').style.display = 'none';
-    q('#role-btns').innerHTML = '';
+    q('#account-dropdown').style.display = 'none';
+    q('#account-menu')?.classList.remove('open');
     q('#sidebar').style.display = '';
     q('#canvas-wrap').style.marginLeft = '';
     showAuthScreen();

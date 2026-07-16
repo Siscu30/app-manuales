@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260716b">
+<link rel="stylesheet" href="styles.css?v=20260716c">
 </head>
 <body>
 
@@ -131,6 +131,15 @@
     <path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2"/>
     <path d="M6.5 7l1 12.5A2 2 0 0 0 9.5 21h5a2 2 0 0 0 2-2L18.5 7"/>
     <path d="M10 11v6M14 11v6"/>
+  </symbol>
+  <symbol id="i-account" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="8.2" r="3.6"/>
+    <path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/>
+  </symbol>
+  <symbol id="i-resources" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+    <rect x="3.5" y="4" width="17" height="16" rx="2"/>
+    <path d="M3.5 9h17"/>
+    <circle cx="7" cy="6.5" r=".9" fill="currentColor" stroke="none"/>
   </symbol>
 </svg>
 
@@ -304,8 +313,6 @@
   <div class="topbar-spacer"></div>
   <span id="save-status"></span>
   <span id="stats-indicator" style="font-size:11px;color:rgba(var(--shell-fg-rgb),.35);white-space:nowrap;margin:0 6px"></span>
-  <div id="role-btns"></div>
-  <div class="topbar-sep"></div>
   <div class="color-picker" id="color-picker"></div>
   <div class="topbar-sep"></div>
   <div class="dropdown" id="share-dropdown">
@@ -318,13 +325,27 @@
       <div class="dropdown-item" onclick="window.print()">🖨 Imprimir / PDF</div>
     </div>
   </div>
-  <button class="tb-btn" onclick="openMediaGallery()" title="Repositorio de imágenes del manual"><svg class="icon-svg"><use href="#i-gallery"></use></svg>Imágenes</button>
-  <button class="tb-btn" onclick="toggleTextBank()" title="Banco de texto (pantalla dividida)"><svg class="icon-svg"><use href="#i-textbank"></use></svg>Textos</button>
-  <button class="tb-btn" onclick="openManualTrash()" title="Papelera del manual (bloques eliminados)"><svg class="icon-svg"><use href="#i-trash"></use></svg></button>
+  <div class="dropdown" id="resources-dropdown">
+    <button class="tb-btn" onclick="toggleResourcesMenu()"><svg class="icon-svg"><use href="#i-resources"></use></svg>Recursos ▾</button>
+    <div class="dropdown-menu" id="resources-menu">
+      <div class="dropdown-item" onclick="openMediaGallery()"><svg class="icon-svg"><use href="#i-gallery"></use></svg>Imágenes</div>
+      <div class="dropdown-item" onclick="toggleTextBank()"><svg class="icon-svg"><use href="#i-textbank"></use></svg>Banco de texto</div>
+      <div class="dropdown-item" onclick="openManualTrash()"><svg class="icon-svg"><use href="#i-trash"></use></svg>Papelera del manual</div>
+    </div>
+  </div>
   <button class="tb-btn primary" id="btn-guardar" onclick="guardar()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
-  <button class="tb-btn" id="btn-cambiar-pass" onclick="showSetPasswordModal(false)" title="Cambiar contraseña" style="display:none">🔑</button>
   <button class="tb-btn" id="btn-theme-toggle" onclick="toggleTheme()" title="Cambiar tema (claro/oscuro)">🌙</button>
-  <button class="tb-btn danger" onclick="logout()" id="btn-logout" title="Cerrar sesión" style="display:none">⎋ Salir</button>
+  <div class="dropdown" id="account-dropdown" style="display:none">
+    <button class="tb-btn" onclick="toggleAccountMenu()" title="Cuenta"><svg class="icon-svg"><use href="#i-account"></use></svg></button>
+    <div class="dropdown-menu" id="account-menu" style="right:0;min-width:210px">
+      <div class="dropdown-item" id="acc-revision" onclick="enviarRevision()" style="display:none">📤 Enviar revisión</div>
+      <div class="dropdown-item" id="acc-usuarios" onclick="openModal('modal-users')" style="display:none"><svg class="icon-svg"><use href="#i-account"></use></svg>Usuarios</div>
+      <div class="dropdown-item" id="acc-admin" style="display:none"><a href="admin.html" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;width:100%">⚙️ Administración</a></div>
+      <div class="dropdown-item" id="acc-cambiar-pass" onclick="showSetPasswordModal(false)">🔑 Cambiar contraseña</div>
+      <div class="dropdown-divider"></div>
+      <div class="dropdown-item" id="acc-logout" onclick="logout()" style="color:#fca5a5">⎋ Salir</div>
+    </div>
+  </div>
 </div>
 <input type="file" id="import-html-input" accept=".html,.htm" style="display:none" onchange="importHTMLFile(this)">
 
@@ -692,10 +713,17 @@
 <!-- ── MANUALES PANEL ── -->
 <div id="manuales-panel" style="display:none">
   <div class="mp2-bar">
-    <h2>📚 Mis Manuales</h2>
-    <button class="mp2-close" onclick="closeManualesPanel()">✕ Cerrar</button>
+    <span class="mp2-bar-logo"><svg width="24" height="24"><use href="#i-logo"></use></svg></span>
+    <h2>Manualia</h2>
+    <button class="mp2-close" id="mp2-close-btn" onclick="closeManualesPanel()" style="display:none">✕ Cerrar</button>
   </div>
   <div class="mp2-body">
+    <div class="mp2-quickbar">
+      <button class="btn btn-primary" onclick="closeManualesPanel();nuevoManual()"><svg class="icon-svg"><use href="#i-new"></use></svg>Nuevo manual</button>
+      <button class="btn" onclick="closeManualesPanel();openUnifiedImportModal()"><svg class="icon-svg"><use href="#i-import"></use></svg>Importar</button>
+      <button class="btn" onclick="closeManualesPanel();openTemplatesModal()"><svg class="icon-svg"><use href="#i-templates"></use></svg>Plantillas</button>
+      <button class="btn" onclick="closeManualesPanel();openVersionHistory()"><svg class="icon-svg"><use href="#i-history"></use></svg>Historial</button>
+    </div>
     <div class="mp2-tabs">
       <button class="mp2-tab active" id="mp2-tab-activos" onclick="switchManualesTab('activos')">📄 Activos</button>
       <button class="mp2-tab" id="mp2-tab-papelera" onclick="switchManualesTab('papelera')">🗑 Papelera</button>
@@ -731,7 +759,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260716b"></script>
+<script src="app.js?v=20260716c"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>
