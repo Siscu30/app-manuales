@@ -1,6 +1,25 @@
 // Fuerza recarga si la página viene del bfcache (pulsar Atrás) para evitar estado congelado
 window.addEventListener('pageshow', function(e) { if (e.persisted) window.location.reload(); });
 
+// ── Tema (claro/oscuro) ── aplicado lo antes posible para evitar parpadeo
+(function() {
+  const saved = localStorage.getItem('app_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+})();
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = cur === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('app_theme', next);
+  const btn = document.getElementById('btn-theme-toggle');
+  if (btn) { btn.textContent = next === 'light' ? '☀️' : '🌙'; btn.title = next === 'light' ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'; }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('btn-theme-toggle');
+  const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  if (btn) { btn.textContent = cur === 'light' ? '☀️' : '🌙'; btn.title = cur === 'light' ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'; }
+});
+
 // ═══════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════
@@ -531,7 +550,7 @@ const BLOCK_TYPES = {
     },
     editorHTML(b) {
       const vt = b.videoType || 'link';
-      const tab = (t, icon, label) => `<span id="be-vtab-${t}" style="flex:1;cursor:pointer;text-align:center;padding:8px 4px;border-radius:6px;border:2px solid ${vt===t?'var(--primary)':'var(--border-color)'};font-size:13px;font-weight:${vt===t?600:400};background:${vt===t?'rgba(37,99,235,0.08)':'transparent'}" onclick="switchVideoTab('${t}')">${icon} ${label}</span>`;
+      const tab = (t, icon, label) => `<span id="be-vtab-${t}" style="flex:1;cursor:pointer;text-align:center;padding:8px 4px;border-radius:6px;border:2px solid ${vt===t?'var(--primary)':'var(--border-color)'};font-size:13px;font-weight:${vt===t?600:400};background:${vt===t?'rgba(124,58,237,0.08)':'transparent'}" onclick="switchVideoTab('${t}')">${icon} ${label}</span>`;
       return `<div style="display:flex;gap:6px;margin-bottom:16px">
         ${tab('link','🔗','Enlace')}${tab('file','📹','MP4')}${tab('pdf','📄','PDF')}
       </div>
@@ -2121,7 +2140,7 @@ function renderBlockForExport(b, pasoN) {
         ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
       const _expSingle = (src,cap,w) => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(cap||'')}</div>` : '';
-      const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
+      const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:#7C3AED;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
       const _imgArea = (b.src && b.src2)
         ? `<div style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
         : _expSingle(b.src,b.caption,b.imgWidth);
@@ -2156,15 +2175,15 @@ function renderBlockForExport(b, pasoN) {
     case 'video': {
       if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
       if (b.videoType === 'file' && b.storagePath) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls class="lazy-video" data-vpath="${b.storagePath}" style="width:100%;border-radius:6px"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
-      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#2563eb">${esc(b.url)}</a></div></div>`;
+      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#7C3AED">${esc(b.url)}</a></div></div>`;
       const embed = getVideoEmbedUrl(b.url);
       if (embed) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
-      if (b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#2563eb">${esc(b.url)}</a></div></div>`;
+      if (b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:#7C3AED">${esc(b.url)}</a></div></div>`;
       return '';
     }
     case 'enlace': {
       const title = b.titulo || b.url || 'Enlace';
-      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:#2563eb">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
+      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:#7C3AED">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
     }
     case 'codigo': {
       const lang = esc(b.language||'');
@@ -2258,7 +2277,7 @@ function switchVideoTab(t) {
     if (vtab) {
       vtab.style.borderColor = tab === t ? 'var(--primary)' : 'var(--border-color)';
       vtab.style.fontWeight = tab === t ? '600' : '400';
-      vtab.style.background = tab === t ? 'rgba(37,99,235,0.08)' : 'transparent';
+      vtab.style.background = tab === t ? 'rgba(124,58,237,0.08)' : 'transparent';
     }
   });
   const vtype = document.getElementById('be-vtype');

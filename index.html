@@ -6,16 +6,133 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Constructor de Manuales</title>
+<title>Manualia</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
 <link rel="apple-touch-icon" href="favicon.svg?v=1">
 <meta name="theme-color" content="#7C3AED">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260713b">
+<link rel="stylesheet" href="styles.css?v=20260716b">
 </head>
 <body>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24">
+    <rect x="3" y="4" width="18" height="4" rx="1.5" fill="var(--primary)"/>
+    <rect x="3" y="10" width="18" height="4" rx="1.5" fill="var(--accent)"/>
+    <rect x="3" y="16" width="13" height="4" rx="1.5" fill="var(--accent-light)"/>
+  </symbol>
+  <symbol id="i-new" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+    <path d="M14 3v4h4"/>
+    <rect x="8" y="14.5" width="8" height="1.8" rx=".9" fill="var(--primary)" stroke="none"/>
+  </symbol>
+  <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3.5v9.5"/>
+    <path d="M8 9.5l4 4 4-4"/>
+    <path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>
+    <rect x="5.5" y="18" width="13" height="1.8" rx=".9" fill="var(--primary)" stroke="none"/>
+  </symbol>
+  <symbol id="i-library" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+    <rect x="2.5" y="3" width="19" height="18" rx="2.5"/>
+    <rect x="6" y="7" width="12" height="2.6" rx="1.3" fill="currentColor" opacity=".55" stroke="none"/>
+    <rect x="6" y="11.2" width="12" height="2.6" rx="1.3" fill="currentColor" opacity=".55" stroke="none"/>
+    <rect x="6" y="15.4" width="8" height="2.6" rx="1.3" fill="var(--primary)" stroke="none"/>
+  </symbol>
+  <symbol id="i-import" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3.5v9.5"/>
+    <path d="M8 9.5l4 4 4-4"/>
+    <path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>
+    <path d="M2.5 15h2M19.5 15h2" stroke="var(--primary)" stroke-width="2"/>
+  </symbol>
+  <symbol id="i-templates" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+    <rect x="3" y="3" width="18" height="18" rx="2.5" stroke-dasharray="3 2.5"/>
+    <rect x="6.5" y="8" width="11" height="2" rx="1" fill="currentColor" opacity=".5" stroke="none"/>
+    <rect x="6.5" y="12" width="11" height="2" rx="1" fill="currentColor" opacity=".5" stroke="none"/>
+    <rect x="6.5" y="16" width="7" height="2" rx="1" fill="var(--primary)" stroke="none"/>
+  </symbol>
+  <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="13" r="8" stroke-width="1.6"/>
+    <path d="M12 9v4l3 2"/>
+    <path d="M8.5 4.2A9 9 0 0 1 12 3.5" stroke-linecap="round"/>
+    <circle cx="12" cy="13" r="1.3" fill="var(--primary)" stroke="none"/>
+  </symbol>
+  <symbol id="i-titulo" viewBox="0 0 24 24">
+    <rect x="4" y="6" width="16" height="3.4" rx="1" fill="currentColor"/>
+    <rect x="4" y="14" width="10" height="2" rx="1" fill="currentColor" opacity=".5"/>
+  </symbol>
+  <symbol id="i-subtitulo" viewBox="0 0 24 24">
+    <rect x="4" y="7.2" width="16" height="2.4" rx="1" fill="currentColor" opacity=".85"/>
+    <rect x="4" y="13" width="11" height="2.4" rx="1" fill="currentColor" opacity=".5"/>
+  </symbol>
+  <symbol id="i-alerta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M12 4l9 16H3z"/>
+    <path d="M12 10v4"/>
+    <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/>
+  </symbol>
+  <symbol id="i-paso" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8.5"/>
+    <path d="M10 8l4 4-4 4"/>
+  </symbol>
+  <symbol id="i-imagen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+    <rect x="3" y="4.5" width="18" height="15" rx="2"/>
+    <circle cx="8.5" cy="9.5" r="1.6" fill="currentColor" stroke="none"/>
+    <path d="M4 16l5-5 4 4 3-3 5 5"/>
+  </symbol>
+  <symbol id="i-tabla" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <rect x="3.5" y="4" width="17" height="16" rx="1.5"/>
+    <path d="M3.5 10h17M3.5 15h17M10 4v16M15 4v16"/>
+  </symbol>
+  <symbol id="i-lista" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 6.5l1.6 1.6L9.5 5"/>
+    <path d="M12 6.5h8"/>
+    <path d="M5 12.5l1.6 1.6 2.9-3.2"/>
+    <path d="M12 12.5h8"/>
+    <path d="M5 18.5l1.6 1.6 2.9-3.2"/>
+    <path d="M12 18.5h8"/>
+  </symbol>
+  <symbol id="i-separador" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M3 12h4M10.5 12h3M17 12h4"/>
+  </symbol>
+  <symbol id="i-texto" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+    <path d="M4 6h16M4 11h16M4 16h11"/>
+  </symbol>
+  <symbol id="i-flujos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+    <rect x="3" y="4" width="7" height="5" rx="1.3"/>
+    <rect x="14" y="4" width="7" height="5" rx="1.3"/>
+    <rect x="8.5" y="15" width="7" height="5" rx="1.3"/>
+    <path d="M10 6.5h4M6.5 9v3.5a2 2 0 0 0 2 2h1.5M17.5 9v3.5a2 2 0 0 1-2 2h-1.5"/>
+  </symbol>
+  <symbol id="i-video" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <rect x="3" y="5" width="18" height="14" rx="2"/>
+    <path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/>
+  </symbol>
+  <symbol id="i-enlace" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+    <path d="M9 15l6-6"/>
+    <path d="M8 16.5a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 0 1 5 0"/>
+    <path d="M16 7.5a3.5 3.5 0 0 1 0 5l-2 2a3.5 3.5 0 0 1-5 0"/>
+  </symbol>
+  <symbol id="i-codigo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8.5 8l-4.5 4 4.5 4M15.5 8l4.5 4-4.5 4M13.5 5.5l-3 13"/>
+  </symbol>
+  <symbol id="i-gallery" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+    <rect x="5" y="7" width="14" height="12" rx="1.8"/>
+    <path d="M8 4.5h10a1.8 1.8 0 0 1 1.8 1.8v9.7"/>
+    <circle cx="9.3" cy="11" r="1.2" fill="currentColor" stroke="none"/>
+    <path d="M6 17l3.2-3.2 2.3 2 3-3.5L19 17"/>
+  </symbol>
+  <symbol id="i-textbank" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+    <rect x="4" y="3.5" width="16" height="17" rx="2"/>
+    <path d="M7.5 8h9M7.5 12h9M7.5 16h5.5"/>
+  </symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 7h16"/>
+    <path d="M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2"/>
+    <path d="M6.5 7l1 12.5A2 2 0 0 0 9.5 21h5a2 2 0 0 0 2-2L18.5 7"/>
+    <path d="M10 11v6M14 11v6"/>
+  </symbol>
+</svg>
 
 <!-- ── LOADING ── -->
 <div id="loading"><div class="spinner"></div><span>Cargando...</span></div>
@@ -23,8 +140,8 @@
 <!-- ── AUTH SCREEN ── -->
 <div id="auth-screen" class="hidden">
   <div class="auth-card">
-    <div style="font-size:40px;margin-bottom:12px">📋</div>
-    <h1>Constructor de Manuales</h1>
+    <div style="margin-bottom:14px"><svg width="44" height="44"><use href="#i-logo"></use></svg></div>
+    <h1>Manualia</h1>
     <p class="auth-sub" id="auth-subtitle">Introduce tus credenciales</p>
     <div class="form-group">
       <input type="email" id="auth-email" class="form-input" placeholder="tu@empresa.com" autocomplete="email" onkeydown="if(event.key==='Enter')q('#auth-password').focus()">
@@ -50,20 +167,20 @@
 <!-- ── SIDEBAR (fixed, full-height) ── -->
 <aside id="sidebar" role="navigation" aria-label="Panel lateral de bloques y herramientas">
   <div class="sid-header">
-    <span class="sid-logo">📋</span>
-    <span class="sid-brand">Manuales</span>
+    <span class="sid-logo"><svg class="icon-svg" width="22" height="22"><use href="#i-logo"></use></svg></span>
+    <span class="sid-brand">Manualia</span>
   </div>
 
   <div class="sb-section-hdr" onclick="toggleSidSection('sid-chips-manuales','arrow-manuales')">
     <span>Manuales</span><span class="sb-toggle" id="arrow-manuales">▼</span>
   </div>
   <div class="sid-chips" id="sid-chips-manuales">
-    <button class="block-btn" onclick="nuevoManual()"><span class="icon">📄</span>Nuevo</button>
-    <button class="block-btn" onclick="guardar()"><span class="icon">💾</span>Guardar</button>
-    <button class="block-btn" onclick="openMisManuals()"><span class="icon">📂</span>Manuales</button>
-    <button class="block-btn" onclick="openUnifiedImportModal()"><span class="icon">📥</span>Importar</button>
-    <button class="block-btn" onclick="openTemplatesModal()"><span class="icon">📋</span>Plantillas</button>
-    <button class="block-btn" onclick="openVersionHistory()"><span class="icon">🕐</span>Historial</button>
+    <button class="block-btn" onclick="nuevoManual()"><svg class="icon-svg"><use href="#i-new"></use></svg>Nuevo</button>
+    <button class="block-btn" onclick="guardar()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
+    <button class="block-btn" onclick="openMisManuals()"><svg class="icon-svg"><use href="#i-library"></use></svg>Manuales</button>
+    <button class="block-btn" onclick="openUnifiedImportModal()"><svg class="icon-svg"><use href="#i-import"></use></svg>Importar</button>
+    <button class="block-btn" onclick="openTemplatesModal()"><svg class="icon-svg"><use href="#i-templates"></use></svg>Plantillas</button>
+    <button class="block-btn" onclick="openVersionHistory()"><svg class="icon-svg"><use href="#i-history"></use></svg>Historial</button>
   </div>
 
   <hr class="sid-divider">
@@ -72,19 +189,19 @@
   </div>
   <div class="sid-chips" id="sid-chips-bloques">
     <input id="block-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar bloque…" aria-label="Buscar tipo de bloque" oninput="filterBlockBtns(this.value)">
-    <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><span class="icon">📑</span>Título</button>
-    <button class="block-btn" onclick="addBlock('subtitulo')" draggable="true" data-type="subtitulo"><span class="icon">🔹</span>Subtítulo</button>
-    <button class="block-btn" onclick="addBlock('alerta')" draggable="true" data-type="alerta"><span class="icon">⚠️</span>Alerta</button>
-    <button class="block-btn" onclick="addBlock('paso')" draggable="true" data-type="paso"><span class="icon">🔢</span>Paso</button>
-    <button class="block-btn" onclick="addBlock('imagen')" draggable="true" data-type="imagen"><span class="icon">🖼</span>Imagen</button>
-    <button class="block-btn" onclick="addBlock('tabla')" draggable="true" data-type="tabla"><span class="icon">📊</span>Tabla</button>
-    <button class="block-btn" onclick="addBlock('lista')" draggable="true" data-type="lista"><span class="icon">✅</span>Lista</button>
-    <button class="block-btn" onclick="addBlock('separador')" draggable="true" data-type="separador"><span class="icon">—</span>Separador</button>
-    <button class="block-btn" onclick="addBlock('texto')" draggable="true" data-type="texto"><span class="icon">📝</span>Texto</button>
-    <button class="block-btn" onclick="addBlock('flujos')" draggable="true" data-type="flujos"><span class="icon">🔀</span>Flujos</button>
-    <button class="block-btn" onclick="addBlock('video')" draggable="true" data-type="video"><span class="icon">🎬</span>Vídeo</button>
-    <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><span class="icon">🔗</span>Enlace</button>
-    <button class="block-btn" onclick="addBlock('codigo')" draggable="true" data-type="codigo"><span class="icon">💻</span>Código</button>
+    <button class="block-btn" onclick="addBlock('titulo')" draggable="true" data-type="titulo"><svg class="icon-svg"><use href="#i-titulo"></use></svg>Título</button>
+    <button class="block-btn" onclick="addBlock('subtitulo')" draggable="true" data-type="subtitulo"><svg class="icon-svg"><use href="#i-subtitulo"></use></svg>Subtítulo</button>
+    <button class="block-btn" onclick="addBlock('alerta')" draggable="true" data-type="alerta"><svg class="icon-svg"><use href="#i-alerta"></use></svg>Alerta</button>
+    <button class="block-btn" onclick="addBlock('paso')" draggable="true" data-type="paso"><svg class="icon-svg"><use href="#i-paso"></use></svg>Paso</button>
+    <button class="block-btn" onclick="addBlock('imagen')" draggable="true" data-type="imagen"><svg class="icon-svg"><use href="#i-imagen"></use></svg>Imagen</button>
+    <button class="block-btn" onclick="addBlock('tabla')" draggable="true" data-type="tabla"><svg class="icon-svg"><use href="#i-tabla"></use></svg>Tabla</button>
+    <button class="block-btn" onclick="addBlock('lista')" draggable="true" data-type="lista"><svg class="icon-svg"><use href="#i-lista"></use></svg>Lista</button>
+    <button class="block-btn" onclick="addBlock('separador')" draggable="true" data-type="separador"><svg class="icon-svg"><use href="#i-separador"></use></svg>Separador</button>
+    <button class="block-btn" onclick="addBlock('texto')" draggable="true" data-type="texto"><svg class="icon-svg"><use href="#i-texto"></use></svg>Texto</button>
+    <button class="block-btn" onclick="addBlock('flujos')" draggable="true" data-type="flujos"><svg class="icon-svg"><use href="#i-flujos"></use></svg>Flujos</button>
+    <button class="block-btn" onclick="addBlock('video')" draggable="true" data-type="video"><svg class="icon-svg"><use href="#i-video"></use></svg>Vídeo</button>
+    <button class="block-btn" onclick="addBlock('enlace')" draggable="true" data-type="enlace"><svg class="icon-svg"><use href="#i-enlace"></use></svg>Enlace</button>
+    <button class="block-btn" onclick="addBlock('codigo')" draggable="true" data-type="codigo"><svg class="icon-svg"><use href="#i-codigo"></use></svg>Código</button>
   </div>
 
   <hr class="sid-divider">
@@ -182,11 +299,11 @@
 <div id="topbar" role="toolbar" aria-label="Barra de herramientas del manual">
   <button id="tb-hamburger" aria-label="Abrir menú lateral" onclick="document.getElementById('sidebar').classList.toggle('open')" title="Menú">☰</button>
   <input id="manual-titulo" type="text" value="Nuevo manual" spellcheck="false" title="Título del manual" aria-label="Título del manual">
-  <span style="color:rgba(255,255,255,.2);font-size:12px;flex-shrink:0">·</span>
+  <span style="color:rgba(var(--shell-fg-rgb),.2);font-size:12px;flex-shrink:0">·</span>
   <input id="manual-empresa" type="text" placeholder="Empresa" spellcheck="false" aria-label="Nombre de la empresa">
   <div class="topbar-spacer"></div>
   <span id="save-status"></span>
-  <span id="stats-indicator" style="font-size:11px;color:rgba(255,255,255,.35);white-space:nowrap;margin:0 6px"></span>
+  <span id="stats-indicator" style="font-size:11px;color:rgba(var(--shell-fg-rgb),.35);white-space:nowrap;margin:0 6px"></span>
   <div id="role-btns"></div>
   <div class="topbar-sep"></div>
   <div class="color-picker" id="color-picker"></div>
@@ -201,11 +318,12 @@
       <div class="dropdown-item" onclick="window.print()">🖨 Imprimir / PDF</div>
     </div>
   </div>
-  <button class="tb-btn" onclick="openMediaGallery()" title="Repositorio de imágenes del manual">🖼 Imágenes</button>
-  <button class="tb-btn" onclick="toggleTextBank()" title="Banco de texto (pantalla dividida)">📝 Textos</button>
-  <button class="tb-btn" onclick="openManualTrash()" title="Papelera del manual (bloques eliminados)">🗑</button>
-  <button class="tb-btn primary" id="btn-guardar" onclick="guardar()">💾 Guardar</button>
+  <button class="tb-btn" onclick="openMediaGallery()" title="Repositorio de imágenes del manual"><svg class="icon-svg"><use href="#i-gallery"></use></svg>Imágenes</button>
+  <button class="tb-btn" onclick="toggleTextBank()" title="Banco de texto (pantalla dividida)"><svg class="icon-svg"><use href="#i-textbank"></use></svg>Textos</button>
+  <button class="tb-btn" onclick="openManualTrash()" title="Papelera del manual (bloques eliminados)"><svg class="icon-svg"><use href="#i-trash"></use></svg></button>
+  <button class="tb-btn primary" id="btn-guardar" onclick="guardar()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
   <button class="tb-btn" id="btn-cambiar-pass" onclick="showSetPasswordModal(false)" title="Cambiar contraseña" style="display:none">🔑</button>
+  <button class="tb-btn" id="btn-theme-toggle" onclick="toggleTheme()" title="Cambiar tema (claro/oscuro)">🌙</button>
   <button class="tb-btn danger" onclick="logout()" id="btn-logout" title="Cerrar sesión" style="display:none">⎋ Salir</button>
 </div>
 <input type="file" id="import-html-input" accept=".html,.htm" style="display:none" onchange="importHTMLFile(this)">
@@ -613,7 +731,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260713b"></script>
+<script src="app.js?v=20260716b"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>
