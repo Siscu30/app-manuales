@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btn) { btn.textContent = cur === 'light' ? '☀️' : '🌙'; btn.title = cur === 'light' ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'; }
   loadBlockPaletteOrderLocal();
   renderBlockPalette();
+  loadManualesOrderLocal();
+  renderManualesActions();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -27,14 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // ═══════════════════════════════════════════════════════
 const SUPABASE_URL = 'https://tbeqkabdkqffdcufvfof.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXFrYWJka3FmZmRjdWZ2Zm9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NzA3NjYsImV4cCI6MjA5NzM0Njc2Nn0.bPywboiecnWj7XHhWoM1ACG26mId4Naa5CYFSPAwzYg';
-const COLORS = [
-  {name:'Azul',    hex:'#2563EB'},
-  {name:'Verde',   hex:'#16A34A'},
-  {name:'Rojo',    hex:'#DC2626'},
-  {name:'Morado',  hex:'#7C3AED'},
-  {name:'Naranja', hex:'#EA580C'},
-  {name:'Gris',    hex:'#4B5563'},
-];
 const EMOJIS = ['📋','📄','📌','🔧','⚙️','🛠','📊','🖥','🖨','📡','🔑','🔐','📁','💡','🚀','✅','⚡','🔍','📞','🏢'];
 
 // ═══════════════════════════════════════════════════════
@@ -67,10 +61,12 @@ let STATE = {
   isDirty: false,
   autoSaveTimer: null,
   blockPaletteOrder: null,
+  manualesActionsOrder: null,
 };
 
 // ═══════════════════════════════════════════════════════
-// PALETA DE BLOQUES (sidebar) — orden reordenable y persistente por usuario
+// PALETA DE BLOQUES + ACCIONES "MANUALES" (sidebar) — orden reordenable
+// por arrastre (drag & drop) y persistente por usuario
 // ═══════════════════════════════════════════════════════
 const BLOCK_PALETTE_META = {
   titulo:     { icon: 'i-titulo',     label: 'Título' },
@@ -89,6 +85,16 @@ const BLOCK_PALETTE_META = {
 };
 const DEFAULT_BLOCK_ORDER = ['titulo','subtitulo','alerta','paso','imagen','tabla','lista','separador','texto','flujos','video','enlace','codigo'];
 
+const MANUALES_ACTIONS_META = {
+  nuevo:      { icon: 'i-new',       label: 'Nuevo',      onclick: 'nuevoManual()' },
+  guardar:    { icon: 'i-save',      label: 'Guardar',    onclick: 'guardar()' },
+  manuales:   { icon: 'i-library',   label: 'Manuales',   onclick: 'openMisManuals()' },
+  importar:   { icon: 'i-import',    label: 'Importar',   onclick: 'openUnifiedImportModal()' },
+  plantillas: { icon: 'i-templates', label: 'Plantillas', onclick: 'openTemplatesModal()' },
+  historial:  { icon: 'i-history',   label: 'Historial',  onclick: 'openVersionHistory()' },
+};
+const DEFAULT_MANUALES_ORDER = ['nuevo','guardar','manuales','importar','plantillas','historial'];
+
 function renderBlockPalette() {
   const cont = document.getElementById('sid-chips-bloques');
   if (!cont) return;
@@ -98,28 +104,11 @@ function renderBlockPalette() {
   const chips = order.map((type, i) => {
     const meta = BLOCK_PALETTE_META[type];
     if (!meta) return '';
-    return `<button class="block-btn" onclick="addBlock('${type}')" draggable="true" data-type="${type}">
-      <span class="bp-reorder">
-        <span class="bp-arrow" onclick="event.stopPropagation();event.preventDefault();moveBlockPalette('${type}',-1)" onmousedown="event.stopPropagation()" title="Mover antes">▲</span>
-        <span class="bp-arrow" onclick="event.stopPropagation();event.preventDefault();moveBlockPalette('${type}',1)" onmousedown="event.stopPropagation()" title="Mover después">▼</span>
-      </span>
+    return `<button class="block-btn" onclick="addBlock('${type}')" draggable="true" data-type="${type}" data-reorder-group="bloques" data-reorder-index="${i}" data-reorder-key="${type}">
       <svg class="icon-svg"><use href="#${meta.icon}"></use></svg>${meta.label}
     </button>`;
   }).join('');
   cont.innerHTML = `<input id="block-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar bloque…" aria-label="Buscar tipo de bloque" oninput="filterBlockBtns(this.value)" value="${search ? search.value.replace(/"/g,'&quot;') : ''}">` + chips;
-}
-
-function moveBlockPalette(type, dir) {
-  const order = (STATE.blockPaletteOrder && STATE.blockPaletteOrder.length === DEFAULT_BLOCK_ORDER.length)
-    ? STATE.blockPaletteOrder.slice() : DEFAULT_BLOCK_ORDER.slice();
-  const i = order.indexOf(type);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= order.length) return;
-  [order[i], order[j]] = [order[j], order[i]];
-  STATE.blockPaletteOrder = order;
-  renderBlockPalette();
-  try { localStorage.setItem('block_palette_order', JSON.stringify(order)); } catch(e) {}
-  saveUserPrefs();
 }
 function loadBlockPaletteOrderLocal() {
   try {
@@ -128,6 +117,89 @@ function loadBlockPaletteOrderLocal() {
       STATE.blockPaletteOrder = saved;
     }
   } catch(e) {}
+}
+
+function renderManualesActions() {
+  const cont = document.getElementById('sid-chips-manuales');
+  if (!cont) return;
+  const order = (STATE.manualesActionsOrder && STATE.manualesActionsOrder.length === DEFAULT_MANUALES_ORDER.length)
+    ? STATE.manualesActionsOrder : DEFAULT_MANUALES_ORDER;
+  cont.innerHTML = order.map((key, i) => {
+    const meta = MANUALES_ACTIONS_META[key];
+    if (!meta) return '';
+    return `<button class="block-btn" onclick="${meta.onclick}" draggable="true" data-reorder-group="manuales" data-reorder-index="${i}" data-reorder-key="${key}">
+      <svg class="icon-svg"><use href="#${meta.icon}"></use></svg>${meta.label}
+    </button>`;
+  }).join('');
+}
+function loadManualesOrderLocal() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('manuales_actions_order') || 'null');
+    if (Array.isArray(saved) && saved.length === DEFAULT_MANUALES_ORDER.length && saved.every(k => MANUALES_ACTIONS_META[k])) {
+      STATE.manualesActionsOrder = saved;
+    }
+  } catch(e) {}
+}
+
+// ── Motor genérico de reordenar por arrastre (grupos independientes) ──
+let _reorderDrag = null; // { group, fromIndex }
+document.addEventListener('dragstart', ev => {
+  const el = ev.target.closest('[data-reorder-group]');
+  if (!el) return;
+  _reorderDrag = { group: el.dataset.reorderGroup, fromIndex: parseInt(el.dataset.reorderIndex, 10) };
+  el.classList.add('reordering');
+  ev.dataTransfer.effectAllowed = 'move';
+  try { ev.dataTransfer.setData('text/plain', 'reorder'); } catch(e) {}
+});
+document.addEventListener('dragover', ev => {
+  if (!_reorderDrag) return;
+  const el = ev.target.closest('[data-reorder-group]');
+  if (!el || el.dataset.reorderGroup !== _reorderDrag.group) return;
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = 'move';
+  el.classList.add('reorder-over');
+});
+document.addEventListener('dragleave', ev => {
+  const el = ev.target.closest('[data-reorder-group]');
+  if (el) el.classList.remove('reorder-over');
+});
+document.addEventListener('drop', ev => {
+  if (!_reorderDrag) return;
+  const el = ev.target.closest('[data-reorder-group]');
+  if (!el || el.dataset.reorderGroup !== _reorderDrag.group) return;
+  ev.preventDefault();
+  el.classList.remove('reorder-over');
+  const toIndex = parseInt(el.dataset.reorderIndex, 10);
+  _applyReorder(_reorderDrag.group, _reorderDrag.fromIndex, toIndex);
+  _reorderDrag = null;
+});
+document.addEventListener('dragend', () => {
+  document.querySelectorAll('.reordering,.reorder-over').forEach(el => el.classList.remove('reordering','reorder-over'));
+  _reorderDrag = null;
+});
+function _applyReorder(group, fromIndex, toIndex) {
+  if (fromIndex === toIndex) return;
+  if (group === 'bloques') {
+    const order = (STATE.blockPaletteOrder && STATE.blockPaletteOrder.length === DEFAULT_BLOCK_ORDER.length)
+      ? STATE.blockPaletteOrder.slice() : DEFAULT_BLOCK_ORDER.slice();
+    if (fromIndex < 0 || fromIndex >= order.length || toIndex < 0 || toIndex >= order.length) return;
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    STATE.blockPaletteOrder = order;
+    renderBlockPalette();
+    try { localStorage.setItem('block_palette_order', JSON.stringify(order)); } catch(e) {}
+    saveUserPrefs();
+  } else if (group === 'manuales') {
+    const order = (STATE.manualesActionsOrder && STATE.manualesActionsOrder.length === DEFAULT_MANUALES_ORDER.length)
+      ? STATE.manualesActionsOrder.slice() : DEFAULT_MANUALES_ORDER.slice();
+    if (fromIndex < 0 || fromIndex >= order.length || toIndex < 0 || toIndex >= order.length) return;
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    STATE.manualesActionsOrder = order;
+    renderManualesActions();
+    try { localStorage.setItem('manuales_actions_order', JSON.stringify(order)); } catch(e) {}
+    saveUserPrefs();
+  }
 }
 
 function uid() { return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)+Date.now().toString(36); }
@@ -893,8 +965,12 @@ function setLoading(v){ q('#loading').classList.toggle('hidden',!v); }
 // COLOR PICKER
 // ═══════════════════════════════════════════════════════
 function renderColorPicker() {
-  const cp = q('#color-picker');
-  cp.innerHTML = COLORS.map(c=>`<div class="color-dot ${c.hex===STATE.manual.color?'active':''}" style="background:${c.hex}" title="${c.name}" onclick="setColor('${c.hex}')"></div>`).join('');
+  const grid = document.getElementById('manual-color-grid');
+  if (!grid) return;
+  const cur = (STATE.manual.color || '').toUpperCase();
+  grid.innerHTML = BLOCK_PALETTE.map(c=>`<span class="bcp-sw${c.toUpperCase()===cur?' bcp-sw-active':''}" style="background:${c}" title="${c}" onclick="setColor('${c}')"></span>`).join('');
+  const custom = document.getElementById('manual-color-custom');
+  if (custom) custom.value = STATE.manual.color || '#7C3AED';
 }
 function setColor(hex) {
   STATE.manual.color = hex;
@@ -3077,6 +3153,7 @@ function toggleSidSection(id, arrowId) {
 // ═══════════════════════════════════════════════════════
 const _SIDEBAR_PANELS = [
   { id: 'sid-chips-manuales', arrowId: 'arrow-manuales' },
+  { id: 'sid-color-panel',    arrowId: 'arrow-color' },
   { id: 'sid-chips-bloques',  arrowId: 'arrow-bloques' },
   { id: 'sid-fmt-panel',      arrowId: 'arrow-fmt' },
   { id: 'sid-iconos',         arrowId: 'arrow-iconos' },
@@ -3113,6 +3190,11 @@ async function loadUserPrefs() {
       try { localStorage.setItem('block_palette_order', JSON.stringify(data.prefs.blockOrder)); } catch(e) {}
       renderBlockPalette();
     }
+    if (Array.isArray(data.prefs.manualesOrder) && data.prefs.manualesOrder.length === DEFAULT_MANUALES_ORDER.length && data.prefs.manualesOrder.every(k => MANUALES_ACTIONS_META[k])) {
+      STATE.manualesActionsOrder = data.prefs.manualesOrder;
+      try { localStorage.setItem('manuales_actions_order', JSON.stringify(data.prefs.manualesOrder)); } catch(e) {}
+      renderManualesActions();
+    }
   } catch(e) { console.warn('loadUserPrefs:', e); }
 }
 
@@ -3128,7 +3210,7 @@ function saveUserPrefs() {
     const pagesPanel = document.getElementById('pages-panel-body');
     if (pagesPanel) s['pages-panel'] = pagesPanel.style.display !== 'none';
     try {
-      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s, blockOrder: STATE.blockPaletteOrder || DEFAULT_BLOCK_ORDER }, updated_at: new Date().toISOString() });
+      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s, blockOrder: STATE.blockPaletteOrder || DEFAULT_BLOCK_ORDER, manualesOrder: STATE.manualesActionsOrder || DEFAULT_MANUALES_ORDER }, updated_at: new Date().toISOString() });
     } catch(e) { console.warn('saveUserPrefs:', e); }
   }, 500);
 }

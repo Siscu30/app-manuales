@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260717b">
+<link rel="stylesheet" href="styles.css?v=20260717c">
 </head>
 <body>
 
@@ -183,13 +183,18 @@
   <div class="sb-section-hdr" onclick="toggleSidSection('sid-chips-manuales','arrow-manuales')">
     <span>Manuales</span><span class="sb-toggle" id="arrow-manuales">▼</span>
   </div>
-  <div class="sid-chips" id="sid-chips-manuales">
-    <button class="block-btn" onclick="nuevoManual()"><svg class="icon-svg"><use href="#i-new"></use></svg>Nuevo</button>
-    <button class="block-btn" onclick="guardar()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
-    <button class="block-btn" onclick="openMisManuals()"><svg class="icon-svg"><use href="#i-library"></use></svg>Manuales</button>
-    <button class="block-btn" onclick="openUnifiedImportModal()"><svg class="icon-svg"><use href="#i-import"></use></svg>Importar</button>
-    <button class="block-btn" onclick="openTemplatesModal()"><svg class="icon-svg"><use href="#i-templates"></use></svg>Plantillas</button>
-    <button class="block-btn" onclick="openVersionHistory()"><svg class="icon-svg"><use href="#i-history"></use></svg>Historial</button>
+  <div class="sid-chips" id="sid-chips-manuales"></div>
+
+  <hr class="sid-divider">
+  <div class="sb-section-hdr" onclick="toggleSidSection('sid-color-panel','arrow-color')">
+    <span>Color del manual</span><span class="sb-toggle" id="arrow-color">▼</span>
+  </div>
+  <div class="sid-color-panel" id="sid-color-panel">
+    <div class="bcp-grid" id="manual-color-grid"></div>
+    <div class="color-row" style="margin-top:8px;padding:0 12px 10px">
+      <span style="font-size:11px;color:rgba(var(--shell-fg-rgb),.55);flex:1">Personalizado</span>
+      <input type="color" id="manual-color-custom" oninput="setColor(this.value)">
+    </div>
   </div>
 
   <hr class="sid-divider">
@@ -300,8 +305,6 @@
   <div class="topbar-spacer"></div>
   <span id="save-status"></span>
   <span id="stats-indicator" style="font-size:11px;color:rgba(var(--shell-fg-rgb),.35);white-space:nowrap;margin:0 6px"></span>
-  <div class="color-picker" id="color-picker"></div>
-  <div class="topbar-sep"></div>
   <div class="dropdown" id="share-dropdown">
     <button class="tb-btn" onclick="toggleShareMenu()">Compartir ▾</button>
     <div class="dropdown-menu" id="share-menu">
@@ -746,7 +749,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260717b"></script>
+<script src="app.js?v=20260717c"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>
