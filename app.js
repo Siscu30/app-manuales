@@ -2307,7 +2307,10 @@ function renderBlockForExport(b, pasoN) {
     ? ` data-custom-colors="1"` : '';
   const wrapStyle = b.blockBgColor ? `background:${b.blockBgColor};` : '';
   const borderAccent = b.blockBorderColor || color;
-  const cardShadow = '0 1px 2px rgba(15,23,42,.04), 0 4px 14px rgba(15,23,42,.06)';
+  const cardShadow = '0 2px 6px rgba(15,23,42,.06), 0 10px 28px rgba(15,23,42,.08)';
+  const cardBorder = `border-left:4px solid ${borderAccent};border-top:1px solid #eef0f4;border-right:1px solid #eef0f4;border-bottom:1px solid #eef0f4`;
+  const stepBg = b.blockBorderColor ? b.blockBorderColor : `linear-gradient(135deg,${color},${colorDark})`;
+  const iconTile = (emoji, size) => `<span style="font-size:${size||20}px;flex-shrink:0;width:44px;height:44px;border-radius:12px;background:${colorLight};display:flex;align-items:center;justify-content:center">${emoji}</span>`;
 
   switch(b.type) {
     case 'subtitulo': {
@@ -2336,7 +2339,7 @@ function renderBlockForExport(b, pasoN) {
       const _aiHtml = _aiLines.length > 0
         ? `<ul style="margin:0;padding-left:16px">${_aiLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
-      return `<div style="padding:14px 16px;border-radius:12px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'info']||styles.info};margin-bottom:16px;box-shadow:${cardShadow}"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_aiIcon}</span><div>${_aiHtml}</div></div>`;
+      return `<div style="padding:14px 16px;border-radius:14px;display:flex;gap:12px;align-items:flex-start;${styles[b.tipo||'info']||styles.info};margin-bottom:18px;box-shadow:${cardShadow}"><span style="font-size:18px;flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.65);display:flex;align-items:center;justify-content:center">${_aiIcon}</span><div>${_aiHtml}</div></div>`;
     }
     case 'paso': {
       const _dLines = (b.descripcion||'').split('\n').filter(l=>l.trim());
@@ -2344,20 +2347,20 @@ function renderBlockForExport(b, pasoN) {
         ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
       const _expSingle = (src,cap,w) => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(cap||'')}</div>` : '';
-      const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:${borderAccent};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
+      const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:${stepBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
       const _imgArea = (b.src && b.src2)
         ? `<div class="mp-img-pair" style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
         : _expSingle(b.src,b.caption,b.imgWidth);
-      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:12px;border:1px solid ${b.blockBorderColor||'#eef0f4'};overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
+      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;box-shadow:${cardShadow}"><div style="display:flex;gap:12px;padding:16px"><div style="width:34px;height:34px;border-radius:50%;background:${stepBg};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px ${hexToLight(color)}">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
     }
-    case 'imagen': return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
+    case 'imagen': return `<div style="background:#fff;border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;box-shadow:${cardShadow}">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
       const _tAlign = b.align||[];
       const _tCols = (b.columnas||[]).length || 1;
       const _tMinW = Math.max(420, _tCols * 130);
-      const headers=(b.columnas||[]).map((c,ci)=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_tAlign[ci]||'left'};border-bottom:2px solid #e2e8f0;white-space:nowrap">${esc(c)}</th>`).join('');
+      const headers=(b.columnas||[]).map((c,ci)=>`<th style="background:${colorLight};font-weight:700;color:${colorDark};padding:11px 12px;text-align:${_tAlign[ci]||'left'};border-bottom:2px solid ${color};white-space:nowrap">${esc(c)}</th>`).join('');
       const rows=(b.filas||[]).map(row=>`<tr>${(row||[]).map((cell,ci)=>`<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_tAlign[ci]||'left'}">${esc(cell)}</td>`).join('')}</tr>`).join('');
-      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;margin-bottom:16px;box-shadow:${cardShadow}" class="mp-table-scroll"><table style="width:100%;min-width:${_tMinW}px;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div style="background:#fff;border-radius:14px;${cardBorder};margin-bottom:18px;box-shadow:${cardShadow}" class="mp-table-scroll"><table style="width:100%;min-width:${_tMinW}px;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'callout': {
       const styles={tip:'background:#f0fdf4;border:1px solid #bbf7d0',warning:'background:#fefce8;border:1px solid #fef08a',important:'background:#eff6ff;border:1px solid #bfdbfe'};
@@ -2367,42 +2370,42 @@ function renderBlockForExport(b, pasoN) {
       const _caHtml = _caLines.length > 0
         ? `<ul style="margin:0;padding-left:16px">${_caLines.map(l=>`<li style="font-size:14px;line-height:1.6">${esc(l)}</li>`).join('')}</ul>`
         : '';
-      return `<div style="padding:14px 16px;border-radius:12px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'tip']||styles.tip};margin-bottom:16px;box-shadow:${cardShadow}"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_caIcon}</span><div>${_caHtml}</div></div>`;
+      return `<div style="padding:14px 16px;border-radius:14px;display:flex;gap:12px;align-items:flex-start;${styles[b.tipo||'tip']||styles.tip};margin-bottom:18px;box-shadow:${cardShadow}"><span style="font-size:18px;flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.65);display:flex;align-items:center;justify-content:center">${_caIcon}</span><div>${_caHtml}</div></div>`;
     }
-    case 'lista': return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:12px 16px;margin-bottom:16px;box-shadow:${cardShadow}">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0;text-align:${it.align||'left'}"><span style="font-size:16px;flex-shrink:0">${_liIconHTML(it.icono)}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
-    case 'separador': return `<div style="padding:10px 0;margin-bottom:16px"><hr style="border:none;border-top:2px solid #eef0f4"></div>`;
+    case 'lista': return `<div style="background:#fff;border-radius:14px;${cardBorder};padding:12px 16px;margin-bottom:18px;box-shadow:${cardShadow}">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:6px 0;text-align:${it.align||'left'}"><span style="font-size:16px;flex-shrink:0">${_liIconHTML(it.icono)}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
+    case 'separador': return `<div style="padding:14px 0;margin-bottom:18px;display:flex;align-items:center;gap:10px"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#e2e8f0)"></div><div style="width:6px;height:6px;border-radius:50%;background:${color}"></div><div style="flex:1;height:1px;background:linear-gradient(90deg,#e2e8f0,transparent)"></div></div>`;
     case 'texto': {
-      const _tImg = b.src ? `<img src="${b.src}" style="width:100%;display:block;border-radius:6px;margin-top:10px" alt="">` : '';
-      return `<div style="padding:14px 18px;background:#fff;border-radius:12px;font-size:14px;line-height:1.6;margin-bottom:16px;box-shadow:${cardShadow}">${b.html||''}${_tImg}</div>`;
+      const _tImg = b.src ? `<img src="${b.src}" style="width:100%;display:block;border-radius:8px;margin-top:10px" alt="">` : '';
+      return `<div style="padding:14px 18px;background:#fff;border-radius:14px;${cardBorder};font-size:14px;line-height:1.6;margin-bottom:18px;box-shadow:${cardShadow}">${b.html||''}${_tImg}</div>`;
     }
     case 'flujos': {
       const _fAlign = b.align||['left','left'];
       const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500;text-align:${_fAlign[0]}">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_fAlign[1]}">${esc(r.accion||'')}</td></tr>`).join('');
-      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;margin-bottom:16px;box-shadow:${cardShadow}" class="mp-table-scroll"><table style="width:100%;min-width:440px;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[0]};border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[1]};border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div style="background:#fff;border-radius:14px;${cardBorder};margin-bottom:18px;box-shadow:${cardShadow}" class="mp-table-scroll"><table style="width:100%;min-width:440px;border-collapse:collapse"><thead><tr><th style="background:${colorLight};font-weight:700;color:${colorDark};padding:11px 12px;text-align:${_fAlign[0]};border-bottom:2px solid ${color};border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:${colorLight};font-weight:700;color:${colorDark};padding:11px 12px;text-align:${_fAlign[1]};border-bottom:2px solid ${color}">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'video': {
-      if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;padding:12px;box-shadow:${cardShadow}"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
-      if (b.videoType === 'file' && b.storagePath) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;padding:12px;box-shadow:${cardShadow}"><video controls class="lazy-video" data-vpath="${b.storagePath}" style="width:100%;border-radius:6px"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
-      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center;box-shadow:${cardShadow}"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
+      if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;padding:12px;box-shadow:${cardShadow}"><video controls style="width:100%;border-radius:8px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
+      if (b.videoType === 'file' && b.storagePath) return `<div style="background:#fff;border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;padding:12px;box-shadow:${cardShadow}"><video controls class="lazy-video" data-vpath="${b.storagePath}" style="width:100%;border-radius:8px"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
+      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:14px;${cardBorder};padding:14px 16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;box-shadow:${cardShadow}">${iconTile('📄',22)}<div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
       const embed = getVideoEmbedUrl(b.url);
-      if (embed) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
-      if (b.url) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center;box-shadow:${cardShadow}"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
+      if (embed) return `<div style="background:#fff;border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;box-shadow:${cardShadow}"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
+      if (b.url) return `<div style="background:#fff;border-radius:14px;${cardBorder};padding:14px 16px;margin-bottom:18px;display:flex;gap:12px;align-items:center;box-shadow:${cardShadow}">${iconTile('🎬',22)}<div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
       return '';
     }
     case 'enlace': {
       const title = b.titulo || b.url || 'Enlace';
-      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;box-shadow:${cardShadow}"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:${color}">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
+      return `<div style="background:#fff;border-radius:14px;${cardBorder};padding:14px 16px;margin-bottom:18px;display:flex;gap:12px;align-items:flex-start;box-shadow:${cardShadow}">${iconTile('🔗',20)}<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:${color}">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
     }
     case 'codigo': {
       const lang = esc(b.language||'');
       const code = esc(b.code||'');
-      return `<div style="border-radius:12px;overflow:hidden;margin-bottom:16px;font-family:'Fira Code',Consolas,monospace;box-shadow:${cardShadow}"><div style="background:#1e293b;padding:8px 14px;font-size:11px;color:#94a3b8;letter-spacing:.5px">${lang}</div><pre style="margin:0;padding:14px;background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre></div>`;
+      return `<div style="border-radius:14px;overflow:hidden;margin-bottom:18px;font-family:'Fira Code',Consolas,monospace;box-shadow:${cardShadow};border-top:3px solid ${borderAccent}"><div style="background:#1e293b;padding:8px 14px;font-size:11px;color:#94a3b8;letter-spacing:.5px">${lang}</div><pre style="margin:0;padding:14px;background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre></div>`;
     }
     case 'icono': {
       if (!b.iconKey) return '';
       const svgEl = iconSVG(b.iconKey, b.size||48, b.color||'#2563EB');
       const labelEl = b.label ? `<div style="margin-top:8px;font-size:13px;color:#64748b">${esc(b.label)}</div>` : '';
-      return `<div style="text-align:${b.align||'center'};padding:16px;background:#fff;border-radius:12px;border:1px solid #eef0f4;margin-bottom:16px;box-shadow:${cardShadow}">${svgEl}${labelEl}</div>`;
+      return `<div style="text-align:${b.align||'center'};padding:16px;background:#fff;border-radius:14px;${cardBorder};margin-bottom:18px;box-shadow:${cardShadow}">${svgEl}${labelEl}</div>`;
     }
     default: return '';
   }
