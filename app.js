@@ -2300,23 +2300,29 @@ function blobToBase64(blob) {
 
 function renderBlockForExport(b, pasoN) {
   const color = STATE.manual.color || '#2563EB';
+  const colorDark = shadeColorHex(color, -35);
+  const colorLight = hexToLight(color);
   const imgTag = src => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:100%;display:block" alt="">` : '';
   const blockStyle = (b.blockBorderColor || b.blockBgColor)
     ? ` data-custom-colors="1"` : '';
   const wrapStyle = b.blockBgColor ? `background:${b.blockBgColor};` : '';
   const borderAccent = b.blockBorderColor || color;
+  const cardShadow = '0 1px 2px rgba(15,23,42,.04), 0 4px 14px rgba(15,23,42,.06)';
 
   switch(b.type) {
     case 'subtitulo': {
-      const _sBg = normalizeHex(b.blockBgColor || '#64748b');
-      const _sTxt = isLightColor(_sBg) ? '#1a1a1a' : '#ffffff';
-      return `<div style="padding:11px 20px 9px;background:${_sBg};border-radius:8px;margin-bottom:12px;text-align:center"><div style="font-weight:700;font-size:17px;color:${_sTxt}">${b.texto||''}</div></div>`;
+      const hasCustom = !!b.blockBgColor;
+      const _sBg = hasCustom ? normalizeHex(b.blockBgColor) : colorLight;
+      const _sTxt = hasCustom ? (isLightColor(_sBg) ? '#1a1a1a' : '#ffffff') : color;
+      return `<div style="padding:11px 20px 9px;background:${_sBg};border-radius:10px;margin-bottom:14px;text-align:center"><div style="font-weight:700;font-size:17px;color:${_sTxt}">${b.texto||''}</div></div>`;
     }
     case 'titulo': {
-      const _bgC = normalizeHex(b.blockBgColor || '#4a4a4a');
-      const _txtC = isLightColor(_bgC) ? '#1a1a1a' : '#ffffff';
-      const _subC = isLightColor(_bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
-      return `<div style="padding:20px 24px 16px;background:${_bgC};border-left:none;border-radius:8px;margin-bottom:12px;text-align:center;color:${_txtC}"><h2 style="font-size:22px;font-weight:700;margin:0;text-align:center;color:${_txtC}">${b.titulo||''}</h2>${b.subtitulo?`<p style="margin-top:4px;text-align:center;color:${_subC}">${b.subtitulo}</p>`:''}</div>`;
+      const hasCustom = !!b.blockBgColor;
+      const _bgC = hasCustom ? `background:${normalizeHex(b.blockBgColor)}` : `background:linear-gradient(135deg,${color},${colorDark})`;
+      const _refColor = hasCustom ? normalizeHex(b.blockBgColor) : color;
+      const _txtC = hasCustom && isLightColor(_refColor) ? '#1a1a1a' : '#ffffff';
+      const _subC = hasCustom && isLightColor(_refColor) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.75)';
+      return `<div style="padding:28px 24px 24px;${_bgC};border-left:none;border-radius:16px;margin-bottom:18px;text-align:center;color:${_txtC};box-shadow:0 10px 30px -8px ${hexToLight(color)}"><h2 style="font-size:24px;font-weight:700;margin:0;text-align:center;color:${_txtC};letter-spacing:-.01em">${b.titulo||''}</h2>${b.subtitulo?`<p style="margin-top:6px;text-align:center;color:${_subC};font-size:14px">${b.subtitulo}</p>`:''}</div>`;
     }
     case 'alerta': {
       const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
@@ -2326,7 +2332,7 @@ function renderBlockForExport(b, pasoN) {
       const _aiHtml = _aiLines.length > 0
         ? `<ul style="margin:0;padding-left:16px">${_aiLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
         : '';
-      return `<div style="padding:12px 16px;border-radius:8px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'info']||styles.info};margin-bottom:12px"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_aiIcon}</span><div>${_aiHtml}</div></div>`;
+      return `<div style="padding:14px 16px;border-radius:12px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'info']||styles.info};margin-bottom:16px;box-shadow:${cardShadow}"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_aiIcon}</span><div>${_aiHtml}</div></div>`;
     }
     case 'paso': {
       const _dLines = (b.descripcion||'').split('\n').filter(l=>l.trim());
@@ -2338,14 +2344,14 @@ function renderBlockForExport(b, pasoN) {
       const _imgArea = (b.src && b.src2)
         ? `<div style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
         : _expSingle(b.src,b.caption,b.imgWidth);
-      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:8px;border:1px solid ${b.blockBorderColor||'#e2e8f0'};overflow:hidden;margin-bottom:12px"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
+      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:12px;border:1px solid ${b.blockBorderColor||'#eef0f4'};overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
     }
-    case 'imagen': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
+    case 'imagen': return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
       const _tAlign = b.align||[];
       const headers=(b.columnas||[]).map((c,ci)=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_tAlign[ci]||'left'};border-bottom:2px solid #e2e8f0">${esc(c)}</th>`).join('');
       const rows=(b.filas||[]).map(row=>`<tr>${(row||[]).map((cell,ci)=>`<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_tAlign[ci]||'left'}">${esc(cell)}</td>`).join('')}</tr>`).join('');
-      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><table style="width:100%;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'callout': {
       const styles={tip:'background:#f0fdf4;border:1px solid #bbf7d0',warning:'background:#fefce8;border:1px solid #fef08a',important:'background:#eff6ff;border:1px solid #bfdbfe'};
@@ -2355,42 +2361,42 @@ function renderBlockForExport(b, pasoN) {
       const _caHtml = _caLines.length > 0
         ? `<ul style="margin:0;padding-left:16px">${_caLines.map(l=>`<li style="font-size:14px;line-height:1.6">${esc(l)}</li>`).join('')}</ul>`
         : '';
-      return `<div style="padding:14px 16px;border-radius:8px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'tip']||styles.tip};margin-bottom:12px"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_caIcon}</span><div>${_caHtml}</div></div>`;
+      return `<div style="padding:14px 16px;border-radius:12px;display:flex;gap:10px;align-items:flex-start;${styles[b.tipo||'tip']||styles.tip};margin-bottom:16px;box-shadow:${cardShadow}"><span style="font-size:18px;flex-shrink:0;display:flex;align-items:center;padding-top:2px">${_caIcon}</span><div>${_caHtml}</div></div>`;
     }
-    case 'lista': return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:12px 16px;margin-bottom:12px">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0;text-align:${it.align||'left'}"><span style="font-size:16px;flex-shrink:0">${_liIconHTML(it.icono)}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
-    case 'separador': return `<div style="padding:8px 0;margin-bottom:12px"><hr style="border:none;border-top:2px solid #e2e8f0"></div>`;
+    case 'lista': return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:12px 16px;margin-bottom:16px;box-shadow:${cardShadow}">${(b.items||[]).map(it=>`<div style="display:flex;gap:10px;padding:5px 0;text-align:${it.align||'left'}"><span style="font-size:16px;flex-shrink:0">${_liIconHTML(it.icono)}</span><span>${esc(it.texto||'')}</span></div>`).join('')}</div>`;
+    case 'separador': return `<div style="padding:10px 0;margin-bottom:16px"><hr style="border:none;border-top:2px solid #eef0f4"></div>`;
     case 'texto': {
       const _tImg = b.src ? `<img src="${b.src}" style="width:100%;display:block;border-radius:6px;margin-top:10px" alt="">` : '';
-      return `<div style="padding:12px 16px;background:#fff;border-radius:8px;font-size:14px;line-height:1.6;margin-bottom:12px">${b.html||''}${_tImg}</div>`;
+      return `<div style="padding:14px 18px;background:#fff;border-radius:12px;font-size:14px;line-height:1.6;margin-bottom:16px;box-shadow:${cardShadow}">${b.html||''}${_tImg}</div>`;
     }
     case 'flujos': {
       const _fAlign = b.align||['left','left'];
       const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500;text-align:${_fAlign[0]}">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_fAlign[1]}">${esc(r.accion||'')}</td></tr>`).join('');
-      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[0]};border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[1]};border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[0]};border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[1]};border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'video': {
-      if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
-      if (b.videoType === 'file' && b.storagePath) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px;padding:12px"><video controls class="lazy-video" data-vpath="${b.storagePath}" style="width:100%;border-radius:6px"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
-      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
+      if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;padding:12px;box-shadow:${cardShadow}"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
+      if (b.videoType === 'file' && b.storagePath) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;padding:12px;box-shadow:${cardShadow}"><video controls class="lazy-video" data-vpath="${b.storagePath}" style="width:100%;border-radius:6px"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
+      if (b.videoType === 'pdf' && b.url) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center;box-shadow:${cardShadow}"><span style="font-size:28px">📄</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
       const embed = getVideoEmbedUrl(b.url);
-      if (embed) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:12px"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
-      if (b.url) return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:center"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
+      if (embed) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><iframe src="${embed}" style="width:100%;display:block;border:none;aspect-ratio:16/9" allowfullscreen></iframe>${b.caption?`<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption)}</div>`:''}</div>`;
+      if (b.url) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:center;box-shadow:${cardShadow}"><span style="font-size:28px">🎬</span><div><div style="font-weight:600">${esc(b.titulo||b.url)}</div><a href="${esc(b.url)}" style="font-size:12px;color:${color}">${esc(b.url)}</a></div></div>`;
       return '';
     }
     case 'enlace': {
       const title = b.titulo || b.url || 'Enlace';
-      return `<div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:${color}">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
+      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;padding:14px 16px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;box-shadow:${cardShadow}"><span style="font-size:22px;flex-shrink:0">🔗</span><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;color:${color}">${esc(title)}</div>${b.url?`<div style="font-size:12px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(b.url)}">${esc(b.url)}</a></div>`:''}${b.descripcion?`<div style="font-size:13px;margin-top:6px">${esc(b.descripcion)}</div>`:''}</div></div>`;
     }
     case 'codigo': {
       const lang = esc(b.language||'');
       const code = esc(b.code||'');
-      return `<div style="border-radius:8px;overflow:hidden;margin-bottom:12px;font-family:'Fira Code',Consolas,monospace"><div style="background:#1e293b;padding:8px 14px;font-size:11px;color:#94a3b8;letter-spacing:.5px">${lang}</div><pre style="margin:0;padding:14px;background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre></div>`;
+      return `<div style="border-radius:12px;overflow:hidden;margin-bottom:16px;font-family:'Fira Code',Consolas,monospace;box-shadow:${cardShadow}"><div style="background:#1e293b;padding:8px 14px;font-size:11px;color:#94a3b8;letter-spacing:.5px">${lang}</div><pre style="margin:0;padding:14px;background:#0f172a;color:#e2e8f0;font-size:13px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all">${code}</pre></div>`;
     }
     case 'icono': {
       if (!b.iconKey) return '';
       const svgEl = iconSVG(b.iconKey, b.size||48, b.color||'#2563EB');
       const labelEl = b.label ? `<div style="margin-top:8px;font-size:13px;color:#64748b">${esc(b.label)}</div>` : '';
-      return `<div style="text-align:${b.align||'center'};padding:16px;background:#fff;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:12px">${svgEl}${labelEl}</div>`;
+      return `<div style="text-align:${b.align||'center'};padding:16px;background:#fff;border-radius:12px;border:1px solid #eef0f4;margin-bottom:16px;box-shadow:${cardShadow}">${svgEl}${labelEl}</div>`;
     }
     default: return '';
   }
@@ -4894,7 +4900,7 @@ function buildExportHTMLMultipage(titulo, empresa, color, pages) {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
+body{font-family:'Inter',sans-serif;background:linear-gradient(180deg,${hexToLight(color)} 0%,#f8fafc 460px);color:#0f172a}
 /* ── Portada ── */
 .mp-cover{position:fixed;inset:0;z-index:500;background:linear-gradient(160deg,${color},${dark});display:flex;align-items:center;justify-content:center;padding:24px}
 .mp-cover.closed{display:none}
@@ -4907,7 +4913,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 .mp-cover-count{font-size:12px;color:#94a3b8;margin-top:18px}
 .mp-shell{display:none}
 .mp-shell.open{display:block}
-.mp-header{position:sticky;top:0;z-index:100;background:${color};color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.mp-header{position:sticky;top:0;z-index:100;background:linear-gradient(135deg,${color},${dark});color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .mp-header h1{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;cursor:pointer}
 .mp-header .empresa{font-size:12px;opacity:.75;white-space:nowrap}
 .mp-search-wrap{position:relative;flex-shrink:0}
@@ -4929,7 +4935,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
 .mp-nav-item{margin:1px 0}
 .mp-nav-row{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:9px 10px 9px 18px;font-size:13px;color:rgba(255,255,255,.65);cursor:pointer;border-radius:6px;margin:0 8px;transition:all .15s}
 .mp-nav-row:hover{background:rgba(255,255,255,.08);color:#fff}
-.mp-nav-row.active{background:rgba(255,255,255,.13);color:#fff;font-weight:500}
+.mp-nav-row.active{background:${color};color:#fff;font-weight:500}
 .mp-nav-expand{font-size:10px;color:rgba(255,255,255,.4);padding:2px 6px;transition:transform .15s;flex-shrink:0}
 .mp-nav-expand:hover{color:#fff}
 .mp-nav-item.expanded .mp-nav-expand{transform:rotate(90deg)}
@@ -4955,7 +4961,7 @@ body{font-family:'Inter',sans-serif;background:#f8fafc;color:#0f172a}
   .mp-layout{flex-direction:column}
 }
 /* block styles (same as single-page export) */
-@media print{.mp-cover,.mp-header,.mp-nav,.mp-nav-toggle{display:none!important}.mp-shell{display:block!important}.mp-content{padding:0}.mp-page{display:block!important}}
+@media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.mp-cover,.mp-header,.mp-nav,.mp-nav-toggle{display:none!important}.mp-shell{display:block!important}.mp-content{padding:0}.mp-page{display:block!important}body{background:#fff!important}}
 ${_lbCSS()}
 </style>
 </head>
