@@ -452,7 +452,7 @@ const BLOCK_TYPES = {
   },
   subtitulo: {
     label: 'Subtítulo',
-    defaultData: () => ({ texto:'Subtítulo del tema', blockBgColor:'#64748b' }),
+    defaultData: () => ({ texto:'Subtítulo del tema' }),
     render(b) {
       const bgC = normalizeHex(b.blockBgColor || '#64748b');
       const textC = isLightColor(bgC) ? '#1a1a1a' : '#ffffff';
@@ -2311,7 +2311,11 @@ function renderBlockForExport(b, pasoN) {
 
   switch(b.type) {
     case 'subtitulo': {
-      const hasCustom = !!b.blockBgColor;
+      // '#64748b' era el gris fijo que ponía por defecto el creador de bloques (ya corregido);
+      // los subtítulos guardados antes de ese arreglo llevan ese valor grabado como si fuera
+      // "personalizado" — lo tratamos como "sin personalizar" para que hereden el degradado
+      // de marca en vez de quedarse grises para siempre.
+      const hasCustom = !!b.blockBgColor && b.blockBgColor.toLowerCase() !== '#64748b';
       const _sBg = hasCustom ? normalizeHex(b.blockBgColor) : colorLight;
       const _sTxt = hasCustom ? (isLightColor(_sBg) ? '#1a1a1a' : '#ffffff') : color;
       return `<div style="padding:11px 20px 9px;background:${_sBg};border-radius:10px;margin-bottom:14px;text-align:center"><div style="font-weight:700;font-size:17px;color:${_sTxt}">${b.texto||''}</div></div>`;
@@ -3532,7 +3536,7 @@ async function parseDOCXtoBlocks(ab) {
     if (r.type === 'titulo') {
       // El primer encabezado es el título del manual (H1); los demás, subtítulos de sección
       if (firstTitle && r._first) { blocks.push({ id: uid(), type: 'titulo', order: 0, emoji: '📋', titulo: r.titulo, subtitulo: '', _isH1: true }); firstTitle = false; }
-      else blocks.push({ id: uid(), type: 'subtitulo', order: 0, texto: r.titulo, blockBgColor: '#64748b' });
+      else blocks.push({ id: uid(), type: 'subtitulo', order: 0, texto: r.titulo });
     } else if (r.type === 'alerta') {
       blocks.push({ id: uid(), type: 'alerta', order: 0, tipo: 'advertencia', texto: r.texto });
     } else if (r.type === 'tabla') {
