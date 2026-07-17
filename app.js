@@ -2342,16 +2342,18 @@ function renderBlockForExport(b, pasoN) {
       const _expSingle = (src,cap,w) => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(cap||'')}</div>` : '';
       const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:${borderAccent};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 1px 4px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
       const _imgArea = (b.src && b.src2)
-        ? `<div style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
+        ? `<div class="mp-img-pair" style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
         : _expSingle(b.src,b.caption,b.imgWidth);
       return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:12px;border:1px solid ${b.blockBorderColor||'#eef0f4'};overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><div style="display:flex;gap:12px;padding:16px"><div style="width:32px;height:32px;border-radius:50%;background:${borderAccent};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
     }
     case 'imagen': return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
       const _tAlign = b.align||[];
-      const headers=(b.columnas||[]).map((c,ci)=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_tAlign[ci]||'left'};border-bottom:2px solid #e2e8f0">${esc(c)}</th>`).join('');
+      const _tCols = (b.columnas||[]).length || 1;
+      const _tMinW = Math.max(420, _tCols * 130);
+      const headers=(b.columnas||[]).map((c,ci)=>`<th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_tAlign[ci]||'left'};border-bottom:2px solid #e2e8f0;white-space:nowrap">${esc(c)}</th>`).join('');
       const rows=(b.filas||[]).map(row=>`<tr>${(row||[]).map((cell,ci)=>`<td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_tAlign[ci]||'left'}">${esc(cell)}</td>`).join('')}</tr>`).join('');
-      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><table style="width:100%;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;margin-bottom:16px;box-shadow:${cardShadow}" class="mp-table-scroll"><table style="width:100%;min-width:${_tMinW}px;border-collapse:collapse"><thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'callout': {
       const styles={tip:'background:#f0fdf4;border:1px solid #bbf7d0',warning:'background:#fefce8;border:1px solid #fef08a',important:'background:#eff6ff;border:1px solid #bfdbfe'};
@@ -2372,7 +2374,7 @@ function renderBlockForExport(b, pasoN) {
     case 'flujos': {
       const _fAlign = b.align||['left','left'];
       const rows=(b.filas||[]).map(r=>`<tr><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;font-weight:500;text-align:${_fAlign[0]}">${esc(r.condicion||'')}</td><td style="padding:9px 12px;border-bottom:1px solid #e2e8f0;text-align:${_fAlign[1]}">${esc(r.accion||'')}</td></tr>`).join('');
-      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;box-shadow:${cardShadow}"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[0]};border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[1]};border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;margin-bottom:16px;box-shadow:${cardShadow}" class="mp-table-scroll"><table style="width:100%;min-width:440px;border-collapse:collapse"><thead><tr><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[0]};border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;width:45%">Condición</th><th style="background:#f8fafc;font-weight:600;padding:10px 12px;text-align:${_fAlign[1]};border-bottom:2px solid #e2e8f0">Acción</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'video': {
       if (b.videoType === 'file' && b.src) return `<div style="background:#fff;border-radius:12px;border:1px solid #eef0f4;overflow:hidden;margin-bottom:16px;padding:12px;box-shadow:${cardShadow}"><video controls style="width:100%;border-radius:6px"><source src="${b.src}" type="video/mp4"></video>${b.titulo?`<div style="font-size:12px;color:#64748b;padding:6px 0">${esc(b.titulo)}</div>`:''}</div>`;
@@ -2493,7 +2495,7 @@ function _lbCSS() {
 .lb-ov.zoomed{align-items:flex-start;cursor:default}
 .lb-full{max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);object-fit:contain;border-radius:4px;cursor:zoom-in;flex-shrink:0;box-shadow:0 8px 48px rgba(0,0,0,.7);transition:none}
 .lb-full.zoomed{max-width:none;max-height:none;width:auto;height:auto;cursor:zoom-out}
-.lb-cls{position:fixed;top:14px;right:18px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:50%;width:40px;height:40px;font-size:22px;cursor:pointer;z-index:1}
+.lb-cls{position:fixed;top:14px;right:18px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px;cursor:pointer;z-index:1}
 .lb-cls:hover{background:rgba(255,255,255,.35)}
 .lb-hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.55);font-size:12px;pointer-events:none;white-space:nowrap}`;
 }
@@ -2501,13 +2503,13 @@ function _lbHTML() {
   return `<div class="lb-ov" id="lb-ov" onclick="if(event.target===this)_lbClose()">
   <button class="lb-cls" onclick="_lbClose()">×</button>
   <img class="lb-full" id="lb-img" src="" onclick="_lbZoom()" alt="">
-  <div class="lb-hint" id="lb-hint">Clic para ampliar · Esc para cerrar</div>
+  <div class="lb-hint" id="lb-hint">Pulsa para ampliar · Esc para cerrar</div>
 </div>`;
 }
 function _lbJS() {
   return `function _lbOpen(src){document.getElementById('lb-ov').classList.add('open');document.getElementById('lb-img').src=src;document.getElementById('lb-img').classList.remove('zoomed');document.getElementById('lb-ov').classList.remove('zoomed');document.addEventListener('keydown',_lbKey);}
 function _lbClose(){document.getElementById('lb-ov').classList.remove('open','zoomed');document.getElementById('lb-img').classList.remove('zoomed');document.removeEventListener('keydown',_lbKey);}
-function _lbZoom(){const z=document.getElementById('lb-img').classList.toggle('zoomed');document.getElementById('lb-ov').classList.toggle('zoomed',z);document.getElementById('lb-hint').textContent=z?'Clic para reducir · Esc para cerrar':'Clic para ampliar · Esc para cerrar';}
+function _lbZoom(){const z=document.getElementById('lb-img').classList.toggle('zoomed');document.getElementById('lb-ov').classList.toggle('zoomed',z);document.getElementById('lb-hint').textContent=z?'Pulsa para reducir · Esc para cerrar':'Pulsa para ampliar · Esc para cerrar';}
 function _lbKey(e){if(e.key==='Escape')_lbClose();}`;
 }
 
@@ -4915,7 +4917,7 @@ body{font-family:'Inter',sans-serif;background:linear-gradient(180deg,${hexToLig
 .mp-shell.open{display:block}
 .mp-header{position:sticky;top:0;z-index:100;background:linear-gradient(135deg,${color},${dark});color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .mp-header h1{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;cursor:pointer}
-.mp-header .empresa{font-size:12px;opacity:.75;white-space:nowrap}
+.mp-header .empresa{font-size:12px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mp-search-wrap{position:relative;flex-shrink:0}
 #searchInput{padding:7px 14px;border-radius:20px;border:none;font-size:13px;width:220px;background:rgba(255,255,255,.18);color:#fff;outline:none}
 #searchInput::placeholder{color:rgba(255,255,255,.6)}
@@ -4948,17 +4950,22 @@ body{font-family:'Inter',sans-serif;background:linear-gradient(180deg,${hexToLig
 .mp-page{width:100%;max-width:760px;display:none}
 .mp-page.active{display:block}
 .mp-anchor{scroll-margin-top:16px}
+.mp-table-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;border-radius:12px}
 /* hamburger for mobile nav */
-.mp-nav-toggle{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:2px 6px;margin-right:4px}
+.mp-nav-toggle{display:none;background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:2px 6px;margin-right:4px;min-width:44px;min-height:44px;align-items:center;justify-content:center}
 @media(max-width:768px){
   .mp-cover-card{padding:40px 28px}
   .mp-nav{position:fixed;left:-260px;top:0;bottom:0;z-index:300;transition:left .25s;height:100vh;width:270px}
   .mp-nav.open{left:0;box-shadow:4px 0 20px rgba(0,0,0,.3)}
+  .mp-nav-expand{padding:9px 12px;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center}
   .mp-content{padding:20px 16px}
   .mp-page{max-width:100%}
-  .mp-nav-toggle{display:inline-block}
+  .mp-page img{width:100%!important;max-width:100%!important;height:auto!important}
+  .mp-img-pair{flex-direction:column!important}
+  .mp-nav-toggle{display:inline-flex}
   #searchInput{width:140px}
   .mp-layout{flex-direction:column}
+  #searchResults{position:fixed;top:60px;left:8px;right:8px;width:auto;min-width:0;max-width:none}
 }
 /* block styles (same as single-page export) */
 @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}.mp-cover,.mp-header,.mp-nav,.mp-nav-toggle{display:none!important}.mp-shell{display:block!important}.mp-content{padding:0}.mp-page{display:block!important}body{background:#fff!important}}
