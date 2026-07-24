@@ -2428,6 +2428,11 @@ function _tiRow(rowId) {
   return STATE.tablaInteractiva && STATE.tablaInteractiva.contenido.rows.find(r => r.id === rowId);
 }
 
+function _tiPillInner(st) {
+  const iconHtml = st.icon ? iconSVG(st.icon, 14, st.color) + '&nbsp;' : '';
+  return iconHtml + esc(st.value || '');
+}
+
 function renderTablaEditor() {
   const ti = STATE.tablaInteractiva;
   if (!ti) return;
@@ -2439,15 +2444,16 @@ function renderTablaEditor() {
   const hr = ti.contenido.highlightRule || {};
 
   const theadCells = cols.map((col, i) => {
-    const colorBtn = `<button class="ti-col-btn" title="Color de cabecera" onclick="openColumnColorPicker('${col.id}',event)">🎨</button>`;
-    const statesBtn = col.type === 'estado-ciclico' ? `<button class="ti-col-btn" title="Editar estados" onclick="openStatesEditor('${col.id}',event)">⚙</button>` : '';
     const typeLabel = col.type === 'estado-ciclico' ? 'Estado cíclico' : 'Texto';
     return `<th data-col-id="${col.id}" style="background:${col.headerColor||'#1B3A4B'};color:${col.headerTextColor||'#ffffff'};text-align:${col.align||'left'}" draggable="true" data-reorder-group="ti-columns" data-reorder-index="${i}">
       <div class="ti-th-inner">
         <span class="ti-th-label" contenteditable="true" spellcheck="false" oninput="updateColumnLabel('${col.id}',this.textContent)">${esc(col.label||'')}</span>
         <span class="ti-th-type">${typeLabel}</span>
       </div>
-      <div class="ti-th-actions">${colorBtn}${statesBtn}<button class="ti-col-btn" title="Eliminar columna" onclick="removeTiColumn('${col.id}')">✕</button></div>
+      <div class="ti-th-actions">
+        <button class="ti-col-btn" title="Configurar columna" onclick="openColumnConfigModal('${col.id}')">⚙ Configurar</button>
+        <button class="ti-col-btn" title="Eliminar columna" onclick="removeTiColumn('${col.id}')">✕</button>
+      </div>
     </th>`;
   }).join('');
 
@@ -2468,7 +2474,7 @@ function renderTablaEditor() {
       if (col.type === 'estado-ciclico') {
         const idx = row.values[col.id] || 0;
         const st = (col.states && col.states[idx]) || (col.states && col.states[0]) || { value:'', bg:'#fff', color:'#000' };
-        return `<td style="text-align:${col.align||'center'}"><span class="ti-pill" style="background:${st.bg};color:${st.color}" onclick="cycleCell('${row.id}','${col.id}')">${esc(st.value)}</span></td>`;
+        return `<td style="text-align:${col.align||'center'}"><span class="ti-pill" style="background:${st.bg};color:${st.color}" onclick="cycleCell('${row.id}','${col.id}')">${_tiPillInner(st)}</span></td>`;
       }
       const val = row.values[col.id] != null ? row.values[col.id] : '';
       return `<td style="text-align:${col.align||'left'}"><span class="ti-td-text" contenteditable="true" spellcheck="false" oninput="updateCellValue('${row.id}','${col.id}',this.textContent)">${esc(val)}</span></td>`;
@@ -2511,7 +2517,7 @@ function addColumnEstado() {
   if (!STATE.tablaInteractiva) return;
   STATE.tablaInteractiva.contenido.columns.push({
     id: uid(), type: 'estado-ciclico', label: 'Estado', align: 'center', headerColor: '#E8622A', headerTextColor: '#ffffff',
-    states: [ { value: 'Sí', bg: '#DCFCE7', color: '#16A34A' }, { value: 'No', bg: '#F1F5F9', color: '#64748B' }, { value: '—', bg: '#F1F5F9', color: '#94A3B8' } ]
+    states: [ { value: 'Sí', icon: '', bg: '#DCFCE7', color: '#16A34A' }, { value: 'No', icon: '', bg: '#F1F5F9', color: '#64748B' }, { value: '—', icon: '', bg: '#F1F5F9', color: '#94A3B8' } ]
   });
   renderTablaEditor();
   scheduleLocalSaveTabla();
@@ -2543,128 +2549,167 @@ function removeTiRow(rowId) {
   scheduleLocalSaveTabla();
 }
 
-function openColumnColorPicker(colId, ev) {
-  ev.stopPropagation();
-  document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
+// ── Configurar columna (modal completo: texto, alineación, colores, iconos por estado) ──
+let _tiEditingColId = null;
+function openColumnConfigModal(colId) {
   const col = _tiCol(colId); if (!col) return;
-  const btn = ev.currentTarget;
-  const popup = document.createElement('div');
-  popup.className = 'block-color-popup';
-  const swBg = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="setColumnColor('${colId}','headerColor','${c}')"></span>`).join('');
-  const swTxt = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="setColumnColor('${colId}','headerTextColor','${c}')"></span>`).join('');
-  popup.innerHTML = `
-    <label>Color de cabecera</label>
-    <div class="bcp-grid">${swBg}</div>
-    <div class="color-row" style="margin-top:8px">
-      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
-      <input type="color" value="${col.headerColor||'#1B3A4B'}" oninput="setColumnColor('${colId}','headerColor',this.value)">
-    </div>
-    <label style="margin-top:8px">Color de texto</label>
-    <div class="bcp-grid">${swTxt}</div>
-    <div class="color-row" style="margin-top:8px">
-      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
-      <input type="color" value="${col.headerTextColor||'#ffffff'}" oninput="setColumnColor('${colId}','headerTextColor',this.value)">
-    </div>
-    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove()">Cerrar</button></div>`;
-  btn.style.position = 'relative';
-  btn.appendChild(popup);
-  setTimeout(() => document.addEventListener('click', function handler(e) {
-    if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', handler); }
-  }), 10);
+  _tiEditingColId = colId;
+  document.getElementById('ti-col-modal-title').textContent = 'Configurar columna: ' + (col.label || '');
+  document.getElementById('ti-col-modal-body').innerHTML = _tiColModalBodyHTML(col);
+  openModal('modal-ti-column');
 }
-function setColumnColor(colId, field, hex) {
-  const col = _tiCol(colId); if (!col) return;
-  col[field] = hex;
-  const th = document.querySelector(`#ti-table th[data-col-id="${colId}"]`);
-  if (th) { th.style.background = col.headerColor || '#1B3A4B'; th.style.color = col.headerTextColor || '#ffffff'; }
+function _tiColModalBodyHTML(col) {
+  const bgSw = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="_tiSetDraftColor('bg','${c}')"></span>`).join('');
+  const txtSw = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="_tiSetDraftColor('text','${c}')"></span>`).join('');
+  const statesSection = col.type === 'estado-ciclico' ? `
+    <label style="margin-top:16px;display:block;font-weight:600;font-size:13px">Estados cíclicos <span style="font-weight:400;color:var(--text-muted)">(clic en la celda para pasar al siguiente)</span></label>
+    <div id="ti-states-editor-list">${(col.states||[]).map((st,i)=>_tiStateRowHTML(st,i)).join('')}</div>
+    <button class="btn btn-sm" style="margin-top:8px" onclick="_tiAddStateRow()">➕ Añadir estado</button>
+  ` : '';
+  return `
+    <label style="font-weight:600;font-size:13px">Texto de la cabecera</label>
+    <input type="text" class="form-input" id="ti-col-label" value="${escAttr(col.label||'')}" style="margin:4px 0 12px">
+    <label style="font-weight:600;font-size:13px">Alineación</label>
+    <select class="form-select" id="ti-col-align" style="margin:4px 0 14px">
+      <option value="left" ${col.align==='left'?'selected':''}>⬅ Izquierda</option>
+      <option value="center" ${col.align==='center'?'selected':''}>↔ Centro</option>
+      <option value="right" ${col.align==='right'?'selected':''}>➡ Derecha</option>
+    </select>
+    <label style="font-weight:600;font-size:13px">Color de fondo de cabecera</label>
+    <div class="bcp-grid">${bgSw}</div>
+    <div class="color-row" style="margin:4px 0 12px">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
+      <input type="color" id="ti-col-bg-custom" value="${col.headerColor||'#1B3A4B'}" oninput="_tiSetDraftColor('bg',this.value)">
+    </div>
+    <label style="font-weight:600;font-size:13px">Color de texto de cabecera</label>
+    <div class="bcp-grid">${txtSw}</div>
+    <div class="color-row" style="margin:4px 0 12px">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
+      <input type="color" id="ti-col-text-custom" value="${col.headerTextColor||'#ffffff'}" oninput="_tiSetDraftColor('text',this.value)">
+    </div>
+    ${statesSection}`;
+}
+function _tiSetDraftColor(which, hex) {
+  const input = document.getElementById(which === 'bg' ? 'ti-col-bg-custom' : 'ti-col-text-custom');
+  if (input) input.value = hex;
+}
+function _tiStateRowHTML(st, i) {
+  const iconPreview = st.icon ? iconSVG(st.icon, 16, st.color||'#000') : '<span style="font-size:10px;color:var(--text-muted)">Sin icono</span>';
+  return `<div class="ti-state-row-modal" data-idx="${i}">
+    <button class="ti-col-btn" title="Elegir icono" onclick="_tiPickStateIcon(${i})">🖼</button>
+    <span class="ti-state-icon-preview">${iconPreview}</span>
+    <input type="hidden" class="ti-state-icon-val" value="${escAttr(st.icon||'')}">
+    <button class="ti-col-btn" title="Quitar icono" onclick="_tiClearStateIcon(${i})">🚫</button>
+    <input type="text" class="form-input ti-state-value" value="${escAttr(st.value||'')}" placeholder="Texto" style="width:90px">
+    <input type="color" class="ti-state-bg" value="${st.bg||'#F1F5F9'}" title="Fondo">
+    <input type="color" class="ti-state-color" value="${st.color||'#64748B'}" title="Texto" oninput="_tiRefreshStatePreview(${i})">
+    <button class="ti-col-btn" title="Eliminar estado" onclick="_tiRemoveStateRow(${i})">✕</button>
+  </div>`;
+}
+function _tiClearStateIcon(idx) {
+  const list = document.getElementById('ti-states-editor-list');
+  const row = list && list.children[idx];
+  if (!row) return;
+  row.querySelector('.ti-state-icon-val').value = '';
+  _tiRefreshStatePreview(idx);
+}
+function _tiRefreshStatePreview(idx) {
+  const list = document.getElementById('ti-states-editor-list');
+  const row = list && list.children[idx];
+  if (!row) return;
+  const key = row.querySelector('.ti-state-icon-val').value;
+  const color = row.querySelector('.ti-state-color').value;
+  const preview = row.querySelector('.ti-state-icon-preview');
+  preview.innerHTML = key ? iconSVG(key, 16, color) : '<span style="font-size:10px;color:var(--text-muted)">Sin icono</span>';
+}
+function _tiAddStateRow() {
+  const list = document.getElementById('ti-states-editor-list');
+  const idx = list.children.length;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = _tiStateRowHTML({ value: 'Nuevo', icon: '', bg: '#F1F5F9', color: '#64748B' }, idx);
+  list.appendChild(wrap.firstElementChild);
+}
+function _tiReindexStateRows() {
+  const list = document.getElementById('ti-states-editor-list');
+  Array.from(list.children).forEach((row, newIdx) => {
+    row.dataset.idx = newIdx;
+    const iconBtn = row.querySelector('[title="Elegir icono"]');
+    const delBtn = row.querySelector('[title="Eliminar estado"]');
+    if (iconBtn) iconBtn.setAttribute('onclick', `_tiPickStateIcon(${newIdx})`);
+    if (delBtn) delBtn.setAttribute('onclick', `_tiRemoveStateRow(${newIdx})`);
+  });
+}
+function _tiRemoveStateRow(idx) {
+  const list = document.getElementById('ti-states-editor-list');
+  if (list.children.length <= 1) { notify('Debe quedar al menos un estado'); return; }
+  const row = list.children[idx];
+  if (row) row.remove();
+  _tiReindexStateRows();
+}
+function _tiPickStateIcon(idx) {
+  openIconPicker(function(key) {
+    const list = document.getElementById('ti-states-editor-list');
+    const row = list.children[idx];
+    if (!row) return;
+    row.querySelector('.ti-state-icon-val').value = key;
+    _tiRefreshStatePreview(idx);
+  });
+}
+function saveColumnConfig() {
+  const col = _tiCol(_tiEditingColId); if (!col) return;
+  col.label = document.getElementById('ti-col-label').value || col.label;
+  col.align = document.getElementById('ti-col-align').value;
+  col.headerColor = document.getElementById('ti-col-bg-custom').value;
+  col.headerTextColor = document.getElementById('ti-col-text-custom').value;
+  if (col.type === 'estado-ciclico') {
+    const rows = Array.from(document.querySelectorAll('#ti-states-editor-list .ti-state-row-modal'));
+    if (rows.length) {
+      col.states = rows.map(row => ({
+        value: row.querySelector('.ti-state-value').value || '',
+        icon: row.querySelector('.ti-state-icon-val').value || '',
+        bg: row.querySelector('.ti-state-bg').value,
+        color: row.querySelector('.ti-state-color').value
+      }));
+      STATE.tablaInteractiva.contenido.rows.forEach(r => { if ((r.values[col.id] || 0) >= col.states.length) r.values[col.id] = 0; });
+    }
+  }
+  closeModal('modal-ti-column');
+  renderTablaEditor();
   scheduleLocalSaveTabla();
+  _tiEditingColId = null;
 }
 
-function openStatesEditor(colId, ev) {
-  ev.stopPropagation();
-  document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
-  const col = _tiCol(colId); if (!col || col.type !== 'estado-ciclico') return;
-  const btn = ev.currentTarget;
-  const popup = document.createElement('div');
-  popup.className = 'block-color-popup ti-states-popup';
-  popup.innerHTML = _tiStatesPopupHTML(colId);
-  btn.style.position = 'relative';
-  btn.appendChild(popup);
-  setTimeout(() => document.addEventListener('click', function handler(e) {
-    if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', handler); renderTablaEditor(); }
-  }), 10);
-}
-function _tiStatesPopupHTML(colId) {
-  const col = _tiCol(colId);
-  const rows = (col.states || []).map((st, i) => `
-    <div class="ti-state-row">
-      <input type="text" value="${escAttr(st.value)}" oninput="updateStateField('${colId}',${i},'value',this.value)" style="width:64px">
-      <input type="color" value="${st.bg}" title="Fondo" oninput="updateStateField('${colId}',${i},'bg',this.value)">
-      <input type="color" value="${st.color}" title="Texto" oninput="updateStateField('${colId}',${i},'color',this.value)">
-      <button class="ti-col-btn" onclick="removeState('${colId}',${i})">✕</button>
-    </div>`).join('');
-  return `<label>Estados cíclicos</label>
-    <div class="ti-states-list">${rows}</div>
-    <button class="btn btn-sm" style="margin-top:6px" onclick="addState('${colId}')">➕ Añadir estado</button>
-    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove();renderTablaEditor()">Cerrar</button></div>`;
-}
-function updateStateField(colId, idx, field, value) {
-  const col = _tiCol(colId); if (!col || !col.states[idx]) return;
-  col.states[idx][field] = value;
-  scheduleLocalSaveTabla();
-}
-function addState(colId) {
-  const col = _tiCol(colId); if (!col) return;
-  col.states.push({ value: 'Nuevo', bg: '#F1F5F9', color: '#64748B' });
-  const popup = document.querySelector('.ti-states-popup');
-  if (popup) popup.innerHTML = _tiStatesPopupHTML(colId);
-  scheduleLocalSaveTabla();
-}
-function removeState(colId, idx) {
-  const col = _tiCol(colId); if (!col) return;
-  if (col.states.length <= 1) { notify('Debe quedar al menos un estado'); return; }
-  col.states.splice(idx, 1);
-  STATE.tablaInteractiva.contenido.rows.forEach(r => { if ((r.values[colId] || 0) >= col.states.length) r.values[colId] = 0; });
-  const popup = document.querySelector('.ti-states-popup');
-  if (popup) popup.innerHTML = _tiStatesPopupHTML(colId);
-  scheduleLocalSaveTabla();
-}
-
-function openHighlightRuleEditor(ev) {
-  ev.stopPropagation();
-  document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
+// ── Resaltado de fila (modal) ──
+function openHighlightRuleModal() {
+  if (!STATE.tablaInteractiva) return;
   if (!STATE.tablaInteractiva.contenido.highlightRule) {
     STATE.tablaInteractiva.contenido.highlightRule = { enabled: false, columnIds: [], matchValue: 'Sí', minCount: 1, bg: '#FCF0E5', borderColor: '#E8622A' };
   }
-  const btn = ev.currentTarget;
-  const popup = document.createElement('div');
-  popup.className = 'block-color-popup ti-hr-popup';
-  popup.innerHTML = _tiHighlightPopupHTML();
-  btn.style.position = 'relative';
-  btn.appendChild(popup);
-  setTimeout(() => document.addEventListener('click', function handler(e) {
-    if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', handler); renderTablaEditor(); }
-  }), 10);
+  document.getElementById('ti-highlight-modal-body').innerHTML = _tiHighlightModalBodyHTML();
+  openModal('modal-ti-highlight');
 }
-function _tiHighlightPopupHTML() {
+function _tiHighlightModalBodyHTML() {
   const hr = STATE.tablaInteractiva.contenido.highlightRule;
   const cyclicCols = STATE.tablaInteractiva.contenido.columns.filter(c => c.type === 'estado-ciclico');
-  const checks = cyclicCols.map(c => `<label class="ti-hr-check"><input type="checkbox" ${hr.columnIds.includes(c.id)?'checked':''} onchange="toggleHighlightColumn('${c.id}',this.checked)"> ${esc(c.label)}</label>`).join('');
-  return `<label><input type="checkbox" ${hr.enabled?'checked':''} onchange="updateHighlightRule('enabled',this.checked)"> Activar resaltado de fila</label>
-    <div style="margin:8px 0">${checks || '<span style="font-size:12px;color:var(--text-muted)">Añade una columna de estado primero</span>'}</div>
-    <div class="color-row"><span style="font-size:11px;flex:1">Valor que cuenta</span><input type="text" value="${escAttr(hr.matchValue)}" style="width:70px" oninput="updateHighlightRule('matchValue',this.value)"></div>
-    <div class="color-row"><span style="font-size:11px;flex:1">Mínimo de columnas</span><input type="number" min="1" value="${hr.minCount}" style="width:50px" oninput="updateHighlightRule('minCount',parseInt(this.value)||1)"></div>
-    <div class="color-row"><span style="font-size:11px;flex:1">Color de resaltado</span><input type="color" value="${hr.borderColor}" oninput="updateHighlightRule('borderColor',this.value)"></div>
-    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove();renderTablaEditor()">Cerrar</button></div>`;
+  const checks = cyclicCols.map(c => `<label class="ti-hr-check"><input type="checkbox" value="${c.id}" ${hr.columnIds.includes(c.id)?'checked':''}> ${esc(c.label)}</label>`).join('');
+  return `<label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px"><input type="checkbox" id="ti-hr-enabled" ${hr.enabled?'checked':''}> Activar resaltado de fila</label>
+    <div id="ti-hr-columns" style="margin:10px 0">${checks || '<span style="font-size:12px;color:var(--text-muted)">Añade una columna de estado primero</span>'}</div>
+    <label style="font-weight:600;font-size:13px">Valor que cuenta</label>
+    <input type="text" class="form-input" id="ti-hr-matchvalue" value="${escAttr(hr.matchValue)}" style="margin:4px 0 12px">
+    <label style="font-weight:600;font-size:13px">Mínimo de columnas coincidentes</label>
+    <input type="number" min="1" class="form-input" id="ti-hr-mincount" value="${hr.minCount}" style="margin:4px 0 12px">
+    <label style="font-weight:600;font-size:13px">Color de resaltado</label>
+    <input type="color" id="ti-hr-bordercolor" value="${hr.borderColor}" style="margin-top:4px">`;
 }
-function toggleHighlightColumn(colId, checked) {
+function saveHighlightRuleModal() {
   const hr = STATE.tablaInteractiva.contenido.highlightRule;
-  if (checked) { if (!hr.columnIds.includes(colId)) hr.columnIds.push(colId); }
-  else { hr.columnIds = hr.columnIds.filter(id => id !== colId); }
-  scheduleLocalSaveTabla();
-}
-function updateHighlightRule(field, value) {
-  STATE.tablaInteractiva.contenido.highlightRule[field] = value;
+  hr.enabled = document.getElementById('ti-hr-enabled').checked;
+  hr.columnIds = Array.from(document.querySelectorAll('#ti-hr-columns input[type=checkbox]:checked')).map(cb => cb.value);
+  hr.matchValue = document.getElementById('ti-hr-matchvalue').value;
+  hr.minCount = parseInt(document.getElementById('ti-hr-mincount').value) || 1;
+  hr.borderColor = document.getElementById('ti-hr-bordercolor').value;
+  closeModal('modal-ti-highlight');
+  renderTablaEditor();
   scheduleLocalSaveTabla();
 }
 function updateLegend(html) {
@@ -3094,18 +3139,23 @@ ${legend}
 }
 function _tiJS(contenido) {
   const colsMap = {};
-  (contenido.columns || []).forEach(col => { if (col.type === 'estado-ciclico') colsMap[col.id] = { states: col.states }; });
+  (contenido.columns || []).forEach(col => {
+    if (col.type === 'estado-ciclico') {
+      colsMap[col.id] = { states: (col.states||[]).map(st => ({ value: st.value, bg: st.bg, color: st.color, iconHtml: st.icon ? iconSVG(st.icon, 14, st.color) : '' })) };
+    }
+  });
   const hr = contenido.highlightRule || { enabled: false, columnIds: [], matchValue: '', minCount: 1, borderColor: '#E8622A' };
   const safe = json => JSON.stringify(json).replace(/<\/script/gi, '<\\/script');
   return `(function(){
 var TI_COLUMNS = ${safe(colsMap)};
 var TI_HIGHLIGHT = ${safe(hr)};
+function escHtml(s){var d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
 function hexToLight(hex){hex=(hex||'#000000').replace('#','');if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);return 'rgba('+r+','+g+','+b+',0.12)';}
 function paintCell(el){
   var col = TI_COLUMNS[el.dataset.col]; if(!col) return;
   var idx = parseInt(el.dataset.v||'0',10);
   var st = col.states[idx] || col.states[0];
-  el.textContent = st.value;
+  el.innerHTML = (st.iconHtml||'') + (st.iconHtml?'&nbsp;':'') + escHtml(st.value);
   el.style.display='inline-block';el.style.minWidth='44px';el.style.textAlign='center';el.style.padding='4px 10px';el.style.borderRadius='20px';el.style.fontSize='12px';el.style.fontWeight='600';el.style.cursor='pointer';el.style.userSelect='none';
   el.style.background = st.bg; el.style.color = st.color;
 }
@@ -3168,6 +3218,76 @@ ${_tiJS(contenido)}
   a.click();
   URL.revokeObjectURL(url);
   notify('✅ Tabla exportada');
+}
+
+async function exportTablaInteractivaImagen() {
+  const ti = STATE.tablaInteractiva;
+  if (!ti) { notify('No hay ninguna tabla abierta'); return; }
+  const titleInput = document.getElementById('ti-titulo');
+  if (titleInput) ti.titulo = titleInput.value || ti.titulo;
+  const titulo = ti.titulo || 'Tabla interactiva';
+  notify('Generando imagen...');
+  let container;
+  try {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    container = document.createElement('div');
+    container.style.cssText = 'position:fixed;top:0;left:-9999px;width:1100px;background:#f8fafc;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1e293b;box-sizing:border-box';
+    container.innerHTML = `<h1 style="font-size:20px;margin:0 0 16px">${esc(titulo)}</h1>${_tiHTML(ti.contenido)}`;
+    document.body.appendChild(container);
+    container.querySelectorAll('.ti-cell').forEach(el => {
+      const col = ti.contenido.columns.find(c => c.id === el.dataset.col);
+      if (!col) return;
+      const idx = parseInt(el.dataset.v || '0', 10);
+      const st = (col.states && col.states[idx]) || (col.states && col.states[0]) || { value:'', bg:'#fff', color:'#000' };
+      el.innerHTML = _tiPillInner(st);
+      el.style.display = 'inline-block'; el.style.minWidth = '44px'; el.style.textAlign = 'center'; el.style.padding = '4px 10px';
+      el.style.borderRadius = '20px'; el.style.fontSize = '12px'; el.style.fontWeight = '600';
+      el.style.background = st.bg; el.style.color = st.color;
+    });
+    const canvas = await window.html2canvas(container, { scale: 3, backgroundColor: '#f8fafc', useCORS: true });
+    document.body.removeChild(container);
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (titulo.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g,'').trim() || 'tabla') + '.png';
+      a.click();
+      URL.revokeObjectURL(url);
+      notify('✅ Imagen exportada');
+    }, 'image/png');
+  } catch(e) {
+    if (container && container.parentNode) document.body.removeChild(container);
+    notify('❌ Error al generar la imagen: ' + (e.message||e), 4000);
+  }
+}
+
+function exportTablaInteractivaExcel() {
+  const ti = STATE.tablaInteractiva;
+  if (!ti) { notify('No hay ninguna tabla abierta'); return; }
+  const titleInput = document.getElementById('ti-titulo');
+  if (titleInput) ti.titulo = titleInput.value || ti.titulo;
+  const titulo = ti.titulo || 'Tabla interactiva';
+  const cols = ti.contenido.columns || [];
+  const rows = ti.contenido.rows || [];
+  const csvEsc = v => '"' + String(v == null ? '' : v).replace(/"/g,'""') + '"';
+  const headerLine = cols.map(c => csvEsc(c.label||'')).join(';');
+  const bodyLines = rows.map(row => cols.map(col => {
+    if (col.type === 'estado-ciclico') {
+      const idx = row.values[col.id] || 0;
+      const st = (col.states && col.states[idx]) || {};
+      return csvEsc(st.value||'');
+    }
+    return csvEsc(row.values[col.id]||'');
+  }).join(';')).join('\r\n');
+  const csv = '﻿' + headerLine + '\r\n' + bodyLines;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (titulo.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g,'').trim() || 'tabla') + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  notify('✅ Tabla exportada a Excel (CSV)');
 }
 
 // ═══════════════════════════════════════════════════════

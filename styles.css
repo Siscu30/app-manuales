@@ -482,8 +482,8 @@ body.mode-manuales .tablas-only{display:none!important}
 .ti-th-label{outline:none;border-bottom:1px dashed transparent}
 .ti-th-label:hover,.ti-th-label:focus{border-bottom-color:rgba(255,255,255,.5)}
 .ti-th-type{font-size:10px;font-weight:400;opacity:.7;text-transform:uppercase;letter-spacing:.04em}
-.ti-th-actions{display:flex;gap:4px}
-.ti-col-btn{background:rgba(255,255,255,.18);border:none;color:inherit;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;line-height:1;flex-shrink:0}
+.ti-th-actions{display:flex;gap:4px;flex-wrap:wrap}
+.ti-col-btn{background:rgba(255,255,255,.18);border:none;color:inherit;min-width:22px;height:22px;padding:0 6px;border-radius:5px;cursor:pointer;font-size:11px;line-height:22px;flex-shrink:0;white-space:nowrap;font-family:inherit}
 .ti-col-btn:hover{background:rgba(255,255,255,.32)}
 .ti-table td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
 .ti-table tbody tr:last-child td{border-bottom:none}
@@ -493,11 +493,13 @@ body.mode-manuales .tablas-only{display:none!important}
 .ti-pill:hover{transform:scale(1.05)}
 .ti-row-actions,.ti-row-actions-head{width:34px;text-align:center!important}
 .ti-legend{max-width:1100px;margin:0 auto 24px;width:100%;padding:12px 24px;box-sizing:border-box;font-size:12px;color:var(--text-muted);outline:none;min-height:1.4em}
-.ti-states-popup,.ti-hr-popup{max-height:70vh;overflow-y:auto}
-.ti-states-list{display:flex;flex-direction:column;gap:6px;margin:6px 0}
-.ti-state-row{display:flex;align-items:center;gap:6px}
-.ti-state-row input[type=text]{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:12px;color:inherit;font-family:inherit}
-.ti-state-row input[type=color]{width:26px;height:26px;border:1px solid var(--border);border-radius:4px;padding:1px;cursor:pointer;background:none}
+.ti-state-row-modal .ti-col-btn{background:rgba(var(--shell-fg-rgb),.08);color:rgb(var(--shell-fg-rgb))}
+.ti-state-row-modal .ti-col-btn:hover{background:rgba(var(--shell-fg-rgb),.16)}
+#ti-states-editor-list{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+.ti-state-row-modal{display:flex;align-items:center;gap:6px;padding:6px 4px;border-bottom:1px solid var(--panel-border)}
+.ti-state-row-modal:last-child{border-bottom:none}
+.ti-state-icon-preview{width:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ti-state-row-modal input[type=color]{width:26px;height:26px;border:1px solid var(--panel-border);border-radius:4px;padding:1px;cursor:pointer;background:none;flex-shrink:0}
 .ti-hr-check{display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0}
 .mp2-bar{background:var(--sidebar);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;box-shadow:var(--shadow-md)}
 .mp2-bar-logo{display:flex;flex-shrink:0}

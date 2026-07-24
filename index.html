@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260717h">
+<link rel="stylesheet" href="styles.css?v=20260717i">
 </head>
 <body class="mode-manuales">
 
@@ -766,19 +766,43 @@
     <input id="ti-titulo" class="ti-title-input" placeholder="Título de la tabla">
     <div class="ti-bar-actions">
       <button class="btn" id="ti-btn-guardar" onclick="guardarTablaInteractiva()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
-      <button class="btn" onclick="exportTablaInteractivaHTML()"><svg class="icon-svg"><use href="#i-export"></use></svg>Exportar HTML</button>
+      <button class="btn" onclick="exportTablaInteractivaHTML()"><svg class="icon-svg"><use href="#i-export"></use></svg>HTML</button>
+      <button class="btn" onclick="exportTablaInteractivaImagen()">🖼 Imagen</button>
+      <button class="btn" onclick="exportTablaInteractivaExcel()">📊 Excel</button>
     </div>
   </div>
   <div class="ti-toolbar">
     <button class="btn btn-sm" onclick="addColumnTexto()">➕ Columna de texto</button>
     <button class="btn btn-sm" onclick="addColumnEstado()">➕ Columna de estado</button>
     <button class="btn btn-sm" onclick="addTiRow()">➕ Fila</button>
-    <button class="btn btn-sm" onclick="openHighlightRuleEditor(event)">🎨 Resaltado de fila</button>
+    <button class="btn btn-sm" onclick="openHighlightRuleModal()">🎨 Resaltado de fila</button>
   </div>
   <div class="ti-table-wrap">
     <table class="ti-table" id="ti-table"></table>
   </div>
   <div class="ti-legend" id="ti-legend" contenteditable="true" spellcheck="false" oninput="updateLegend(this.innerHTML)"></div>
+</div>
+
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-ti-column">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3 id="ti-col-modal-title">Configurar columna</h3><button class="modal-close" onclick="closeModal('modal-ti-column')">×</button></div>
+    <div class="modal-body" id="ti-col-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveColumnConfig()">Guardar</button>
+      <button class="btn" onclick="closeModal('modal-ti-column')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-ti-highlight">
+  <div class="modal modal-md">
+    <div class="modal-header"><h3>Resaltado de fila</h3><button class="modal-close" onclick="closeModal('modal-ti-highlight')">×</button></div>
+    <div class="modal-body" id="ti-highlight-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveHighlightRuleModal()">Guardar</button>
+      <button class="btn" onclick="closeModal('modal-ti-highlight')">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <div id="modal-icon-picker">
@@ -808,7 +832,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260717h"></script>
+<script src="app.js?v=20260717i"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>
