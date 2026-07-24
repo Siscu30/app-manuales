@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderManualesActions();
   loadTablasOrderLocal();
   renderTablasActions();
+  renderColumnPalette();
   initAppMode();
 });
 
@@ -106,9 +107,8 @@ const TABLAS_ACTIONS_META = {
   nueva:    { icon: 'i-new',     label: 'Nueva',  onclick: 'nuevaTablaInteractiva()' },
   guardar:  { icon: 'i-save',    label: 'Guardar', onclick: 'guardarTablaInteractiva()' },
   tablas:   { icon: 'i-library', label: 'Tablas',  onclick: 'openMisTablas()' },
-  exportar: { icon: 'i-export',  label: 'Exportar', onclick: 'exportTablaInteractivaHTML()' },
 };
-const DEFAULT_TABLAS_ORDER = ['nueva','guardar','tablas','exportar'];
+const DEFAULT_TABLAS_ORDER = ['nueva','guardar','tablas'];
 
 function renderBlockPalette() {
   const cont = document.getElementById('sid-chips-bloques');
@@ -1017,8 +1017,17 @@ function notify(msg, duration=2500) {
 }
 function setSaveStatus(txt){ q('#save-status').textContent=txt; }
 let _lastSavedAt = 0;
+let _tiLastSavedAt = 0;
 function _relTime(ms){ const s=Math.round((Date.now()-ms)/1000); if(s<10)return 'ahora mismo'; if(s<60)return 'hace '+s+' s'; const m=Math.round(s/60); if(m<60)return 'hace '+m+' min'; const h=Math.round(m/60); if(h<24)return 'hace '+h+' h'; return 'hace '+Math.round(h/24)+' d'; }
-function _tickSavedAgo(){ if(_lastSavedAt && !STATE.isDirty){ const el=q('#save-status'); if(el) el.textContent='✓ Guardado '+_relTime(_lastSavedAt); } }
+function _tickSavedAgo(){
+  if (STATE.appMode === 'tablas') {
+    if (_tiLastSavedAt && STATE.tablaInteractiva && !STATE.tablaInteractiva.isDirty) {
+      const el=q('#save-status'); if(el) el.textContent='✓ Guardado '+_relTime(_tiLastSavedAt);
+    }
+  } else if (_lastSavedAt && !STATE.isDirty) {
+    const el=q('#save-status'); if(el) el.textContent='✓ Guardado '+_relTime(_lastSavedAt);
+  }
+}
 setInterval(_tickSavedAgo, 20000);
 function openModal(id){ q('#'+id).classList.remove('hidden'); }
 function closeModal(id){ q('#'+id).classList.add('hidden'); }
@@ -1042,6 +1051,21 @@ function setColor(hex) {
   document.documentElement.style.setProperty('--manual-color-light', hexToLight(hex));
   renderColorPicker();
   scheduleLocalSave();
+}
+function renderTablaColorPicker() {
+  const grid = document.getElementById('tabla-color-grid');
+  if (!grid || !STATE.tablaInteractiva) return;
+  const cur = (STATE.tablaInteractiva.color || '').toUpperCase();
+  grid.innerHTML = BLOCK_PALETTE.map(c=>`<span class="bcp-sw${c.toUpperCase()===cur?' bcp-sw-active':''}" style="background:${c}" title="${c}" onclick="setTablaColor('${c}')"></span>`).join('');
+  const custom = document.getElementById('tabla-color-custom');
+  if (custom) custom.value = STATE.tablaInteractiva.color || '#2563EB';
+}
+function setTablaColor(hex) {
+  if (!STATE.tablaInteractiva) return;
+  STATE.tablaInteractiva.color = hex;
+  document.documentElement.style.setProperty('--tabla-color', hex);
+  renderTablaColorPicker();
+  scheduleLocalSaveTabla();
 }
 function shadeColor(hex,pct){
   let n=parseInt(hex.slice(1),16),r=(n>>16)+pct,g=((n>>8)&0xFF)+pct,b=(n&0xFF)+pct;
@@ -1124,6 +1148,13 @@ function updateStats() {
   });
   const pages = STATE.pages && STATE.pages.length > 0 ? STATE.pages.length : 1;
   el.textContent = `${blocks} bloq · ${words} pal · ${pages} pág`;
+}
+function updateTiStats() {
+  const el = q('#stats-indicator');
+  if (!el || !STATE.tablaInteractiva) return;
+  const cols = (STATE.tablaInteractiva.contenido.columns || []).length;
+  const rows = (STATE.tablaInteractiva.contenido.rows || []).length;
+  el.textContent = `${cols} columnas · ${rows} filas`;
 }
 
 function isLightColor(hex) {
@@ -1815,6 +1846,30 @@ function filterBlockBtns(qtext) {
     btn.style.display = !t || btn.textContent.toLowerCase().includes(t) ? '' : 'none';
   });
 }
+const COLUMN_TYPE_META = [
+  { type: 'texto',           icon: 'i-texto',    label: 'Texto' },
+  { type: 'estado-ciclico',  icon: 'i-alerta',   label: 'Estado cíclico' },
+  { type: 'select',          icon: 'i-lista',    label: 'Lista' },
+  { type: 'checkbox',        icon: 'i-checkbox', label: 'Casilla' },
+  { type: 'fecha',           icon: 'i-fecha',    label: 'Fecha' },
+  { type: 'badge',           icon: 'i-badge',    label: 'Insignia' },
+  { type: 'enlace',          icon: 'i-enlace',   label: 'Enlace' },
+];
+function renderColumnPalette() {
+  const cont = document.getElementById('sid-chips-columnas');
+  if (!cont) return;
+  const search = document.getElementById('column-search');
+  const chips = COLUMN_TYPE_META.map(m => `<button class="block-btn" onclick="addTiColumnOfType('${m.type}')" data-type="${m.type}">
+    <svg class="icon-svg"><use href="#${m.icon}"></use></svg>${m.label}
+  </button>`).join('');
+  cont.innerHTML = `<input id="column-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar tipo de columna…" aria-label="Buscar tipo de columna" oninput="filterColumnBtns(this.value)" value="${search ? search.value.replace(/"/g,'&quot;') : ''}">` + chips;
+}
+function filterColumnBtns(qtext) {
+  const t = (qtext||'').toLowerCase().trim();
+  document.querySelectorAll('#sid-chips-columnas .block-btn').forEach(btn=>{
+    btn.style.display = !t || btn.textContent.toLowerCase().includes(t) ? '' : 'none';
+  });
+}
 // ── Buscador global del manual (Ctrl+F): busca en todas las páginas ──
 function _blockText(b) {
   const parts = [b.titulo, b.subtitulo, b.descripcion, b.texto, b.caption, b.code, b.url];
@@ -2253,7 +2308,6 @@ async function openMisTablas() {
 
 function openTablasPanel() {
   if (!STATE.user) { openAuthModal('Accede para ver tus tablas guardadas'); return; }
-  closeTablaEditor();
   document.getElementById('tablas-panel').style.display = 'block';
   document.body.style.overflow = 'hidden';
   loadTablasPanel('activos');
@@ -2262,9 +2316,7 @@ function openTablasPanel() {
 function closeTablasPanel() {
   const panel = document.getElementById('tablas-panel');
   if (panel) panel.style.display = 'none';
-  if (!document.getElementById('ti-editor') || document.getElementById('ti-editor').style.display === 'none') {
-    document.body.style.overflow = '';
-  }
+  document.body.style.overflow = '';
 }
 
 function switchTablasTab(tab) {
@@ -2307,6 +2359,7 @@ async function loadTablasPanel(tab) {
         </div>`;
       }
       return `<div class="mp2-card${isActive?' current':''}">
+        <span class="mp2-card-dot" style="background:${_tiSafeHexColor(t.color)}"></span>
         <div class="mp2-card-info" onclick="loadTablaInteractiva('${t.id}');closeTablasPanel()">
           <div class="mp2-card-title">${isActive?'▶ ':''}${esc(t.titulo||'Sin título')}</div>
           <div class="mp2-card-sub">${dateStr}</div>
@@ -2393,9 +2446,9 @@ async function guardarTablaInteractiva() {
   if (!STATE.tablaInteractiva) return;
   if (!STATE.user) { openAuthModal('Guarda la tabla para sincronizar en la nube'); return; }
   if (STATE.role === 'visualizador') { notify('⚠️ Los visualizadores no pueden guardar'); return; }
-  const titleInput = document.getElementById('ti-titulo');
+  const titleInput = document.getElementById('tabla-titulo');
   if (titleInput) STATE.tablaInteractiva.titulo = titleInput.value || 'Sin título';
-  const btn = document.getElementById('ti-btn-guardar');
+  const btn = document.getElementById('btn-guardar-tabla');
   if (btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
   try {
     const tablaData = {
@@ -2417,6 +2470,8 @@ async function guardarTablaInteractiva() {
     STATE.tablaInteractiva.id = result.data.id;
     STATE.tablaInteractiva.isDirty = false;
     try { localStorage.setItem('last_tabla_id', STATE.tablaInteractiva.id); } catch(e){}
+    _tiLastSavedAt = Date.now();
+    setSaveStatus('✓ Guardado');
     notify('✅ Tabla guardada');
   } catch(e) {
     notify('❌ Error al guardar: ' + (e.message||e), 4000);
@@ -2438,26 +2493,32 @@ async function loadTablaInteractiva(id) {
 
 // ── Editor de tabla interactiva ──
 function openTablaEditor() {
-  const panel = document.getElementById('tablas-panel');
-  if (panel) panel.style.display = 'none';
-  document.getElementById('ti-editor').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+  closeTablasPanel();
+  _tiViewSort = null; _tiSearchQuery = '';
+  const empty = document.getElementById('ti-canvas-empty');
+  const content = document.getElementById('ti-canvas-content');
+  if (empty) empty.style.display = 'none';
+  if (content) content.style.display = '';
+  renderTablaColorPicker();
   renderTablaEditor();
+  if (STATE.appMode === 'tablas') setSaveStatus('');
 }
 function closeTablaEditor() {
-  const ed = document.getElementById('ti-editor');
-  if (ed) ed.style.display = 'none';
   document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
   closeRulesPanel();
   _tiViewSort = null; _tiSearchQuery = '';
-  const panelOpen = document.getElementById('tablas-panel') && document.getElementById('tablas-panel').style.display !== 'none';
-  if (!panelOpen) document.body.style.overflow = '';
+  const empty = document.getElementById('ti-canvas-empty');
+  const content = document.getElementById('ti-canvas-content');
+  if (content) content.style.display = 'none';
+  if (empty) empty.style.display = '';
+  if (STATE.appMode === 'tablas') { setSaveStatus(''); const el = q('#stats-indicator'); if (el) el.textContent = ''; }
 }
 
 let _tiSaveTimer = null;
 function scheduleLocalSaveTabla() {
   if (!STATE.tablaInteractiva) return;
   STATE.tablaInteractiva.isDirty = true;
+  if (STATE.appMode === 'tablas') setSaveStatus('⚠ Sin guardar');
   clearTimeout(_tiSaveTimer);
   _tiSaveTimer = setTimeout(localSaveTabla, 600);
 }
@@ -2491,6 +2552,13 @@ function _tiSafeUrl(url) {
   if (!v) return '';
   if (/^\s*(javascript|data|vbscript):/i.test(v)) return '';
   return v;
+}
+// Cualquier color persistido (tablas_interactivas.color) que se interpola en un
+// atributo style="" debe validarse como hex — evita que un valor corrupto/manual
+// en la fila (fuera de la UI del color picker) inyecte propiedades CSS extra.
+function _tiSafeHexColor(hex, fallback) {
+  const v = String(hex || '').trim();
+  return /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : (fallback || '#2563EB');
 }
 function _tiCellCompareValue(col, row) {
   const val = row.values[col.id];
@@ -2657,7 +2725,7 @@ function searchTiRows(q) {
 function renderTablaEditor() {
   const ti = STATE.tablaInteractiva;
   if (!ti) return;
-  const titleInput = document.getElementById('ti-titulo');
+  const titleInput = document.getElementById('tabla-titulo');
   if (titleInput && document.activeElement !== titleInput) titleInput.value = ti.titulo || '';
 
   const cols = ti.contenido.columns || [];
@@ -2694,6 +2762,7 @@ function renderTablaEditor() {
 
   const legend = document.getElementById('ti-legend');
   if (legend && document.activeElement !== legend) legend.innerHTML = ti.contenido.legend || '';
+  updateTiStats();
 }
 
 function updateColumnLabel(colId, text) {
@@ -3678,7 +3747,7 @@ window._tiSetCell = function(el, kind){
 function exportTablaInteractivaHTML() {
   const ti = STATE.tablaInteractiva;
   if (!ti) { notify('No hay ninguna tabla abierta'); return; }
-  const titleInput = document.getElementById('ti-titulo');
+  const titleInput = document.getElementById('tabla-titulo');
   if (titleInput) ti.titulo = titleInput.value || ti.titulo;
   const titulo = ti.titulo || 'Tabla interactiva';
   const contenido = ti.contenido;
@@ -3713,7 +3782,7 @@ ${_tiJS(contenido)}
 async function exportTablaInteractivaImagen() {
   const ti = STATE.tablaInteractiva;
   if (!ti) { notify('No hay ninguna tabla abierta'); return; }
-  const titleInput = document.getElementById('ti-titulo');
+  const titleInput = document.getElementById('tabla-titulo');
   if (titleInput) ti.titulo = titleInput.value || ti.titulo;
   const titulo = ti.titulo || 'Tabla interactiva';
   notify('Generando imagen...');
@@ -3780,7 +3849,7 @@ async function exportTablaInteractivaImagen() {
 function exportTablaInteractivaExcel() {
   const ti = STATE.tablaInteractiva;
   if (!ti) { notify('No hay ninguna tabla abierta'); return; }
-  const titleInput = document.getElementById('ti-titulo');
+  const titleInput = document.getElementById('tabla-titulo');
   if (titleInput) ti.titulo = titleInput.value || ti.titulo;
   const titulo = ti.titulo || 'Tabla interactiva';
   const cols = ti.contenido.columns || [];
@@ -3847,6 +3916,12 @@ function toggleResourcesMenu() {
 }
 document.addEventListener('click', ev=>{
   if (!ev.target.closest('#resources-dropdown')) q('#resources-menu')?.classList.remove('open');
+});
+function toggleTablaShareMenu() {
+  q('#tabla-share-menu').classList.toggle('open');
+}
+document.addEventListener('click', ev=>{
+  if (!ev.target.closest('#tabla-share-dropdown')) q('#tabla-share-menu')?.classList.remove('open');
 });
 function toggleAccountMenu() {
   q('#account-menu').classList.toggle('open');
@@ -4471,14 +4546,18 @@ function switchAppMode(mode, isInit) {
   try { localStorage.setItem('app_mode', mode); } catch(e) {}
   if (isInit) return; // en el arranque, handleSession() decide qué pantalla abrir
   if (mode === 'tablas') {
-    if (!document.getElementById('tablas-panel') || document.getElementById('tablas-panel').style.display === 'none') {
-      if (!document.getElementById('ti-editor') || document.getElementById('ti-editor').style.display === 'none') {
-        openMisTablas();
-      }
+    const tablasPanelOpen = document.getElementById('tablas-panel') && document.getElementById('tablas-panel').style.display !== 'none';
+    if (STATE.tablaInteractiva) {
+      renderTablaEditor();
+      _tickSavedAgo();
+    } else {
+      setSaveStatus('');
+      const el = q('#stats-indicator'); if (el) el.textContent = '';
+      if (!tablasPanelOpen) openMisTablas();
     }
   } else {
     closeTablasPanel();
-    closeTablaEditor();
+    updateStats();
   }
 }
 
@@ -4491,7 +4570,9 @@ const _SIDEBAR_PANELS = [
   { id: 'sid-chips-bloques',  arrowId: 'arrow-bloques' },
   { id: 'sid-fmt-panel',      arrowId: 'arrow-fmt' },
   { id: 'sid-iconos',         arrowId: 'arrow-iconos' },
-  { id: 'sid-chips-tablas',   arrowId: 'arrow-tablas' },
+  { id: 'sid-chips-tablas',        arrowId: 'arrow-tablas' },
+  { id: 'sid-tabla-color-panel',   arrowId: 'arrow-tabla-color' },
+  { id: 'sid-chips-columnas',      arrowId: 'arrow-columnas' },
 ];
 let _prefsTimer = null;
 
