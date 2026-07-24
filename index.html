@@ -13,9 +13,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
-<link rel="stylesheet" href="styles.css?v=20260717g">
+<link rel="stylesheet" href="styles.css?v=20260717h">
 </head>
-<body>
+<body class="mode-manuales">
 
 <svg style="display:none" aria-hidden="true">
   <symbol id="i-logo" viewBox="0 0 24 24">
@@ -45,6 +45,11 @@
     <path d="M8 9.5l4 4 4-4"/>
     <path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>
     <path d="M2.5 15h2M19.5 15h2" stroke="var(--primary)" stroke-width="2"/>
+  </symbol>
+  <symbol id="i-export" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 12.5v-9.5"/>
+    <path d="M8 6.5l4-4 4 4"/>
+    <path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>
   </symbol>
   <symbol id="i-templates" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
     <rect x="3" y="3" width="18" height="18" rx="2.5" stroke-dasharray="3 2.5"/>
@@ -180,16 +185,25 @@
     <span class="sid-brand">Manualia</span>
   </div>
 
-  <div class="sb-section-hdr" onclick="toggleSidSection('sid-chips-manuales','arrow-manuales')">
+  <div class="sid-mode-switch" role="tablist" aria-label="Selector de módulo">
+    <button class="sid-mode-btn active" id="mode-btn-manuales" role="tab" aria-selected="true" onclick="switchAppMode('manuales')">
+      <svg class="icon-svg"><use href="#i-titulo"></use></svg>Manuales
+    </button>
+    <button class="sid-mode-btn" id="mode-btn-tablas" role="tab" aria-selected="false" onclick="switchAppMode('tablas')">
+      <svg class="icon-svg"><use href="#i-tabla"></use></svg>Tablas
+    </button>
+  </div>
+
+  <div class="sb-section-hdr manual-only" onclick="toggleSidSection('sid-chips-manuales','arrow-manuales')">
     <span>Manuales</span><span class="sb-toggle" id="arrow-manuales">▼</span>
   </div>
-  <div class="sid-chips" id="sid-chips-manuales"></div>
+  <div class="sid-chips manual-only" id="sid-chips-manuales"></div>
 
-  <hr class="sid-divider">
-  <div class="sb-section-hdr" onclick="toggleSidSection('sid-color-panel','arrow-color')">
+  <hr class="sid-divider manual-only">
+  <div class="sb-section-hdr manual-only" onclick="toggleSidSection('sid-color-panel','arrow-color')">
     <span>Color del manual</span><span class="sb-toggle" id="arrow-color">▼</span>
   </div>
-  <div class="sid-color-panel" id="sid-color-panel">
+  <div class="sid-color-panel manual-only" id="sid-color-panel">
     <div class="bcp-grid" id="manual-color-grid"></div>
     <div class="color-row" style="margin-top:8px;padding:0 12px 10px">
       <span style="font-size:11px;color:rgba(var(--shell-fg-rgb),.55);flex:1">Personalizado</span>
@@ -197,19 +211,25 @@
     </div>
   </div>
 
-  <hr class="sid-divider">
-  <div class="sb-section-hdr" onclick="toggleSidSection('sid-chips-bloques','arrow-bloques')">
+  <hr class="sid-divider manual-only">
+  <div class="sb-section-hdr manual-only" onclick="toggleSidSection('sid-chips-bloques','arrow-bloques')">
     <span>Bloques</span><span class="sb-toggle" id="arrow-bloques">▼</span>
   </div>
-  <div class="sid-chips" id="sid-chips-bloques">
+  <div class="sid-chips manual-only" id="sid-chips-bloques">
     <input id="block-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar bloque…" aria-label="Buscar tipo de bloque" oninput="filterBlockBtns(this.value)">
   </div>
 
-  <hr class="sid-divider">
-  <div class="sb-section-hdr" onclick="toggleSidSection('sid-fmt-panel','arrow-fmt')">
+  <hr class="sid-divider tablas-only">
+  <div class="sb-section-hdr tablas-only" onclick="toggleSidSection('sid-chips-tablas','arrow-tablas')">
+    <span>Tablas Interactivas</span><span class="sb-toggle" id="arrow-tablas">▼</span>
+  </div>
+  <div class="sid-chips tablas-only" id="sid-chips-tablas"></div>
+
+  <hr class="sid-divider manual-only">
+  <div class="sb-section-hdr manual-only" onclick="toggleSidSection('sid-fmt-panel','arrow-fmt')">
     <span>Formato</span><span class="sb-toggle" id="arrow-fmt">▼</span>
   </div>
-  <div class="sid-fmt-panel" id="sid-fmt-panel">
+  <div class="sid-fmt-panel manual-only" id="sid-fmt-panel">
     <span class="fmt-hint" id="fmt-hint">Haz clic en texto para editar</span>
     <div class="fmt-row">
       <button class="fmt-btn" id="fmts-bold" data-cmd="bold" title="Negrita (Ctrl+B)" onmousedown="event.preventDefault();fmt('bold')"><b>B</b></button>
@@ -254,11 +274,11 @@
     </div>
     <input type="color" id="fmt-sid-custom-inp" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none" oninput="_restoreFmtSel();document.execCommand('foreColor',false,this.value)">
   </div>
-  <hr class="sid-divider">
-  <div class="sb-section-hdr" onclick="toggleSidSection('sid-iconos','arrow-iconos');_icoInit()">
+  <hr class="sid-divider manual-only">
+  <div class="sb-section-hdr manual-only" onclick="toggleSidSection('sid-iconos','arrow-iconos');_icoInit()">
     <span>Iconos</span><span class="sb-toggle" id="arrow-iconos">▶</span>
   </div>
-  <div class="sid-iconos" id="sid-iconos" style="display:none">
+  <div class="sid-iconos manual-only" id="sid-iconos" style="display:none">
     <input id="ico-search-sb" class="ico-inp" placeholder="Buscar icono…" oninput="_icoOnSearch(this.value)">
     <div class="ico-cats" id="ico-cats-sb"></div>
     <div class="ico-grid" id="ico-grid-sb"></div>
@@ -722,6 +742,45 @@
   </div>
 </div>
 
+<div id="tablas-panel" style="display:none">
+  <div class="mp2-bar">
+    <span class="mp2-bar-logo"><svg width="24" height="24"><use href="#i-tabla"></use></svg></span>
+    <h2>Tablas Interactivas</h2>
+    <button class="mp2-close" onclick="closeTablasPanel();switchAppMode('manuales')">✕ Cerrar</button>
+  </div>
+  <div class="mp2-body">
+    <div class="mp2-quickbar">
+      <button class="btn btn-primary" onclick="closeTablasPanel();nuevaTablaInteractiva()"><svg class="icon-svg"><use href="#i-new"></use></svg>Nueva tabla</button>
+    </div>
+    <div class="mp2-tabs">
+      <button class="mp2-tab active" id="tp2-tab-activos" onclick="switchTablasTab('activos')">📊 Activas</button>
+      <button class="mp2-tab" id="tp2-tab-papelera" onclick="switchTablasTab('papelera')">🗑 Papelera</button>
+    </div>
+    <div id="tp2-list" class="mp2-list-target"></div>
+  </div>
+</div>
+
+<div id="ti-editor" style="display:none">
+  <div class="ti-bar">
+    <button class="ti-back" onclick="closeTablaEditor();openTablasPanel()" title="Volver a Mis Tablas">←</button>
+    <input id="ti-titulo" class="ti-title-input" placeholder="Título de la tabla">
+    <div class="ti-bar-actions">
+      <button class="btn" id="ti-btn-guardar" onclick="guardarTablaInteractiva()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
+      <button class="btn" onclick="exportTablaInteractivaHTML()"><svg class="icon-svg"><use href="#i-export"></use></svg>Exportar HTML</button>
+    </div>
+  </div>
+  <div class="ti-toolbar">
+    <button class="btn btn-sm" onclick="addColumnTexto()">➕ Columna de texto</button>
+    <button class="btn btn-sm" onclick="addColumnEstado()">➕ Columna de estado</button>
+    <button class="btn btn-sm" onclick="addTiRow()">➕ Fila</button>
+    <button class="btn btn-sm" onclick="openHighlightRuleEditor(event)">🎨 Resaltado de fila</button>
+  </div>
+  <div class="ti-table-wrap">
+    <table class="ti-table" id="ti-table"></table>
+  </div>
+  <div class="ti-legend" id="ti-legend" contenteditable="true" spellcheck="false" oninput="updateLegend(this.innerHTML)"></div>
+</div>
+
 <div id="modal-icon-picker">
   <div class="ip-panel">
     <div class="ip-head">
@@ -749,7 +808,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260717g"></script>
+<script src="app.js?v=20260717h"></script>
 <div id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" alt="" onclick="toggleLightboxZoom(event)">
   <button id="lightbox-close" onclick="event.stopPropagation();closeLightbox()" title="Cerrar (Esc)">×</button>

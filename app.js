@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderBlockPalette();
   loadManualesOrderLocal();
   renderManualesActions();
+  loadTablasOrderLocal();
+  renderTablasActions();
+  initAppMode();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -44,6 +47,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 let STATE = {
   user: null,
   role: null, // 'admin' | 'editor' | 'visualizador' | null (guest)
+  appMode: 'manuales', // 'manuales' | 'tablas' — selector de modo del sidebar
   manual: { id: null, titulo: 'Nuevo manual', empresa: '', color: '#2563EB', estado: 'borrador' },
   blocks: [],
   isDragging: false,
@@ -62,6 +66,9 @@ let STATE = {
   autoSaveTimer: null,
   blockPaletteOrder: null,
   manualesActionsOrder: null,
+  tablasActionsOrder: null,
+  // Tabla interactiva actualmente en edición (módulo separado del editor de manuales)
+  tablaInteractiva: null,
 };
 
 // ═══════════════════════════════════════════════════════
@@ -94,6 +101,14 @@ const MANUALES_ACTIONS_META = {
   historial:  { icon: 'i-history',   label: 'Historial',  onclick: 'openVersionHistory()' },
 };
 const DEFAULT_MANUALES_ORDER = ['nuevo','guardar','manuales','importar','plantillas','historial'];
+
+const TABLAS_ACTIONS_META = {
+  nueva:    { icon: 'i-new',     label: 'Nueva',  onclick: 'nuevaTablaInteractiva()' },
+  guardar:  { icon: 'i-save',    label: 'Guardar', onclick: 'guardarTablaInteractiva()' },
+  tablas:   { icon: 'i-library', label: 'Tablas',  onclick: 'openMisTablas()' },
+  exportar: { icon: 'i-export',  label: 'Exportar', onclick: 'exportTablaInteractivaHTML()' },
+};
+const DEFAULT_TABLAS_ORDER = ['nueva','guardar','tablas','exportar'];
 
 function renderBlockPalette() {
   const cont = document.getElementById('sid-chips-bloques');
@@ -137,6 +152,28 @@ function loadManualesOrderLocal() {
     const saved = JSON.parse(localStorage.getItem('manuales_actions_order') || 'null');
     if (Array.isArray(saved) && saved.length === DEFAULT_MANUALES_ORDER.length && saved.every(k => MANUALES_ACTIONS_META[k])) {
       STATE.manualesActionsOrder = saved;
+    }
+  } catch(e) {}
+}
+
+function renderTablasActions() {
+  const cont = document.getElementById('sid-chips-tablas');
+  if (!cont) return;
+  const order = (STATE.tablasActionsOrder && STATE.tablasActionsOrder.length === DEFAULT_TABLAS_ORDER.length)
+    ? STATE.tablasActionsOrder : DEFAULT_TABLAS_ORDER;
+  cont.innerHTML = order.map((key, i) => {
+    const meta = TABLAS_ACTIONS_META[key];
+    if (!meta) return '';
+    return `<button class="block-btn" onclick="${meta.onclick}" draggable="true" data-reorder-group="tablas" data-reorder-index="${i}" data-reorder-key="${key}">
+      <svg class="icon-svg"><use href="#${meta.icon}"></use></svg>${meta.label}
+    </button>`;
+  }).join('');
+}
+function loadTablasOrderLocal() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('tablas_actions_order') || 'null');
+    if (Array.isArray(saved) && saved.length === DEFAULT_TABLAS_ORDER.length && saved.every(k => TABLAS_ACTIONS_META[k])) {
+      STATE.tablasActionsOrder = saved;
     }
   } catch(e) {}
 }
@@ -199,6 +236,23 @@ function _applyReorder(group, fromIndex, toIndex) {
     renderManualesActions();
     try { localStorage.setItem('manuales_actions_order', JSON.stringify(order)); } catch(e) {}
     saveUserPrefs();
+  } else if (group === 'tablas') {
+    const order = (STATE.tablasActionsOrder && STATE.tablasActionsOrder.length === DEFAULT_TABLAS_ORDER.length)
+      ? STATE.tablasActionsOrder.slice() : DEFAULT_TABLAS_ORDER.slice();
+    if (fromIndex < 0 || fromIndex >= order.length || toIndex < 0 || toIndex >= order.length) return;
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    STATE.tablasActionsOrder = order;
+    renderTablasActions();
+    try { localStorage.setItem('tablas_actions_order', JSON.stringify(order)); } catch(e) {}
+    saveUserPrefs();
+  } else if (group === 'ti-columns') {
+    const cols = STATE.tablaInteractiva && STATE.tablaInteractiva.contenido && STATE.tablaInteractiva.contenido.columns;
+    if (!cols || fromIndex < 0 || fromIndex >= cols.length || toIndex < 0 || toIndex >= cols.length) return;
+    const [moved] = cols.splice(fromIndex, 1);
+    cols.splice(toIndex, 0, moved);
+    renderTablaEditor();
+    scheduleLocalSaveTabla();
   }
 }
 
@@ -1979,7 +2033,7 @@ function closeManualesPanel() {
 }
 
 function switchManualesTab(tab) {
-  document.querySelectorAll('.mp2-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#manuales-panel .mp2-tab').forEach(t => t.classList.remove('active'));
   const tabEl = document.getElementById('mp2-tab-' + tab);
   if (tabEl) tabEl.classList.add('active');
   loadManualesPanel(tab);
@@ -2134,6 +2188,489 @@ async function nuevoManual() {
   render();
   renderPagesPanel();
   setSaveStatus('');
+}
+
+// ═══════════════════════════════════════════════════════
+// TABLAS INTERACTIVAS — módulo separado, propia tabla Supabase
+// ═══════════════════════════════════════════════════════
+function _tiDefaultContenido() {
+  const colA = uid(), colB = uid();
+  return {
+    schemaVersion: 1,
+    columns: [
+      { id: colA, type: 'texto', label: 'Columna', align: 'left', headerColor: '#1B3A4B', headerTextColor: '#ffffff' },
+      { id: colB, type: 'estado-ciclico', label: 'Estado', align: 'center', headerColor: '#E8622A', headerTextColor: '#ffffff',
+        states: [ { value: 'Sí', bg: '#DCFCE7', color: '#16A34A' }, { value: 'No', bg: '#F1F5F9', color: '#64748B' }, { value: '—', bg: '#F1F5F9', color: '#94A3B8' } ] }
+    ],
+    rows: [ { id: uid(), values: { [colA]: 'Fila 1', [colB]: 0 } } ],
+    highlightRule: { enabled: false, columnIds: [], matchValue: 'Sí', minCount: 1, bg: '#FCF0E5', borderColor: '#E8622A' },
+    legend: ''
+  };
+}
+
+async function openMisTablas() {
+  if (!STATE.user) { openAuthModal('Accede para ver tus tablas guardadas'); return; }
+  openTablasPanel();
+}
+
+function openTablasPanel() {
+  if (!STATE.user) { openAuthModal('Accede para ver tus tablas guardadas'); return; }
+  closeTablaEditor();
+  document.getElementById('tablas-panel').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  loadTablasPanel('activos');
+}
+
+function closeTablasPanel() {
+  const panel = document.getElementById('tablas-panel');
+  if (panel) panel.style.display = 'none';
+  if (!document.getElementById('ti-editor') || document.getElementById('ti-editor').style.display === 'none') {
+    document.body.style.overflow = '';
+  }
+}
+
+function switchTablasTab(tab) {
+  document.querySelectorAll('#tablas-panel .mp2-tab').forEach(t => t.classList.remove('active'));
+  const tabEl = document.getElementById('tp2-tab-' + tab);
+  if (tabEl) tabEl.classList.add('active');
+  loadTablasPanel(tab);
+}
+
+async function loadTablasPanel(tab) {
+  const list = document.getElementById('tp2-list');
+  if (!list) return;
+  list.innerHTML = '<div class="mp2-empty">Cargando...</div>';
+  try {
+    let query = sb.from('tablas_interactivas').select('id,titulo,color,estado,updated_at,created_by');
+    if (tab === 'papelera') {
+      query = query.eq('estado', 'papelera');
+    } else {
+      query = query.neq('estado', 'papelera');
+    }
+    const { data, error } = await query.order('updated_at', { ascending: false });
+    if (error) throw error;
+    if (!data.length) {
+      list.innerHTML = `<div class="mp2-empty">${tab === 'papelera' ? '🗑 La papelera está vacía' : '📊 No tienes tablas guardadas.<br><br><button class="btn btn-primary" onclick="closeTablasPanel();nuevaTablaInteractiva()">Crear tabla</button>'}</div>`;
+      return;
+    }
+    list.innerHTML = data.map(t => {
+      const isActive = STATE.tablaInteractiva && STATE.tablaInteractiva.id === t.id;
+      const dateStr = new Date(t.updated_at).toLocaleString('es', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      if (tab === 'papelera') {
+        return `<div class="mp2-card">
+          <div class="mp2-card-info">
+            <div class="mp2-card-title">${esc(t.titulo||'Sin título')}</div>
+            <div class="mp2-card-sub">Eliminado · ${dateStr}</div>
+          </div>
+          <div class="mp2-card-actions">
+            <button class="btn" onclick="restoreTablaInteractiva('${t.id}')">♻️ Restaurar</button>
+            <button class="btn" style="color:#dc2626" data-id="${t.id}" data-titulo="${escAttr(t.titulo||'Sin título')}" onclick="permanentDeleteTablaInteractiva(this.dataset.id, this.dataset.titulo)">🗑 Eliminar definitivamente</button>
+          </div>
+        </div>`;
+      }
+      return `<div class="mp2-card${isActive?' current':''}">
+        <div class="mp2-card-info" onclick="loadTablaInteractiva('${t.id}');closeTablasPanel()">
+          <div class="mp2-card-title">${isActive?'▶ ':''}${esc(t.titulo||'Sin título')}</div>
+          <div class="mp2-card-sub">${dateStr}</div>
+        </div>
+        <div class="mp2-card-actions">
+          <button class="btn" style="font-size:12px" data-id="${t.id}" data-titulo="${escAttr(t.titulo||'Sin título')}" onclick="duplicateTablaInteractiva(this.dataset.id, this.dataset.titulo)">⧉ Duplicar</button>
+          <button class="btn" style="font-size:12px;color:#dc2626" data-id="${t.id}" data-titulo="${escAttr(t.titulo||'Sin título')}" onclick="softDeleteTablaInteractiva(this.dataset.id, this.dataset.titulo)">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = `<div class="mp2-empty" style="color:#dc2626">Error: ${e.message}</div>`;
+  }
+}
+
+async function softDeleteTablaInteractiva(id, titulo) {
+  if (!confirm(`¿Mover "${titulo}" a la papelera?`)) return;
+  try {
+    const { error } = await sb.from('tablas_interactivas').update({ estado: 'papelera' }).eq('id', id);
+    if (error) throw error;
+    if (STATE.tablaInteractiva && STATE.tablaInteractiva.id === id) {
+      closeTablaEditor();
+      STATE.tablaInteractiva = null;
+    }
+    notify('🗑 Movida a la papelera');
+    loadTablasPanel('activos');
+  } catch(e) { notify('❌ Error: ' + (e.message||e), 4000); }
+}
+
+async function restoreTablaInteractiva(id) {
+  try {
+    const { error } = await sb.from('tablas_interactivas').update({ estado: 'borrador' }).eq('id', id);
+    if (error) throw error;
+    notify('✅ Tabla restaurada');
+    loadTablasPanel('papelera');
+  } catch(e) { notify('❌ Error: ' + (e.message||e), 4000); }
+}
+
+async function permanentDeleteTablaInteractiva(id, titulo) {
+  if (!confirm(`¿Eliminar definitivamente "${titulo}"?\n\nEsta acción NO se puede deshacer.`)) return;
+  if (!confirm('⚠️ Última advertencia — todos los datos se borrarán para siempre. ¿Continuar?')) return;
+  try {
+    const { error } = await sb.from('tablas_interactivas').delete().eq('id', id);
+    if (error) throw error;
+    notify('🗑 Tabla eliminada definitivamente');
+    loadTablasPanel('papelera');
+  } catch(e) { notify('❌ Error: ' + (e.message||e), 4000); }
+}
+
+async function duplicateTablaInteractiva(id, titulo) {
+  if (!STATE.user) { openAuthModal('Accede para duplicar'); return; }
+  try {
+    const { data, error } = await sb.from('tablas_interactivas').select('titulo,color,contenido').eq('id', id).single();
+    if (error || !data) throw new Error('Tabla no encontrada');
+    const c = data.contenido || {};
+    const idMap = {};
+    const columns = (c.columns||[]).map(col => { const nid = uid(); idMap[col.id] = nid; return { ...col, id: nid }; });
+    const rows = (c.rows||[]).map(r => ({ id: uid(), values: Object.fromEntries(Object.entries(r.values||{}).map(([k,v]) => [idMap[k]||k, v])) }));
+    const highlightRule = { ...(c.highlightRule||{}), columnIds: (c.highlightRule?.columnIds||[]).map(cid => idMap[cid]||cid) };
+    const contenido = { ...c, columns, rows, highlightRule };
+    const ins = await sb.from('tablas_interactivas').insert({
+      titulo: (data.titulo || 'Tabla') + ' (copia)', color: data.color || '#2563EB',
+      contenido, estado: 'borrador', user_id: STATE.user.id, created_by: STATE.user.id
+    }).select().single();
+    if (ins.error) throw ins.error;
+    notify('✅ Tabla duplicada');
+    loadTablasPanel('activos');
+  } catch(e) { notify('❌ Error al duplicar: ' + (e.message || e), 4000); }
+}
+
+async function nuevaTablaInteractiva() {
+  if (STATE.tablaInteractiva && STATE.tablaInteractiva.isDirty) {
+    if (!confirm('¿Crear una tabla nueva? Los cambios no guardados se perderán.')) return;
+  }
+  STATE.tablaInteractiva = { id: null, titulo: 'Nueva tabla', color: '#2563EB', estado: 'borrador', contenido: _tiDefaultContenido(), isDirty: false };
+  openTablaEditor();
+}
+
+async function guardarTablaInteractiva() {
+  if (!STATE.tablaInteractiva) return;
+  if (!STATE.user) { openAuthModal('Guarda la tabla para sincronizar en la nube'); return; }
+  if (STATE.role === 'visualizador') { notify('⚠️ Los visualizadores no pueden guardar'); return; }
+  const titleInput = document.getElementById('ti-titulo');
+  if (titleInput) STATE.tablaInteractiva.titulo = titleInput.value || 'Sin título';
+  const btn = document.getElementById('ti-btn-guardar');
+  if (btn) { btn.textContent = '⏳ Guardando...'; btn.disabled = true; }
+  try {
+    const tablaData = {
+      titulo: STATE.tablaInteractiva.titulo,
+      color: STATE.tablaInteractiva.color,
+      contenido: STATE.tablaInteractiva.contenido,
+      estado: STATE.tablaInteractiva.estado || 'borrador',
+      updated_at: new Date().toISOString(),
+      user_id: STATE.user.id,
+      created_by: STATE.tablaInteractiva.createdBy || STATE.user.id
+    };
+    let result;
+    if (STATE.tablaInteractiva.id) {
+      result = await sb.from('tablas_interactivas').update(tablaData).eq('id', STATE.tablaInteractiva.id).select().single();
+    } else {
+      result = await sb.from('tablas_interactivas').insert(tablaData).select().single();
+    }
+    if (result.error) throw result.error;
+    STATE.tablaInteractiva.id = result.data.id;
+    STATE.tablaInteractiva.isDirty = false;
+    try { localStorage.setItem('last_tabla_id', STATE.tablaInteractiva.id); } catch(e){}
+    notify('✅ Tabla guardada');
+  } catch(e) {
+    notify('❌ Error al guardar: ' + (e.message||e), 4000);
+  } finally {
+    if (btn) { btn.textContent = '💾 Guardar'; btn.disabled = false; }
+  }
+}
+
+async function loadTablaInteractiva(id) {
+  try {
+    const { data, error } = await sb.from('tablas_interactivas').select('*').eq('id', id).single();
+    if (error) throw error;
+    STATE.tablaInteractiva = { id: data.id, titulo: data.titulo, color: data.color||'#2563EB', estado: data.estado||'borrador', createdBy: data.created_by, contenido: data.contenido || _tiDefaultContenido(), isDirty: false };
+    openTablaEditor();
+    notify('📂 Tabla cargada');
+  } catch(e) { notify('❌ Error al cargar: '+(e.message||e), 4000); }
+}
+
+// ── Editor de tabla interactiva ──
+function openTablaEditor() {
+  const panel = document.getElementById('tablas-panel');
+  if (panel) panel.style.display = 'none';
+  document.getElementById('ti-editor').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  renderTablaEditor();
+}
+function closeTablaEditor() {
+  const ed = document.getElementById('ti-editor');
+  if (ed) ed.style.display = 'none';
+  document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
+  const panelOpen = document.getElementById('tablas-panel') && document.getElementById('tablas-panel').style.display !== 'none';
+  if (!panelOpen) document.body.style.overflow = '';
+}
+
+let _tiSaveTimer = null;
+function scheduleLocalSaveTabla() {
+  if (!STATE.tablaInteractiva) return;
+  STATE.tablaInteractiva.isDirty = true;
+  clearTimeout(_tiSaveTimer);
+  _tiSaveTimer = setTimeout(localSaveTabla, 600);
+}
+function localSaveTabla() {
+  if (!STATE.tablaInteractiva) return;
+  try { localStorage.setItem('tabla_draft_' + (STATE.tablaInteractiva.id || 'guest'), JSON.stringify(STATE.tablaInteractiva)); } catch(e) {}
+}
+
+function _tiCol(colId) {
+  return STATE.tablaInteractiva && STATE.tablaInteractiva.contenido.columns.find(c => c.id === colId);
+}
+function _tiRow(rowId) {
+  return STATE.tablaInteractiva && STATE.tablaInteractiva.contenido.rows.find(r => r.id === rowId);
+}
+
+function renderTablaEditor() {
+  const ti = STATE.tablaInteractiva;
+  if (!ti) return;
+  const titleInput = document.getElementById('ti-titulo');
+  if (titleInput && document.activeElement !== titleInput) titleInput.value = ti.titulo || '';
+
+  const cols = ti.contenido.columns || [];
+  const rows = ti.contenido.rows || [];
+  const hr = ti.contenido.highlightRule || {};
+
+  const theadCells = cols.map((col, i) => {
+    const colorBtn = `<button class="ti-col-btn" title="Color de cabecera" onclick="openColumnColorPicker('${col.id}',event)">🎨</button>`;
+    const statesBtn = col.type === 'estado-ciclico' ? `<button class="ti-col-btn" title="Editar estados" onclick="openStatesEditor('${col.id}',event)">⚙</button>` : '';
+    const typeLabel = col.type === 'estado-ciclico' ? 'Estado cíclico' : 'Texto';
+    return `<th data-col-id="${col.id}" style="background:${col.headerColor||'#1B3A4B'};color:${col.headerTextColor||'#ffffff'};text-align:${col.align||'left'}" draggable="true" data-reorder-group="ti-columns" data-reorder-index="${i}">
+      <div class="ti-th-inner">
+        <span class="ti-th-label" contenteditable="true" spellcheck="false" oninput="updateColumnLabel('${col.id}',this.textContent)">${esc(col.label||'')}</span>
+        <span class="ti-th-type">${typeLabel}</span>
+      </div>
+      <div class="ti-th-actions">${colorBtn}${statesBtn}<button class="ti-col-btn" title="Eliminar columna" onclick="removeTiColumn('${col.id}')">✕</button></div>
+    </th>`;
+  }).join('');
+
+  const tbodyRows = rows.map(row => {
+    let hit = false;
+    if (hr.enabled && hr.columnIds && hr.columnIds.length) {
+      const count = hr.columnIds.filter(cid => {
+        const col = cols.find(c => c.id === cid);
+        if (!col || col.type !== 'estado-ciclico') return false;
+        const idx = row.values[cid] || 0;
+        const st = col.states[idx];
+        return st && st.value === hr.matchValue;
+      }).length;
+      hit = count >= (hr.minCount || 1);
+    }
+    const rowStyle = hit ? ` style="background:${hexToLight(hr.borderColor||'#E8622A')};border-left:3px solid ${hr.borderColor||'#E8622A'}"` : '';
+    const cells = cols.map(col => {
+      if (col.type === 'estado-ciclico') {
+        const idx = row.values[col.id] || 0;
+        const st = (col.states && col.states[idx]) || (col.states && col.states[0]) || { value:'', bg:'#fff', color:'#000' };
+        return `<td style="text-align:${col.align||'center'}"><span class="ti-pill" style="background:${st.bg};color:${st.color}" onclick="cycleCell('${row.id}','${col.id}')">${esc(st.value)}</span></td>`;
+      }
+      const val = row.values[col.id] != null ? row.values[col.id] : '';
+      return `<td style="text-align:${col.align||'left'}"><span class="ti-td-text" contenteditable="true" spellcheck="false" oninput="updateCellValue('${row.id}','${col.id}',this.textContent)">${esc(val)}</span></td>`;
+    }).join('');
+    return `<tr${rowStyle}>${cells}<td class="ti-row-actions"><button class="ti-col-btn" title="Eliminar fila" onclick="removeTiRow('${row.id}')">✕</button></td></tr>`;
+  }).join('');
+
+  const table = document.getElementById('ti-table');
+  if (table) table.innerHTML = `<thead><tr>${theadCells}<th class="ti-row-actions-head"></th></tr></thead><tbody>${tbodyRows}</tbody>`;
+
+  const legend = document.getElementById('ti-legend');
+  if (legend && document.activeElement !== legend) legend.innerHTML = ti.contenido.legend || '';
+}
+
+function updateColumnLabel(colId, text) {
+  const col = _tiCol(colId); if (!col) return;
+  col.label = text;
+  scheduleLocalSaveTabla();
+}
+function updateCellValue(rowId, colId, text) {
+  const row = _tiRow(rowId); if (!row) return;
+  row.values[colId] = text;
+  scheduleLocalSaveTabla();
+}
+function cycleCell(rowId, colId) {
+  const row = _tiRow(rowId), col = _tiCol(colId);
+  if (!row || !col || col.type !== 'estado-ciclico') return;
+  const cur = row.values[colId] || 0;
+  row.values[colId] = (cur + 1) % col.states.length;
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
+function addColumnTexto() {
+  if (!STATE.tablaInteractiva) return;
+  STATE.tablaInteractiva.contenido.columns.push({ id: uid(), type: 'texto', label: 'Columna', align: 'left', headerColor: '#1B3A4B', headerTextColor: '#ffffff' });
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
+function addColumnEstado() {
+  if (!STATE.tablaInteractiva) return;
+  STATE.tablaInteractiva.contenido.columns.push({
+    id: uid(), type: 'estado-ciclico', label: 'Estado', align: 'center', headerColor: '#E8622A', headerTextColor: '#ffffff',
+    states: [ { value: 'Sí', bg: '#DCFCE7', color: '#16A34A' }, { value: 'No', bg: '#F1F5F9', color: '#64748B' }, { value: '—', bg: '#F1F5F9', color: '#94A3B8' } ]
+  });
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
+function removeTiColumn(colId) {
+  if (!STATE.tablaInteractiva) return;
+  if (!confirm('¿Eliminar esta columna?')) return;
+  const c = STATE.tablaInteractiva.contenido;
+  c.columns = c.columns.filter(x => x.id !== colId);
+  c.rows.forEach(r => { delete r.values[colId]; });
+  if (c.highlightRule) c.highlightRule.columnIds = (c.highlightRule.columnIds || []).filter(id => id !== colId);
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
+function addTiRow() {
+  if (!STATE.tablaInteractiva) return;
+  const c = STATE.tablaInteractiva.contenido;
+  const values = {};
+  c.columns.forEach(col => { values[col.id] = col.type === 'estado-ciclico' ? 0 : ''; });
+  c.rows.push({ id: uid(), values });
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
+function removeTiRow(rowId) {
+  if (!STATE.tablaInteractiva) return;
+  const c = STATE.tablaInteractiva.contenido;
+  c.rows = c.rows.filter(r => r.id !== rowId);
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
+
+function openColumnColorPicker(colId, ev) {
+  ev.stopPropagation();
+  document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
+  const col = _tiCol(colId); if (!col) return;
+  const btn = ev.currentTarget;
+  const popup = document.createElement('div');
+  popup.className = 'block-color-popup';
+  const swBg = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="setColumnColor('${colId}','headerColor','${c}')"></span>`).join('');
+  const swTxt = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="setColumnColor('${colId}','headerTextColor','${c}')"></span>`).join('');
+  popup.innerHTML = `
+    <label>Color de cabecera</label>
+    <div class="bcp-grid">${swBg}</div>
+    <div class="color-row" style="margin-top:8px">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
+      <input type="color" value="${col.headerColor||'#1B3A4B'}" oninput="setColumnColor('${colId}','headerColor',this.value)">
+    </div>
+    <label style="margin-top:8px">Color de texto</label>
+    <div class="bcp-grid">${swTxt}</div>
+    <div class="color-row" style="margin-top:8px">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
+      <input type="color" value="${col.headerTextColor||'#ffffff'}" oninput="setColumnColor('${colId}','headerTextColor',this.value)">
+    </div>
+    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove()">Cerrar</button></div>`;
+  btn.style.position = 'relative';
+  btn.appendChild(popup);
+  setTimeout(() => document.addEventListener('click', function handler(e) {
+    if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', handler); }
+  }), 10);
+}
+function setColumnColor(colId, field, hex) {
+  const col = _tiCol(colId); if (!col) return;
+  col[field] = hex;
+  const th = document.querySelector(`#ti-table th[data-col-id="${colId}"]`);
+  if (th) { th.style.background = col.headerColor || '#1B3A4B'; th.style.color = col.headerTextColor || '#ffffff'; }
+  scheduleLocalSaveTabla();
+}
+
+function openStatesEditor(colId, ev) {
+  ev.stopPropagation();
+  document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
+  const col = _tiCol(colId); if (!col || col.type !== 'estado-ciclico') return;
+  const btn = ev.currentTarget;
+  const popup = document.createElement('div');
+  popup.className = 'block-color-popup ti-states-popup';
+  popup.innerHTML = _tiStatesPopupHTML(colId);
+  btn.style.position = 'relative';
+  btn.appendChild(popup);
+  setTimeout(() => document.addEventListener('click', function handler(e) {
+    if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', handler); renderTablaEditor(); }
+  }), 10);
+}
+function _tiStatesPopupHTML(colId) {
+  const col = _tiCol(colId);
+  const rows = (col.states || []).map((st, i) => `
+    <div class="ti-state-row">
+      <input type="text" value="${escAttr(st.value)}" oninput="updateStateField('${colId}',${i},'value',this.value)" style="width:64px">
+      <input type="color" value="${st.bg}" title="Fondo" oninput="updateStateField('${colId}',${i},'bg',this.value)">
+      <input type="color" value="${st.color}" title="Texto" oninput="updateStateField('${colId}',${i},'color',this.value)">
+      <button class="ti-col-btn" onclick="removeState('${colId}',${i})">✕</button>
+    </div>`).join('');
+  return `<label>Estados cíclicos</label>
+    <div class="ti-states-list">${rows}</div>
+    <button class="btn btn-sm" style="margin-top:6px" onclick="addState('${colId}')">➕ Añadir estado</button>
+    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove();renderTablaEditor()">Cerrar</button></div>`;
+}
+function updateStateField(colId, idx, field, value) {
+  const col = _tiCol(colId); if (!col || !col.states[idx]) return;
+  col.states[idx][field] = value;
+  scheduleLocalSaveTabla();
+}
+function addState(colId) {
+  const col = _tiCol(colId); if (!col) return;
+  col.states.push({ value: 'Nuevo', bg: '#F1F5F9', color: '#64748B' });
+  const popup = document.querySelector('.ti-states-popup');
+  if (popup) popup.innerHTML = _tiStatesPopupHTML(colId);
+  scheduleLocalSaveTabla();
+}
+function removeState(colId, idx) {
+  const col = _tiCol(colId); if (!col) return;
+  if (col.states.length <= 1) { notify('Debe quedar al menos un estado'); return; }
+  col.states.splice(idx, 1);
+  STATE.tablaInteractiva.contenido.rows.forEach(r => { if ((r.values[colId] || 0) >= col.states.length) r.values[colId] = 0; });
+  const popup = document.querySelector('.ti-states-popup');
+  if (popup) popup.innerHTML = _tiStatesPopupHTML(colId);
+  scheduleLocalSaveTabla();
+}
+
+function openHighlightRuleEditor(ev) {
+  ev.stopPropagation();
+  document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
+  if (!STATE.tablaInteractiva.contenido.highlightRule) {
+    STATE.tablaInteractiva.contenido.highlightRule = { enabled: false, columnIds: [], matchValue: 'Sí', minCount: 1, bg: '#FCF0E5', borderColor: '#E8622A' };
+  }
+  const btn = ev.currentTarget;
+  const popup = document.createElement('div');
+  popup.className = 'block-color-popup ti-hr-popup';
+  popup.innerHTML = _tiHighlightPopupHTML();
+  btn.style.position = 'relative';
+  btn.appendChild(popup);
+  setTimeout(() => document.addEventListener('click', function handler(e) {
+    if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('click', handler); renderTablaEditor(); }
+  }), 10);
+}
+function _tiHighlightPopupHTML() {
+  const hr = STATE.tablaInteractiva.contenido.highlightRule;
+  const cyclicCols = STATE.tablaInteractiva.contenido.columns.filter(c => c.type === 'estado-ciclico');
+  const checks = cyclicCols.map(c => `<label class="ti-hr-check"><input type="checkbox" ${hr.columnIds.includes(c.id)?'checked':''} onchange="toggleHighlightColumn('${c.id}',this.checked)"> ${esc(c.label)}</label>`).join('');
+  return `<label><input type="checkbox" ${hr.enabled?'checked':''} onchange="updateHighlightRule('enabled',this.checked)"> Activar resaltado de fila</label>
+    <div style="margin:8px 0">${checks || '<span style="font-size:12px;color:var(--text-muted)">Añade una columna de estado primero</span>'}</div>
+    <div class="color-row"><span style="font-size:11px;flex:1">Valor que cuenta</span><input type="text" value="${escAttr(hr.matchValue)}" style="width:70px" oninput="updateHighlightRule('matchValue',this.value)"></div>
+    <div class="color-row"><span style="font-size:11px;flex:1">Mínimo de columnas</span><input type="number" min="1" value="${hr.minCount}" style="width:50px" oninput="updateHighlightRule('minCount',parseInt(this.value)||1)"></div>
+    <div class="color-row"><span style="font-size:11px;flex:1">Color de resaltado</span><input type="color" value="${hr.borderColor}" oninput="updateHighlightRule('borderColor',this.value)"></div>
+    <div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="this.closest('.block-color-popup').remove();renderTablaEditor()">Cerrar</button></div>`;
+}
+function toggleHighlightColumn(colId, checked) {
+  const hr = STATE.tablaInteractiva.contenido.highlightRule;
+  if (checked) { if (!hr.columnIds.includes(colId)) hr.columnIds.push(colId); }
+  else { hr.columnIds = hr.columnIds.filter(id => id !== colId); }
+  scheduleLocalSaveTabla();
+}
+function updateHighlightRule(field, value) {
+  STATE.tablaInteractiva.contenido.highlightRule[field] = value;
+  scheduleLocalSaveTabla();
+}
+function updateLegend(html) {
+  if (!STATE.tablaInteractiva) return;
+  STATE.tablaInteractiva.contenido.legend = html;
+  scheduleLocalSaveTabla();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -2518,6 +3055,119 @@ function _lbJS() {
 function _lbClose(){document.getElementById('lb-ov').classList.remove('open','zoomed');document.getElementById('lb-img').classList.remove('zoomed');document.removeEventListener('keydown',_lbKey);}
 function _lbZoom(){const z=document.getElementById('lb-img').classList.toggle('zoomed');document.getElementById('lb-ov').classList.toggle('zoomed',z);document.getElementById('lb-hint').textContent=z?'Pulsa para reducir · Esc para cerrar':'Pulsa para ampliar · Esc para cerrar';}
 function _lbKey(e){if(e.key==='Escape')_lbClose();}`;
+}
+
+// ═══════════════════════════════════════════════════════
+// EXPORTACIÓN — TABLA INTERACTIVA (standalone, sin runtime de la SPA)
+// ═══════════════════════════════════════════════════════
+function _tiCSS() {
+  return `body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:24px;color:#1e293b}
+h1{font-size:20px;margin:0 0 16px;max-width:1100px;margin-left:auto;margin-right:auto}
+#tbl [contenteditable]:hover{outline:1px dashed #C9C7BE}
+#tbl [contenteditable]:focus{outline:2px solid #2563EB;border-radius:3px}
+.ti-cell:hover{filter:brightness(.95)}
+table{table-layout:auto}
+@media(max-width:640px){#tbl{padding:10px}table{font-size:12px}th,td{padding:7px 8px!important}}`;
+}
+function _tiHTML(contenido) {
+  const cols = contenido.columns || [];
+  const rows = contenido.rows || [];
+  const headers = cols.map(col => `<th style="background:${col.headerColor||'#1B3A4B'};color:${col.headerTextColor||'#ffffff'};text-align:${col.align||'left'};padding:10px 12px;font-size:13px;font-weight:600" contenteditable="true" spellcheck="false">${esc(col.label||'')}</th>`).join('');
+  const bodyRows = rows.map(row => {
+    const cells = cols.map(col => {
+      if (col.type === 'estado-ciclico') {
+        return `<td style="text-align:${col.align||'center'};padding:9px 12px;border-bottom:1px solid #e2e8f0"><span class="ti-cell" data-col="${col.id}" data-v="${row.values[col.id]||0}" onclick="_tiCycle(this)"></span></td>`;
+      }
+      const val = row.values[col.id] != null ? row.values[col.id] : '';
+      return `<td style="text-align:${col.align||'left'};padding:9px 12px;border-bottom:1px solid #e2e8f0"><span contenteditable="true" spellcheck="false">${esc(val)}</span></td>`;
+    }).join('');
+    return `<tr data-row-id="${row.id}">${cells}</tr>`;
+  }).join('');
+  const legend = contenido.legend ? `<p contenteditable="true" spellcheck="false" style="margin:12px 0 0;font-size:11px;color:#7A7A76;line-height:1.6">${contenido.legend}</p>` : '';
+  return `<div id="tbl" style="background:#FFFFFF;padding:16px;border-radius:12px;max-width:1100px;margin:0 auto;overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-family:inherit">
+<thead><tr>${headers}</tr></thead>
+<tbody>${bodyRows}</tbody>
+</table>
+${legend}
+</div>`;
+}
+function _tiJS(contenido) {
+  const colsMap = {};
+  (contenido.columns || []).forEach(col => { if (col.type === 'estado-ciclico') colsMap[col.id] = { states: col.states }; });
+  const hr = contenido.highlightRule || { enabled: false, columnIds: [], matchValue: '', minCount: 1, borderColor: '#E8622A' };
+  const safe = json => JSON.stringify(json).replace(/<\/script/gi, '<\\/script');
+  return `(function(){
+var TI_COLUMNS = ${safe(colsMap)};
+var TI_HIGHLIGHT = ${safe(hr)};
+function hexToLight(hex){hex=(hex||'#000000').replace('#','');if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);return 'rgba('+r+','+g+','+b+',0.12)';}
+function paintCell(el){
+  var col = TI_COLUMNS[el.dataset.col]; if(!col) return;
+  var idx = parseInt(el.dataset.v||'0',10);
+  var st = col.states[idx] || col.states[0];
+  el.textContent = st.value;
+  el.style.display='inline-block';el.style.minWidth='44px';el.style.textAlign='center';el.style.padding='4px 10px';el.style.borderRadius='20px';el.style.fontSize='12px';el.style.fontWeight='600';el.style.cursor='pointer';el.style.userSelect='none';
+  el.style.background = st.bg; el.style.color = st.color;
+}
+function paintRow(tr){
+  if (!tr || !TI_HIGHLIGHT.enabled || !TI_HIGHLIGHT.columnIds.length) return;
+  var count = 0;
+  TI_HIGHLIGHT.columnIds.forEach(function(cid){
+    var cell = tr.querySelector('.ti-cell[data-col="'+cid+'"]');
+    if (!cell) return;
+    var col = TI_COLUMNS[cid]; if (!col) return;
+    var st = col.states[parseInt(cell.dataset.v||'0',10)];
+    if (st && st.value === TI_HIGHLIGHT.matchValue) count++;
+  });
+  var hit = count >= (TI_HIGHLIGHT.minCount||1);
+  tr.style.background = hit ? hexToLight(TI_HIGHLIGHT.borderColor) : '';
+  tr.style.borderLeft = hit ? '3px solid '+TI_HIGHLIGHT.borderColor : '';
+}
+window._tiCycle = function(el){
+  var col = TI_COLUMNS[el.dataset.col]; if(!col) return;
+  var idx = parseInt(el.dataset.v||'0',10);
+  idx = (idx+1) % col.states.length;
+  el.dataset.v = idx;
+  paintCell(el);
+  paintRow(el.closest('tr'));
+};
+document.querySelectorAll('.ti-cell').forEach(paintCell);
+document.querySelectorAll('tr[data-row-id]').forEach(paintRow);
+})();`;
+}
+function exportTablaInteractivaHTML() {
+  const ti = STATE.tablaInteractiva;
+  if (!ti) { notify('No hay ninguna tabla abierta'); return; }
+  const titleInput = document.getElementById('ti-titulo');
+  if (titleInput) ti.titulo = titleInput.value || ti.titulo;
+  const titulo = ti.titulo || 'Tabla interactiva';
+  const contenido = ti.contenido;
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(titulo)}</title>
+<style>
+${_tiCSS()}
+</style>
+</head>
+<body>
+<h1>${esc(titulo)}</h1>
+${_tiHTML(contenido)}
+<script>
+${_tiJS(contenido)}
+</script>
+</body>
+</html>`;
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (titulo.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g,'').trim() || 'tabla') + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
+  notify('✅ Tabla exportada');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3164,6 +3814,37 @@ function toggleSidSection(id, arrowId) {
 }
 
 // ═══════════════════════════════════════════════════════
+// SELECTOR DE MODO — Manuales / Tablas Interactivas
+// ═══════════════════════════════════════════════════════
+function initAppMode() {
+  let mode = 'manuales';
+  try { mode = localStorage.getItem('app_mode') || 'manuales'; } catch(e) {}
+  switchAppMode(mode, true);
+}
+function switchAppMode(mode, isInit) {
+  if (mode !== 'manuales' && mode !== 'tablas') mode = 'manuales';
+  STATE.appMode = mode;
+  document.body.classList.toggle('mode-tablas', mode === 'tablas');
+  document.body.classList.toggle('mode-manuales', mode === 'manuales');
+  const btnManuales = document.getElementById('mode-btn-manuales');
+  const btnTablas = document.getElementById('mode-btn-tablas');
+  if (btnManuales) btnManuales.classList.toggle('active', mode === 'manuales');
+  if (btnTablas) btnTablas.classList.toggle('active', mode === 'tablas');
+  try { localStorage.setItem('app_mode', mode); } catch(e) {}
+  if (isInit) return; // en el arranque, handleSession() decide qué pantalla abrir
+  if (mode === 'tablas') {
+    if (!document.getElementById('tablas-panel') || document.getElementById('tablas-panel').style.display === 'none') {
+      if (!document.getElementById('ti-editor') || document.getElementById('ti-editor').style.display === 'none') {
+        openMisTablas();
+      }
+    }
+  } else {
+    closeTablasPanel();
+    closeTablaEditor();
+  }
+}
+
+// ═══════════════════════════════════════════════════════
 // USER PREFS (sidebar layout, cross-device)
 // ═══════════════════════════════════════════════════════
 const _SIDEBAR_PANELS = [
@@ -3172,6 +3853,7 @@ const _SIDEBAR_PANELS = [
   { id: 'sid-chips-bloques',  arrowId: 'arrow-bloques' },
   { id: 'sid-fmt-panel',      arrowId: 'arrow-fmt' },
   { id: 'sid-iconos',         arrowId: 'arrow-iconos' },
+  { id: 'sid-chips-tablas',   arrowId: 'arrow-tablas' },
 ];
 let _prefsTimer = null;
 
@@ -3210,6 +3892,11 @@ async function loadUserPrefs() {
       try { localStorage.setItem('manuales_actions_order', JSON.stringify(data.prefs.manualesOrder)); } catch(e) {}
       renderManualesActions();
     }
+    if (Array.isArray(data.prefs.tablasOrder) && data.prefs.tablasOrder.length === DEFAULT_TABLAS_ORDER.length && data.prefs.tablasOrder.every(k => TABLAS_ACTIONS_META[k])) {
+      STATE.tablasActionsOrder = data.prefs.tablasOrder;
+      try { localStorage.setItem('tablas_actions_order', JSON.stringify(data.prefs.tablasOrder)); } catch(e) {}
+      renderTablasActions();
+    }
   } catch(e) { console.warn('loadUserPrefs:', e); }
 }
 
@@ -3225,7 +3912,7 @@ function saveUserPrefs() {
     const pagesPanel = document.getElementById('pages-panel-body');
     if (pagesPanel) s['pages-panel'] = pagesPanel.style.display !== 'none';
     try {
-      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s, blockOrder: STATE.blockPaletteOrder || DEFAULT_BLOCK_ORDER, manualesOrder: STATE.manualesActionsOrder || DEFAULT_MANUALES_ORDER }, updated_at: new Date().toISOString() });
+      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s, blockOrder: STATE.blockPaletteOrder || DEFAULT_BLOCK_ORDER, manualesOrder: STATE.manualesActionsOrder || DEFAULT_MANUALES_ORDER, tablasOrder: STATE.tablasActionsOrder || DEFAULT_TABLAS_ORDER }, updated_at: new Date().toISOString() });
     } catch(e) { console.warn('saveUserPrefs:', e); }
   }, 500);
 }
