@@ -113,6 +113,18 @@
     <rect x="3" y="5" width="18" height="14" rx="2"/>
     <path d="M10 9l6 3-6 3z" fill="currentColor" stroke="none"/>
   </symbol>
+  <symbol id="i-checkbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="4" width="16" height="16" rx="3"></rect>
+    <path d="M8 12.5l2.5 2.5L16 9"></path>
+  </symbol>
+  <symbol id="i-fecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="4" y="5" width="16" height="15" rx="2"></rect>
+    <path d="M4 10h16M8 3v4M16 3v4"></path>
+  </symbol>
+  <symbol id="i-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 12.5V6a1 1 0 0 0-1-1h-6.5a1 1 0 0 0-.7.3L4 12l7.8 6.7a1 1 0 0 0 .7.3H19a1 1 0 0 0 1-1v-5.5z"></path>
+    <circle cx="9.5" cy="9.5" r="1.3"></circle>
+  </symbol>
   <symbol id="i-enlace" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
     <path d="M9 15l6-6"/>
     <path d="M8 16.5a3.5 3.5 0 0 1 0-5l2-2a3.5 3.5 0 0 1 5 0"/>
@@ -225,6 +237,26 @@
   </div>
   <div class="sid-chips tablas-only" id="sid-chips-tablas"></div>
 
+  <hr class="sid-divider tablas-only">
+  <div class="sb-section-hdr tablas-only" onclick="toggleSidSection('sid-tabla-color-panel','arrow-tabla-color')">
+    <span>Color de la tabla</span><span class="sb-toggle" id="arrow-tabla-color">▼</span>
+  </div>
+  <div class="sid-color-panel tablas-only" id="sid-tabla-color-panel">
+    <div class="bcp-grid" id="tabla-color-grid"></div>
+    <div class="color-row" style="margin-top:8px;padding:0 12px 10px">
+      <span style="font-size:11px;color:rgba(var(--shell-fg-rgb),.55);flex:1">Personalizado</span>
+      <input type="color" id="tabla-color-custom" oninput="setTablaColor(this.value)">
+    </div>
+  </div>
+
+  <hr class="sid-divider tablas-only">
+  <div class="sb-section-hdr tablas-only" onclick="toggleSidSection('sid-chips-columnas','arrow-columnas')">
+    <span>Columnas</span><span class="sb-toggle" id="arrow-columnas">▼</span>
+  </div>
+  <div class="sid-chips tablas-only" id="sid-chips-columnas">
+    <input id="column-search" class="ico-inp" style="grid-column:1/-1;width:100%;box-sizing:border-box;margin-bottom:4px" placeholder="Buscar tipo de columna…" aria-label="Buscar tipo de columna" oninput="filterColumnBtns(this.value)">
+  </div>
+
   <hr class="sid-divider manual-only">
   <div class="sb-section-hdr manual-only" onclick="toggleSidSection('sid-fmt-panel','arrow-fmt')">
     <span>Formato</span><span class="sb-toggle" id="arrow-fmt">▼</span>
@@ -319,13 +351,14 @@
 <!-- ── TOP BAR ── -->
 <div id="topbar" role="toolbar" aria-label="Barra de herramientas del manual">
   <button id="tb-hamburger" aria-label="Abrir menú lateral" onclick="document.getElementById('sidebar').classList.toggle('open')" title="Menú">☰</button>
-  <input id="manual-titulo" type="text" value="Nuevo manual" spellcheck="false" title="Título del manual" aria-label="Título del manual">
-  <span style="color:rgba(var(--shell-fg-rgb),.2);font-size:12px;flex-shrink:0">·</span>
-  <input id="manual-empresa" type="text" placeholder="Empresa" spellcheck="false" aria-label="Nombre de la empresa">
+  <input id="manual-titulo" class="manual-only" type="text" value="Nuevo manual" spellcheck="false" title="Título del manual" aria-label="Título del manual">
+  <span class="manual-only" style="color:rgba(var(--shell-fg-rgb),.2);font-size:12px;flex-shrink:0">·</span>
+  <input id="manual-empresa" class="manual-only" type="text" placeholder="Empresa" spellcheck="false" aria-label="Nombre de la empresa">
+  <input id="tabla-titulo" class="tablas-only" type="text" placeholder="Título de la tabla" spellcheck="false" title="Título de la tabla" aria-label="Título de la tabla">
   <div class="topbar-spacer"></div>
   <span id="save-status"></span>
   <span id="stats-indicator" style="font-size:11px;color:rgba(var(--shell-fg-rgb),.35);white-space:nowrap;margin:0 6px"></span>
-  <div class="dropdown" id="share-dropdown">
+  <div class="dropdown manual-only" id="share-dropdown">
     <button class="tb-btn" onclick="toggleShareMenu()">Compartir ▾</button>
     <div class="dropdown-menu" id="share-menu">
       <div class="dropdown-item" onclick="exportHTML(true)">👁 Vista previa (HTML / PDF)</div>
@@ -335,7 +368,7 @@
       <div class="dropdown-item" onclick="window.print()">🖨 Imprimir / PDF</div>
     </div>
   </div>
-  <div class="dropdown" id="resources-dropdown">
+  <div class="dropdown manual-only" id="resources-dropdown">
     <button class="tb-btn" onclick="toggleResourcesMenu()"><svg class="icon-svg"><use href="#i-resources"></use></svg>Recursos ▾</button>
     <div class="dropdown-menu" id="resources-menu">
       <div class="dropdown-item" onclick="openMediaGallery()"><svg class="icon-svg"><use href="#i-gallery"></use></svg>Imágenes</div>
@@ -343,7 +376,16 @@
       <div class="dropdown-item" onclick="openManualTrash()"><svg class="icon-svg"><use href="#i-trash"></use></svg>Papelera del manual</div>
     </div>
   </div>
-  <button class="tb-btn primary" id="btn-guardar" onclick="guardar()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
+  <div class="dropdown tablas-only" id="tabla-share-dropdown">
+    <button class="tb-btn" onclick="toggleTablaShareMenu()">Compartir ▾</button>
+    <div class="dropdown-menu" id="tabla-share-menu">
+      <div class="dropdown-item" onclick="exportTablaInteractivaHTML()"><svg class="icon-svg"><use href="#i-export"></use></svg>Exportar HTML</div>
+      <div class="dropdown-item" onclick="exportTablaInteractivaImagen()">🖼 Exportar imagen</div>
+      <div class="dropdown-item" onclick="exportTablaInteractivaExcel()">📊 Exportar Excel</div>
+    </div>
+  </div>
+  <button class="tb-btn primary manual-only" id="btn-guardar" onclick="guardar()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
+  <button class="tb-btn primary tablas-only" id="btn-guardar-tabla" onclick="guardarTablaInteractiva()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
   <button class="tb-btn" id="btn-theme-toggle" onclick="toggleTheme()" title="Cambiar tema (claro/oscuro)">🌙</button>
   <div class="dropdown" id="account-dropdown" style="display:none">
     <button class="tb-btn" onclick="toggleAccountMenu()" title="Cuenta"><svg class="icon-svg"><use href="#i-account"></use></svg></button>
@@ -491,9 +533,27 @@
 </div>
 
 <!-- ── MAIN APP ── -->
-<div id="app" role="main" aria-label="Editor del manual">
+<div id="app" class="manual-only" role="main" aria-label="Editor del manual">
   <div id="canvas-wrap">
     <div id="canvas"></div>
+  </div>
+</div>
+
+<div id="ti-canvas-wrap" class="tablas-only" role="main" aria-label="Editor de tabla interactiva">
+  <div id="ti-canvas-empty" class="ti-canvas-empty">
+    <p>Selecciona o crea una tabla desde el panel de "Tablas" en el sidebar, o</p>
+    <button class="btn btn-primary" onclick="openMisTablas()">Abrir Mis Tablas</button>
+  </div>
+  <div id="ti-canvas-content" style="display:none">
+    <div class="ti-toolbar">
+      <button class="btn btn-sm" onclick="addTiRow()">➕ Fila</button>
+      <button class="btn btn-sm" onclick="toggleRulesPanel()">🔀 Reglas condicionales</button>
+      <input type="text" class="form-input ti-search-input" placeholder="🔍 Buscar en la tabla…" oninput="searchTiRows(this.value)">
+    </div>
+    <div class="ti-table-wrap">
+      <table class="ti-table" id="ti-table"></table>
+    </div>
+    <div class="ti-legend" id="ti-legend" contenteditable="true" spellcheck="false" oninput="updateLegend(this.innerHTML)"></div>
   </div>
 </div>
 
@@ -746,7 +806,7 @@
   <div class="mp2-bar">
     <span class="mp2-bar-logo"><svg width="24" height="24"><use href="#i-tabla"></use></svg></span>
     <h2>Tablas Interactivas</h2>
-    <button class="mp2-close" onclick="closeTablasPanel();switchAppMode('manuales')">✕ Cerrar</button>
+    <button class="mp2-close" onclick="closeTablasPanel()">✕ Cerrar</button>
   </div>
   <div class="mp2-body">
     <div class="mp2-quickbar">
@@ -760,46 +820,14 @@
   </div>
 </div>
 
-<div id="ti-editor" style="display:none">
-  <div class="ti-bar">
-    <button class="ti-back" onclick="closeTablaEditor();openTablasPanel()" title="Volver a Mis Tablas">←</button>
-    <input id="ti-titulo" class="ti-title-input" placeholder="Título de la tabla">
-    <div class="ti-bar-actions">
-      <button class="btn" id="ti-btn-guardar" onclick="guardarTablaInteractiva()"><svg class="icon-svg"><use href="#i-save"></use></svg>Guardar</button>
-      <button class="btn" onclick="exportTablaInteractivaHTML()"><svg class="icon-svg"><use href="#i-export"></use></svg>HTML</button>
-      <button class="btn" onclick="exportTablaInteractivaImagen()">🖼 Imagen</button>
-      <button class="btn" onclick="exportTablaInteractivaExcel()">📊 Excel</button>
-    </div>
+<div class="ti-rules-panel" id="ti-rules-panel">
+  <div class="ti-rules-panel-header">
+    <span>Reglas condicionales</span>
+    <button class="ti-col-btn" onclick="toggleRulesPanel()">✕</button>
   </div>
-  <div class="ti-toolbar">
-    <button class="btn btn-sm" onclick="addColumnTexto()">➕ Texto</button>
-    <button class="btn btn-sm" onclick="addColumnEstado()">➕ Estado cíclico</button>
-    <select class="form-select ti-add-col-select" onchange="addTiColumnOfType(this.value); this.selectedIndex=0;">
-      <option value="">➕ Más tipos de columna…</option>
-      <option value="select">Lista desplegable</option>
-      <option value="checkbox">Casilla</option>
-      <option value="fecha">Fecha</option>
-      <option value="badge">Insignia</option>
-      <option value="enlace">Enlace</option>
-    </select>
-    <button class="btn btn-sm" onclick="addTiRow()">➕ Fila</button>
-    <button class="btn btn-sm" onclick="toggleRulesPanel()">🔀 Reglas condicionales</button>
-    <input type="text" class="form-input ti-search-input" placeholder="🔍 Buscar en la tabla…" oninput="searchTiRows(this.value)">
-  </div>
-  <div class="ti-table-wrap">
-    <table class="ti-table" id="ti-table"></table>
-  </div>
-  <div class="ti-legend" id="ti-legend" contenteditable="true" spellcheck="false" oninput="updateLegend(this.innerHTML)"></div>
-
-  <div class="ti-rules-panel" id="ti-rules-panel">
-    <div class="ti-rules-panel-header">
-      <span>Reglas condicionales</span>
-      <button class="ti-col-btn" onclick="toggleRulesPanel()">✕</button>
-    </div>
-    <div class="ti-rules-panel-body" id="ti-rules-list"></div>
-    <div class="ti-rules-panel-footer">
-      <button class="btn btn-primary btn-sm" style="width:100%" onclick="openRuleBuilderModal(null)">➕ Nueva regla</button>
-    </div>
+  <div class="ti-rules-panel-body" id="ti-rules-list"></div>
+  <div class="ti-rules-panel-footer">
+    <button class="btn btn-primary btn-sm" style="width:100%" onclick="openRuleBuilderModal(null)">➕ Nueva regla</button>
   </div>
 </div>
 

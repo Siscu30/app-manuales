@@ -107,6 +107,9 @@ body.mode-manuales .tablas-only{display:none!important}
 #manual-empresa{font-size:12px;color:rgba(var(--shell-fg-rgb),.45);min-width:60px;max-width:140px;padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;caret-color:#fff}
 #manual-empresa::placeholder{color:rgba(var(--shell-fg-rgb),.28)}
 #manual-empresa:hover,#manual-empresa:focus{border-color:rgba(var(--shell-fg-rgb),.14);background:rgba(var(--shell-fg-rgb),.06);color:rgba(var(--shell-fg-rgb),.8)}
+#tabla-titulo{font-size:14px;font-weight:600;min-width:140px;max-width:260px;padding:5px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:rgba(var(--shell-fg-rgb),.9);caret-color:#fff}
+#tabla-titulo::placeholder{color:rgba(var(--shell-fg-rgb),.3)}
+#tabla-titulo:hover,#tabla-titulo:focus{border-color:rgba(var(--shell-fg-rgb),.18);background:rgba(var(--shell-fg-rgb),.07)}
 .topbar-sep{width:1px;height:20px;background:rgba(var(--shell-fg-rgb),.12);margin:0 4px;flex-shrink:0}
 .tb-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:6px;font-size:12px;font-weight:500;transition:all .15s;white-space:nowrap;border:1px solid transparent;color:rgba(var(--shell-fg-rgb),.7);cursor:pointer;background:transparent}
 .tb-btn:hover{background:rgba(var(--shell-fg-rgb),.1);color:rgb(var(--shell-fg-rgb))}
@@ -131,6 +134,9 @@ body.mode-manuales .tablas-only{display:none!important}
 #app{padding-top:var(--topbar-h);margin-left:var(--sidebar-w);min-height:100vh}
 #canvas-wrap{flex:1;min-height:calc(100vh - var(--topbar-h));padding:32px 24px;display:flex;flex-direction:column;align-items:center;background:var(--bg)}
 #canvas{width:100%;max-width:720px;min-height:400px}
+#ti-canvas-wrap{padding-top:var(--topbar-h);margin-left:var(--sidebar-w);min-height:100vh;background:var(--bg)}
+.ti-canvas-empty{max-width:1100px;margin:80px auto 0;padding:0 24px;text-align:center;color:var(--text-muted)}
+.ti-canvas-empty p{font-size:14px;margin-bottom:16px}
 
 /* ── BLOCKS ── */
 .block-wrap{position:relative;margin-bottom:12px;border-radius:var(--radius)}
@@ -466,12 +472,6 @@ body.mode-manuales .tablas-only{display:none!important}
 #tablas-panel{display:none;position:fixed;inset:0;z-index:2000;background:var(--bg);overflow-y:auto}
 
 /* ── editor de tabla interactiva ── */
-#ti-editor{display:none;flex-direction:column;position:fixed;inset:0;z-index:2000;background:var(--bg);overflow-y:auto}
-.ti-bar{background:var(--sidebar);padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10;box-shadow:var(--shadow-md);flex-shrink:0}
-.ti-back{background:rgba(var(--shell-fg-rgb),.12);border:none;color:rgb(var(--shell-fg-rgb));width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0}
-.ti-title-input{flex:1;background:transparent;border:none;color:rgb(var(--shell-fg-rgb));font-size:16px;font-weight:600;font-family:inherit;padding:6px 8px;border-radius:6px}
-.ti-title-input:focus{outline:none;background:rgba(var(--shell-fg-rgb),.08)}
-.ti-bar-actions{display:flex;gap:8px;flex-shrink:0}
 .ti-toolbar{display:flex;gap:8px;flex-wrap:wrap;padding:16px 24px;max-width:1100px;margin:0 auto;width:100%;box-sizing:border-box}
 .ti-table-wrap{max-width:1100px;margin:0 auto;width:100%;padding:0 24px 16px;box-sizing:border-box;overflow-x:auto}
 .ti-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:10px;overflow:hidden}
@@ -541,6 +541,7 @@ body.mode-manuales .tablas-only{display:none!important}
 .mp2-tab:hover{color:var(--text)}
 .mp2-tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
 .mp2-card{display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;transition:border-color .15s}
+.mp2-card-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .mp2-card:hover{border-color:var(--primary)}
 .mp2-card.current{border-color:var(--primary);background:rgba(var(--primary-rgb),.05)}
 .mp2-card-info{flex:1;min-width:0;cursor:pointer}
