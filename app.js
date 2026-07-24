@@ -253,6 +253,15 @@ function _applyReorder(group, fromIndex, toIndex) {
     cols.splice(toIndex, 0, moved);
     renderTablaEditor();
     scheduleLocalSaveTabla();
+  } else if (group === 'ti-rules') {
+    const reglas = STATE.tablaInteractiva && STATE.tablaInteractiva.contenido && STATE.tablaInteractiva.contenido.reglas;
+    if (!reglas || fromIndex < 0 || fromIndex >= reglas.length || toIndex < 0 || toIndex >= reglas.length) return;
+    const [moved] = reglas.splice(fromIndex, 1);
+    reglas.splice(toIndex, 0, moved);
+    reglas.forEach((r, i) => { r.prioridad = i + 1; });
+    renderRulesPanel();
+    renderTablaEditor();
+    scheduleLocalSaveTabla();
   }
 }
 
@@ -2196,16 +2205,45 @@ async function nuevoManual() {
 function _tiDefaultContenido() {
   const colA = uid(), colB = uid();
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     columns: [
       { id: colA, type: 'texto', label: 'Columna', align: 'left', headerColor: '#1B3A4B', headerTextColor: '#ffffff' },
       { id: colB, type: 'estado-ciclico', label: 'Estado', align: 'center', headerColor: '#E8622A', headerTextColor: '#ffffff',
-        states: [ { value: 'Sí', bg: '#DCFCE7', color: '#16A34A' }, { value: 'No', bg: '#F1F5F9', color: '#64748B' }, { value: '—', bg: '#F1F5F9', color: '#94A3B8' } ] }
+        states: [ { value: 'Sí', icon: '', bg: '#DCFCE7', color: '#16A34A' }, { value: 'No', icon: '', bg: '#F1F5F9', color: '#64748B' }, { value: '—', icon: '', bg: '#F1F5F9', color: '#94A3B8' } ] }
     ],
     rows: [ { id: uid(), values: { [colA]: 'Fila 1', [colB]: 0 } } ],
-    highlightRule: { enabled: false, columnIds: [], matchValue: 'Sí', minCount: 1, bg: '#FCF0E5', borderColor: '#E8622A' },
+    reglas: [],
     legend: ''
   };
+}
+
+// Migra el antiguo highlightRule (single-rule, solo alcance fila) al nuevo array de
+// reglas condicionales — perezoso: solo muta en memoria, se persiste en el próximo
+// guardado normal (evita pisar guardados de un cliente viejo con caché stale).
+function _tiMigrateContenido(contenido) {
+  if (!contenido) return contenido;
+  if (!Array.isArray(contenido.reglas)) contenido.reglas = [];
+  if (contenido.highlightRule) {
+    const hr = contenido.highlightRule;
+    if (hr.enabled && hr.columnIds && hr.columnIds.length) {
+      contenido.reglas.push({
+        id: uid(),
+        prioridad: 1,
+        condiciones: hr.columnIds.map(colId => ({ colId, comparador: '=', valor: hr.matchValue })),
+        logica: 'OR',
+        alcance: 'fila',
+        colId: null,
+        colorFondo: hexToLight(hr.borderColor || '#E8622A'),
+        colorTexto: hr.borderColor || '#E8622A'
+      });
+    }
+    delete contenido.highlightRule;
+  }
+  contenido.columns = (contenido.columns || []).map(col => {
+    if (col.type === 'estado-ciclico' && col.states) col.states.forEach(st => { if (st.icon === undefined) st.icon = ''; });
+    return col;
+  });
+  return contenido;
 }
 
 async function openMisTablas() {
@@ -2323,12 +2361,16 @@ async function duplicateTablaInteractiva(id, titulo) {
   try {
     const { data, error } = await sb.from('tablas_interactivas').select('titulo,color,contenido').eq('id', id).single();
     if (error || !data) throw new Error('Tabla no encontrada');
-    const c = data.contenido || {};
+    const c = _tiMigrateContenido({ ...(data.contenido || {}) });
     const idMap = {};
     const columns = (c.columns||[]).map(col => { const nid = uid(); idMap[col.id] = nid; return { ...col, id: nid }; });
     const rows = (c.rows||[]).map(r => ({ id: uid(), values: Object.fromEntries(Object.entries(r.values||{}).map(([k,v]) => [idMap[k]||k, v])) }));
-    const highlightRule = { ...(c.highlightRule||{}), columnIds: (c.highlightRule?.columnIds||[]).map(cid => idMap[cid]||cid) };
-    const contenido = { ...c, columns, rows, highlightRule };
+    const reglas = (c.reglas||[]).map(regla => ({
+      ...regla, id: uid(),
+      condiciones: (regla.condiciones||[]).map(cond => ({ ...cond, colId: idMap[cond.colId]||cond.colId })),
+      colId: regla.colId ? (idMap[regla.colId]||regla.colId) : regla.colId
+    }));
+    const contenido = { ...c, columns, rows, reglas };
     const ins = await sb.from('tablas_interactivas').insert({
       titulo: (data.titulo || 'Tabla') + ' (copia)', color: data.color || '#2563EB',
       contenido, estado: 'borrador', user_id: STATE.user.id, created_by: STATE.user.id
@@ -2387,7 +2429,8 @@ async function loadTablaInteractiva(id) {
   try {
     const { data, error } = await sb.from('tablas_interactivas').select('*').eq('id', id).single();
     if (error) throw error;
-    STATE.tablaInteractiva = { id: data.id, titulo: data.titulo, color: data.color||'#2563EB', estado: data.estado||'borrador', createdBy: data.created_by, contenido: data.contenido || _tiDefaultContenido(), isDirty: false };
+    const contenido = _tiMigrateContenido(data.contenido || _tiDefaultContenido());
+    STATE.tablaInteractiva = { id: data.id, titulo: data.titulo, color: data.color||'#2563EB', estado: data.estado||'borrador', createdBy: data.created_by, contenido, isDirty: false };
     openTablaEditor();
     notify('📂 Tabla cargada');
   } catch(e) { notify('❌ Error al cargar: '+(e.message||e), 4000); }
@@ -2405,6 +2448,8 @@ function closeTablaEditor() {
   const ed = document.getElementById('ti-editor');
   if (ed) ed.style.display = 'none';
   document.querySelectorAll('.block-color-popup').forEach(p => p.remove());
+  closeRulesPanel();
+  _tiViewSort = null; _tiSearchQuery = '';
   const panelOpen = document.getElementById('tablas-panel') && document.getElementById('tablas-panel').style.display !== 'none';
   if (!panelOpen) document.body.style.overflow = '';
 }
@@ -2433,6 +2478,182 @@ function _tiPillInner(st) {
   return iconHtml + esc(st.value || '');
 }
 
+// ═══════════════════════════════════════════════════════
+// MOTOR DE REGLAS CONDICIONALES — funciones puras (sin closures sobre STATE/DOM)
+// Se comparten tal cual con el export standalone vía fn.toString() (ver _tiJS)
+// para que editor y export nunca puedan divergir en la lógica de evaluación.
+// ═══════════════════════════════════════════════════════
+// Bloquea esquemas de URL ejecutables (javascript:/data:/vbscript:) en columnas 'enlace' —
+// tanto en el editor en vivo como en el export standalone. Solo se usa en tiempo de
+// generación de HTML (no necesita compartirse vía toString con el export).
+function _tiSafeUrl(url) {
+  const v = String(url || '').trim();
+  if (!v) return '';
+  if (/^\s*(javascript|data|vbscript):/i.test(v)) return '';
+  return v;
+}
+function _tiCellCompareValue(col, row) {
+  const val = row.values[col.id];
+  if (col.type === 'estado-ciclico' || col.type === 'badge') {
+    const idx = val || 0;
+    const st = col.states && col.states[idx];
+    return st ? (st.value || '') : '';
+  }
+  if (col.type === 'checkbox') return val ? 'true' : 'false';
+  return val == null ? '' : val;
+}
+function _tiCompare(comparador, actual, valor) {
+  const a = actual == null ? '' : actual;
+  const v = valor == null ? '' : valor;
+  // Fechas ISO (YYYY-MM-DD, lo que produce <input type=date>) parsean con parseFloat
+  // como solo el año (corta en el primer '-'), lo que hace que fechas distintas del
+  // mismo año comparen como iguales. Para esas, la comparación de texto ya es correcta
+  // (orden lexicográfico ISO == orden cronológico), así que se excluyen del atajo numérico.
+  const isDateLike = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s));
+  const av = parseFloat(a), vv = parseFloat(v);
+  const bothNumeric = !isDateLike(a) && !isDateLike(v) && !isNaN(av) && !isNaN(vv) && a !== '' && v !== '';
+  switch (comparador) {
+    case '=': return String(a).toLowerCase() === String(v).toLowerCase();
+    case '!=': return String(a).toLowerCase() !== String(v).toLowerCase();
+    case 'contiene': return String(a).toLowerCase().indexOf(String(v).toLowerCase()) !== -1;
+    case '>': return bothNumeric ? av > vv : String(a) > String(v);
+    case '<': return bothNumeric ? av < vv : String(a) < String(v);
+    case 'vacio': return a === '';
+    case 'novacio': return a !== '';
+    default: return false;
+  }
+}
+// Resuelve el color de UNA celda concreta: una sola cola de prioridad global,
+// sin distinción entre alcance 'fila'/'celda' — la primera regla (ordenada por
+// prioridad) que matchea Y cuyo alcance alcanza esta celda (fila = todas las
+// celdas de esa fila; celda = solo su propia columna) gana; el resto se ignora.
+function evaluarCeldaColor(contenido, rowId, colId) {
+  const row = (contenido.rows || []).find(r => r.id === rowId);
+  if (!row) return null;
+  const cols = contenido.columns || [];
+  const reglas = (contenido.reglas || []).slice().sort((a, b) => (a.prioridad || 0) - (b.prioridad || 0));
+  for (const regla of reglas) {
+    if (regla.alcance === 'celda' && regla.colId !== colId) continue;
+    const conds = regla.condiciones || [];
+    if (!conds.length) continue;
+    const results = conds.map(c => {
+      const col = cols.find(x => x.id === c.colId);
+      return col ? _tiCompare(c.comparador, _tiCellCompareValue(col, row), c.valor) : false;
+    });
+    const isMatch = regla.logica === 'OR' ? results.some(Boolean) : results.every(Boolean);
+    if (isMatch) return { colorFondo: regla.colorFondo, colorTexto: regla.colorTexto };
+  }
+  return null;
+}
+// Igual que arriba pero solo considera reglas de alcance 'fila' — se usa únicamente
+// para el acento visual del borde izquierdo de la fila (cosmético), el color real
+// de cada celda siempre pasa por evaluarCeldaColor().
+function evaluarFilaColor(contenido, rowId) {
+  const row = (contenido.rows || []).find(r => r.id === rowId);
+  if (!row) return null;
+  const cols = contenido.columns || [];
+  const reglas = (contenido.reglas || []).slice().sort((a, b) => (a.prioridad || 0) - (b.prioridad || 0));
+  for (const regla of reglas) {
+    if (regla.alcance !== 'fila') continue;
+    const conds = regla.condiciones || [];
+    if (!conds.length) continue;
+    const results = conds.map(c => {
+      const col = cols.find(x => x.id === c.colId);
+      return col ? _tiCompare(c.comparador, _tiCellCompareValue(col, row), c.valor) : false;
+    });
+    const isMatch = regla.logica === 'OR' ? results.some(Boolean) : results.every(Boolean);
+    if (isMatch) return { colorFondo: regla.colorFondo, colorTexto: regla.colorTexto };
+  }
+  return null;
+}
+
+const TI_COMPARADORES = {
+  texto:            [['=','Es igual a'],['!=','Es distinto de'],['contiene','Contiene'],['vacio','Está vacío'],['novacio','No está vacío']],
+  select:           [['=','Es igual a'],['!=','Es distinto de'],['contiene','Contiene'],['vacio','Está vacío'],['novacio','No está vacío']],
+  badge:            [['=','Es igual a'],['!=','Es distinto de'],['contiene','Contiene'],['vacio','Está vacío'],['novacio','No está vacío']],
+  enlace:           [['=','Es igual a'],['!=','Es distinto de'],['contiene','Contiene'],['vacio','Está vacío'],['novacio','No está vacío']],
+  fecha:            [['=','Es igual a'],['!=','Es distinto de'],['>','Es posterior a'],['<','Es anterior a'],['vacio','Está vacío'],['novacio','No está vacío']],
+  checkbox:         [['=','Es igual a'],['!=','Es distinto de']],
+  'estado-ciclico': [['=','Es igual a'],['!=','Es distinto de']],
+};
+const TI_TYPE_LABELS = { texto:'Texto', 'estado-ciclico':'Estado cíclico', select:'Lista desplegable', checkbox:'Casilla', fecha:'Fecha', badge:'Insignia', enlace:'Enlace' };
+
+function _tiRenderEditorCell(col, row, ruleColor) {
+  const align = col.align || (col.type === 'checkbox' || col.type === 'estado-ciclico' || col.type === 'badge' ? 'center' : 'left');
+  const cellColorStyle = ruleColor ? `background:${ruleColor.colorFondo};color:${ruleColor.colorTexto}` : '';
+  const wrapStyle = `text-align:${align};${cellColorStyle}`;
+  const val = row.values[col.id];
+  switch (col.type) {
+    case 'estado-ciclico': {
+      const idx = val || 0;
+      const st = (col.states && col.states[idx]) || (col.states && col.states[0]) || { value:'', bg:'#fff', color:'#000' };
+      const bg = ruleColor ? ruleColor.colorFondo : st.bg, txt = ruleColor ? ruleColor.colorTexto : st.color;
+      return `<td style="text-align:${align}"><span class="ti-pill" style="background:${bg};color:${txt}" onclick="cycleCell('${row.id}','${col.id}')">${_tiPillInner(st)}</span></td>`;
+    }
+    case 'badge': {
+      const idx = val || 0;
+      const options = col.states || [];
+      const st = options[idx] || { value:'', bg:'#fff', color:'#000' };
+      const bg = ruleColor ? ruleColor.colorFondo : st.bg, txt = ruleColor ? ruleColor.colorTexto : st.color;
+      return `<td style="text-align:${align}"><select class="ti-badge-select" style="background:${bg};color:${txt}" onchange="updateCellValue('${row.id}','${col.id}',parseInt(this.value))">${options.map((o,i)=>`<option value="${i}" ${i===idx?'selected':''}>${esc(o.value)}</option>`).join('')}</select></td>`;
+    }
+    case 'select': {
+      const opts = col.opciones || [];
+      const v = val || '';
+      return `<td style="${wrapStyle}"><select onchange="updateCellValue('${row.id}','${col.id}',this.value)">${['',...opts].map(o=>`<option value="${escAttr(o)}" ${o===v?'selected':''}>${esc(o||'—')}</option>`).join('')}</select></td>`;
+    }
+    case 'checkbox': {
+      return `<td style="text-align:center;${cellColorStyle}"><input type="checkbox" ${val?'checked':''} onchange="updateCellValue('${row.id}','${col.id}',this.checked)"></td>`;
+    }
+    case 'fecha': {
+      return `<td style="${wrapStyle}"><input type="date" class="ti-date-input" value="${escAttr(val||'')}" onchange="updateCellValue('${row.id}','${col.id}',this.value)"></td>`;
+    }
+    case 'enlace': {
+      const v = val || '';
+      const safeUrl = _tiSafeUrl(v);
+      return `<td style="${wrapStyle}"><span class="ti-td-text" contenteditable="true" spellcheck="false" oninput="updateCellValue('${row.id}','${col.id}',this.textContent)">${esc(v)}</span>${safeUrl?` <a href="${escAttr(safeUrl)}" target="_blank" rel="noopener noreferrer" class="ti-link-open" title="Abrir enlace">↗</a>`:''}</td>`;
+    }
+    default: {
+      const v = val != null ? val : '';
+      return `<td style="${wrapStyle}"><span class="ti-td-text" contenteditable="true" spellcheck="false" oninput="updateCellValue('${row.id}','${col.id}',this.textContent)">${esc(v)}</span></td>`;
+    }
+  }
+}
+
+// ── Orden/filtro/buscador — solo vista, nunca reescribe contenido.rows ──
+let _tiViewSort = null; // { colId, dir: 1|-1 }
+let _tiSearchQuery = '';
+function _tiVisibleRows(contenido) {
+  let rows = contenido.rows || [];
+  if (_tiSearchQuery) {
+    const q = _tiSearchQuery.toLowerCase();
+    rows = rows.filter(row => (contenido.columns||[]).some(col => {
+      const v = _tiCellCompareValue(col, row);
+      return String(v).toLowerCase().indexOf(q) !== -1;
+    }));
+  }
+  if (_tiViewSort) {
+    const col = (contenido.columns||[]).find(c => c.id === _tiViewSort.colId);
+    if (col) {
+      rows = rows.slice().sort((a, b) => {
+        const av = _tiCellCompareValue(col, a), bv = _tiCellCompareValue(col, b);
+        const an = parseFloat(av), bn = parseFloat(bv);
+        const cmp = (!isNaN(an) && !isNaN(bn)) ? (an - bn) : String(av).localeCompare(String(bv), 'es');
+        return cmp * _tiViewSort.dir;
+      });
+    }
+  }
+  return rows;
+}
+function sortTiByColumn(colId, dir) {
+  _tiViewSort = (_tiViewSort && _tiViewSort.colId === colId && _tiViewSort.dir === dir) ? null : { colId, dir };
+  renderTablaEditor();
+}
+function searchTiRows(q) {
+  _tiSearchQuery = q || '';
+  renderTablaEditor();
+}
+
 function renderTablaEditor() {
   const ti = STATE.tablaInteractiva;
   if (!ti) return;
@@ -2440,47 +2661,33 @@ function renderTablaEditor() {
   if (titleInput && document.activeElement !== titleInput) titleInput.value = ti.titulo || '';
 
   const cols = ti.contenido.columns || [];
-  const rows = ti.contenido.rows || [];
-  const hr = ti.contenido.highlightRule || {};
+  const rows = _tiVisibleRows(ti.contenido);
 
   const theadCells = cols.map((col, i) => {
-    const typeLabel = col.type === 'estado-ciclico' ? 'Estado cíclico' : 'Texto';
+    const typeLabel = TI_TYPE_LABELS[col.type] || 'Texto';
     return `<th data-col-id="${col.id}" style="background:${col.headerColor||'#1B3A4B'};color:${col.headerTextColor||'#ffffff'};text-align:${col.align||'left'}" draggable="true" data-reorder-group="ti-columns" data-reorder-index="${i}">
       <div class="ti-th-inner">
         <span class="ti-th-label" contenteditable="true" spellcheck="false" oninput="updateColumnLabel('${col.id}',this.textContent)">${esc(col.label||'')}</span>
         <span class="ti-th-type">${typeLabel}</span>
       </div>
       <div class="ti-th-actions">
-        <button class="ti-col-btn" title="Configurar columna" onclick="openColumnConfigModal('${col.id}')">⚙ Configurar</button>
+        <button class="ti-col-btn" title="Ordenar ascendente" onclick="sortTiByColumn('${col.id}',1)">▲</button>
+        <button class="ti-col-btn" title="Ordenar descendente" onclick="sortTiByColumn('${col.id}',-1)">▼</button>
+        <button class="ti-col-btn" title="Configurar columna" onclick="openColumnConfigModal('${col.id}')">⚙</button>
         <button class="ti-col-btn" title="Eliminar columna" onclick="removeTiColumn('${col.id}')">✕</button>
       </div>
     </th>`;
   }).join('');
 
-  const tbodyRows = rows.map(row => {
-    let hit = false;
-    if (hr.enabled && hr.columnIds && hr.columnIds.length) {
-      const count = hr.columnIds.filter(cid => {
-        const col = cols.find(c => c.id === cid);
-        if (!col || col.type !== 'estado-ciclico') return false;
-        const idx = row.values[cid] || 0;
-        const st = col.states[idx];
-        return st && st.value === hr.matchValue;
-      }).length;
-      hit = count >= (hr.minCount || 1);
-    }
-    const rowStyle = hit ? ` style="background:${hexToLight(hr.borderColor||'#E8622A')};border-left:3px solid ${hr.borderColor||'#E8622A'}"` : '';
+  const tbodyRows = rows.length ? rows.map(row => {
+    const filaColor = evaluarFilaColor(ti.contenido, row.id);
+    const rowStyle = filaColor ? ` style="border-left:3px solid ${filaColor.colorTexto||filaColor.colorFondo}"` : '';
     const cells = cols.map(col => {
-      if (col.type === 'estado-ciclico') {
-        const idx = row.values[col.id] || 0;
-        const st = (col.states && col.states[idx]) || (col.states && col.states[0]) || { value:'', bg:'#fff', color:'#000' };
-        return `<td style="text-align:${col.align||'center'}"><span class="ti-pill" style="background:${st.bg};color:${st.color}" onclick="cycleCell('${row.id}','${col.id}')">${_tiPillInner(st)}</span></td>`;
-      }
-      const val = row.values[col.id] != null ? row.values[col.id] : '';
-      return `<td style="text-align:${col.align||'left'}"><span class="ti-td-text" contenteditable="true" spellcheck="false" oninput="updateCellValue('${row.id}','${col.id}',this.textContent)">${esc(val)}</span></td>`;
+      const ruleColor = evaluarCeldaColor(ti.contenido, row.id, col.id);
+      return _tiRenderEditorCell(col, row, ruleColor);
     }).join('');
     return `<tr${rowStyle}>${cells}<td class="ti-row-actions"><button class="ti-col-btn" title="Eliminar fila" onclick="removeTiRow('${row.id}')">✕</button></td></tr>`;
-  }).join('');
+  }).join('') : `<tr><td colspan="${cols.length+1}" style="text-align:center;color:var(--text-muted);padding:20px">Sin resultados${_tiSearchQuery?' para "'+esc(_tiSearchQuery)+'"':''}</td></tr>`;
 
   const table = document.getElementById('ti-table');
   if (table) table.innerHTML = `<thead><tr>${theadCells}<th class="ti-row-actions-head"></th></tr></thead><tbody>${tbodyRows}</tbody>`;
@@ -2522,13 +2729,35 @@ function addColumnEstado() {
   renderTablaEditor();
   scheduleLocalSaveTabla();
 }
+function addTiColumnOfType(type) {
+  if (!STATE.tablaInteractiva || !type) return;
+  const base = { id: uid(), align: type==='checkbox'||type==='estado-ciclico'||type==='badge' ? 'center' : 'left', headerColor: '#1B3A4B', headerTextColor: '#ffffff' };
+  let col;
+  switch (type) {
+    case 'select': col = { ...base, type: 'select', label: 'Lista', opciones: ['Opción 1', 'Opción 2'] }; break;
+    case 'checkbox': col = { ...base, type: 'checkbox', label: 'Casilla' }; break;
+    case 'fecha': col = { ...base, type: 'fecha', label: 'Fecha' }; break;
+    case 'badge': col = { ...base, type: 'badge', label: 'Insignia', headerColor: '#7C3AED',
+      states: [ { value: 'Alta', icon: '', bg: '#FEE2E2', color: '#DC2626' }, { value: 'Media', icon: '', bg: '#FEF3C7', color: '#D97706' }, { value: 'Baja', icon: '', bg: '#DCFCE7', color: '#16A34A' } ] }; break;
+    case 'enlace': col = { ...base, type: 'enlace', label: 'Enlace' }; break;
+    case 'estado-ciclico': return addColumnEstado();
+    default: return addColumnTexto();
+  }
+  STATE.tablaInteractiva.contenido.columns.push(col);
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
 function removeTiColumn(colId) {
   if (!STATE.tablaInteractiva) return;
   if (!confirm('¿Eliminar esta columna?')) return;
   const c = STATE.tablaInteractiva.contenido;
   c.columns = c.columns.filter(x => x.id !== colId);
   c.rows.forEach(r => { delete r.values[colId]; });
-  if (c.highlightRule) c.highlightRule.columnIds = (c.highlightRule.columnIds || []).filter(id => id !== colId);
+  (c.reglas || []).forEach(regla => { regla.condiciones = (regla.condiciones||[]).filter(cond => cond.colId !== colId); });
+  c.reglas = (c.reglas || []).filter(regla => {
+    if (regla.alcance === 'celda' && regla.colId === colId) return false;
+    return (regla.condiciones || []).length > 0;
+  });
   renderTablaEditor();
   scheduleLocalSaveTabla();
 }
@@ -2536,7 +2765,7 @@ function addTiRow() {
   if (!STATE.tablaInteractiva) return;
   const c = STATE.tablaInteractiva.contenido;
   const values = {};
-  c.columns.forEach(col => { values[col.id] = col.type === 'estado-ciclico' ? 0 : ''; });
+  c.columns.forEach(col => { values[col.id] = (col.type === 'estado-ciclico' || col.type === 'badge') ? 0 : (col.type === 'checkbox' ? false : ''); });
   c.rows.push({ id: uid(), values });
   renderTablaEditor();
   scheduleLocalSaveTabla();
@@ -2561,10 +2790,15 @@ function openColumnConfigModal(colId) {
 function _tiColModalBodyHTML(col) {
   const bgSw = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="_tiSetDraftColor('bg','${c}')"></span>`).join('');
   const txtSw = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="_tiSetDraftColor('text','${c}')"></span>`).join('');
-  const statesSection = col.type === 'estado-ciclico' ? `
-    <label style="margin-top:16px;display:block;font-weight:600;font-size:13px">Estados cíclicos <span style="font-weight:400;color:var(--text-muted)">(clic en la celda para pasar al siguiente)</span></label>
+  const statesSection = (col.type === 'estado-ciclico' || col.type === 'badge') ? `
+    <label style="margin-top:16px;display:block;font-weight:600;font-size:13px">${col.type==='estado-ciclico' ? 'Estados cíclicos <span style="font-weight:400;color:var(--text-muted)">(clic en la celda para pasar al siguiente)</span>' : 'Opciones de la insignia <span style="font-weight:400;color:var(--text-muted)">(desplegable en la celda)</span>'}</label>
     <div id="ti-states-editor-list">${(col.states||[]).map((st,i)=>_tiStateRowHTML(st,i)).join('')}</div>
-    <button class="btn btn-sm" style="margin-top:8px" onclick="_tiAddStateRow()">➕ Añadir estado</button>
+    <button class="btn btn-sm" style="margin-top:8px" onclick="_tiAddStateRow()">➕ Añadir opción</button>
+  ` : '';
+  const optionsSection = col.type === 'select' ? `
+    <label style="margin-top:16px;display:block;font-weight:600;font-size:13px">Opciones de la lista</label>
+    <div id="ti-opciones-editor-list">${(col.opciones||[]).map((o,i)=>_tiOpcionRowHTML(o,i)).join('')}</div>
+    <button class="btn btn-sm" style="margin-top:8px" onclick="_tiAddOpcionRow()">➕ Añadir opción</button>
   ` : '';
   return `
     <label style="font-weight:600;font-size:13px">Texto de la cabecera</label>
@@ -2587,7 +2821,35 @@ function _tiColModalBodyHTML(col) {
       <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
       <input type="color" id="ti-col-text-custom" value="${col.headerTextColor||'#ffffff'}" oninput="_tiSetDraftColor('text',this.value)">
     </div>
-    ${statesSection}`;
+    ${statesSection}${optionsSection}`;
+}
+function _tiOpcionRowHTML(value, i) {
+  return `<div class="ti-opcion-row-modal" data-idx="${i}">
+    <input type="text" class="form-input ti-opcion-value" value="${escAttr(value||'')}" placeholder="Opción" style="flex:1">
+    <button class="ti-col-btn" title="Eliminar opción" onclick="_tiRemoveOpcionRow(${i})">✕</button>
+  </div>`;
+}
+function _tiAddOpcionRow() {
+  const list = document.getElementById('ti-opciones-editor-list');
+  const idx = list.children.length;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = _tiOpcionRowHTML('', idx);
+  list.appendChild(wrap.firstElementChild);
+}
+function _tiReindexOpcionRows() {
+  const list = document.getElementById('ti-opciones-editor-list');
+  Array.from(list.children).forEach((row, newIdx) => {
+    row.dataset.idx = newIdx;
+    const delBtn = row.querySelector('[title="Eliminar opción"]');
+    if (delBtn) delBtn.setAttribute('onclick', `_tiRemoveOpcionRow(${newIdx})`);
+  });
+}
+function _tiRemoveOpcionRow(idx) {
+  const list = document.getElementById('ti-opciones-editor-list');
+  if (list.children.length <= 1) { notify('Debe quedar al menos una opción'); return; }
+  const row = list.children[idx];
+  if (row) row.remove();
+  _tiReindexOpcionRows();
 }
 function _tiSetDraftColor(which, hex) {
   const input = document.getElementById(which === 'bg' ? 'ti-col-bg-custom' : 'ti-col-text-custom');
@@ -2661,7 +2923,7 @@ function saveColumnConfig() {
   col.align = document.getElementById('ti-col-align').value;
   col.headerColor = document.getElementById('ti-col-bg-custom').value;
   col.headerTextColor = document.getElementById('ti-col-text-custom').value;
-  if (col.type === 'estado-ciclico') {
+  if (col.type === 'estado-ciclico' || col.type === 'badge') {
     const rows = Array.from(document.querySelectorAll('#ti-states-editor-list .ti-state-row-modal'));
     if (rows.length) {
       col.states = rows.map(row => ({
@@ -2673,49 +2935,232 @@ function saveColumnConfig() {
       STATE.tablaInteractiva.contenido.rows.forEach(r => { if ((r.values[col.id] || 0) >= col.states.length) r.values[col.id] = 0; });
     }
   }
+  if (col.type === 'select') {
+    const rows = Array.from(document.querySelectorAll('#ti-opciones-editor-list .ti-opcion-row-modal'));
+    if (rows.length) col.opciones = rows.map(row => row.querySelector('.ti-opcion-value').value || '').filter(Boolean);
+  }
   closeModal('modal-ti-column');
   renderTablaEditor();
   scheduleLocalSaveTabla();
   _tiEditingColId = null;
 }
 
-// ── Resaltado de fila (modal) ──
-function openHighlightRuleModal() {
-  if (!STATE.tablaInteractiva) return;
-  if (!STATE.tablaInteractiva.contenido.highlightRule) {
-    STATE.tablaInteractiva.contenido.highlightRule = { enabled: false, columnIds: [], matchValue: 'Sí', minCount: 1, bg: '#FCF0E5', borderColor: '#E8622A' };
-  }
-  document.getElementById('ti-highlight-modal-body').innerHTML = _tiHighlightModalBodyHTML();
-  openModal('modal-ti-highlight');
-}
-function _tiHighlightModalBodyHTML() {
-  const hr = STATE.tablaInteractiva.contenido.highlightRule;
-  const cyclicCols = STATE.tablaInteractiva.contenido.columns.filter(c => c.type === 'estado-ciclico');
-  const checks = cyclicCols.map(c => `<label class="ti-hr-check"><input type="checkbox" value="${c.id}" ${hr.columnIds.includes(c.id)?'checked':''}> ${esc(c.label)}</label>`).join('');
-  return `<label style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px"><input type="checkbox" id="ti-hr-enabled" ${hr.enabled?'checked':''}> Activar resaltado de fila</label>
-    <div id="ti-hr-columns" style="margin:10px 0">${checks || '<span style="font-size:12px;color:var(--text-muted)">Añade una columna de estado primero</span>'}</div>
-    <label style="font-weight:600;font-size:13px">Valor que cuenta</label>
-    <input type="text" class="form-input" id="ti-hr-matchvalue" value="${escAttr(hr.matchValue)}" style="margin:4px 0 12px">
-    <label style="font-weight:600;font-size:13px">Mínimo de columnas coincidentes</label>
-    <input type="number" min="1" class="form-input" id="ti-hr-mincount" value="${hr.minCount}" style="margin:4px 0 12px">
-    <label style="font-weight:600;font-size:13px">Color de resaltado</label>
-    <input type="color" id="ti-hr-bordercolor" value="${hr.borderColor}" style="margin-top:4px">`;
-}
-function saveHighlightRuleModal() {
-  const hr = STATE.tablaInteractiva.contenido.highlightRule;
-  hr.enabled = document.getElementById('ti-hr-enabled').checked;
-  hr.columnIds = Array.from(document.querySelectorAll('#ti-hr-columns input[type=checkbox]:checked')).map(cb => cb.value);
-  hr.matchValue = document.getElementById('ti-hr-matchvalue').value;
-  hr.minCount = parseInt(document.getElementById('ti-hr-mincount').value) || 1;
-  hr.borderColor = document.getElementById('ti-hr-bordercolor').value;
-  closeModal('modal-ti-highlight');
-  renderTablaEditor();
-  scheduleLocalSaveTabla();
-}
 function updateLegend(html) {
   if (!STATE.tablaInteractiva) return;
   STATE.tablaInteractiva.contenido.legend = html;
   scheduleLocalSaveTabla();
+}
+
+// ═══════════════════════════════════════════════════════
+// PANEL "REGLAS CONDICIONALES" + CONSTRUCTOR DE REGLA
+// ═══════════════════════════════════════════════════════
+function toggleRulesPanel() {
+  const panel = document.getElementById('ti-rules-panel');
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (open) renderRulesPanel();
+}
+function closeRulesPanel() {
+  const panel = document.getElementById('ti-rules-panel');
+  if (panel) panel.classList.remove('open');
+}
+function _tiRuleSummary(regla) {
+  const cols = STATE.tablaInteractiva.contenido.columns;
+  const parts = (regla.condiciones || []).map(c => {
+    const col = cols.find(x => x.id === c.colId);
+    const compLabel = (TI_COMPARADORES[col && col.type] || []).find(p => p[0] === c.comparador);
+    return `${col ? esc(col.label) : '?'} ${compLabel ? compLabel[1].toLowerCase() : c.comparador} “${esc(c.valor)}”`;
+  });
+  const join = regla.logica === 'OR' ? ' <b>o</b> ' : ' <b>y</b> ';
+  const scopeText = regla.alcance === 'fila' ? 'resalta la fila' : `colorea “${esc((cols.find(c=>c.id===regla.colId)||{}).label||'?')}”`;
+  return `Si ${parts.join(join) || '(sin condiciones)'} → ${scopeText}`;
+}
+function renderRulesPanel() {
+  const ti = STATE.tablaInteractiva;
+  const list = document.getElementById('ti-rules-list');
+  if (!ti || !list) return;
+  const reglas = (ti.contenido.reglas || []).slice().sort((a,b) => (a.prioridad||0) - (b.prioridad||0));
+  if (!reglas.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text-muted);text-align:center;padding:20px 8px">Sin reglas todavía. La primera regla en la lista tiene la prioridad más alta.</div>'; return; }
+  list.innerHTML = reglas.map((regla, i) => `
+    <div class="ti-rule-card" draggable="true" data-reorder-group="ti-rules" data-reorder-index="${i}">
+      <div class="ti-rule-card-top">
+        <span class="ti-rule-swatch" style="background:${regla.colorFondo}"></span>
+        <span class="ti-rule-scope">${regla.alcance === 'fila' ? 'Fila' : 'Celda'} · #${i+1}</span>
+      </div>
+      <div class="ti-rule-summary">${_tiRuleSummary(regla)}</div>
+      <div class="ti-rule-actions">
+        <button class="ti-col-btn" onclick="openRuleBuilderModal('${regla.id}')">✎ Editar</button>
+        <button class="ti-col-btn" onclick="removeRule('${regla.id}')">✕ Eliminar</button>
+      </div>
+    </div>`).join('');
+}
+function removeRule(reglaId) {
+  if (!STATE.tablaInteractiva) return;
+  if (!confirm('¿Eliminar esta regla?')) return;
+  const c = STATE.tablaInteractiva.contenido;
+  c.reglas = (c.reglas || []).filter(r => r.id !== reglaId);
+  c.reglas.forEach((r, i) => { r.prioridad = i + 1; });
+  renderRulesPanel();
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+}
+
+let _tiEditingRuleId = null;
+function openRuleBuilderModal(reglaId) {
+  const ti = STATE.tablaInteractiva;
+  if (!ti) return;
+  _tiEditingRuleId = reglaId;
+  const regla = reglaId ? (ti.contenido.reglas || []).find(r => r.id === reglaId) : null;
+  document.getElementById('ti-rule-modal-title').textContent = regla ? 'Editar regla' : 'Nueva regla';
+  document.getElementById('ti-rule-modal-body').innerHTML = _tiRuleModalBodyHTML(regla);
+  openModal('modal-ti-rule');
+}
+function _tiCondRowHTML(cond, i) {
+  const cols = STATE.tablaInteractiva.contenido.columns || [];
+  const colId = cond ? cond.colId : (cols[0] && cols[0].id);
+  const col = cols.find(c => c.id === colId);
+  const comparadores = TI_COMPARADORES[col && col.type] || TI_COMPARADORES.texto;
+  const colOptions = cols.map(c => `<option value="${c.id}" ${c.id===colId?'selected':''}>${esc(c.label)}</option>`).join('');
+  const compOptions = comparadores.map(([v,l]) => `<option value="${v}" ${cond && cond.comparador===v?'selected':''}>${esc(l)}</option>`).join('');
+  const valorControl = _tiCondValueControl(col, cond ? cond.valor : '');
+  return `<div class="ti-cond-row" data-idx="${i}">
+    <select class="ti-cond-col" onchange="_tiRefreshCondRow(${i})">${colOptions}</select>
+    <select class="ti-cond-comp">${compOptions}</select>
+    <span class="ti-cond-value-wrap">${valorControl}</span>
+    <button class="ti-col-btn" title="Eliminar condición" onclick="_tiRemoveCondRow(${i})">✕</button>
+  </div>`;
+}
+function _tiCondValueControl(col, value) {
+  if (!col) return `<input type="text" class="form-input ti-cond-value" value="${escAttr(value||'')}">`;
+  if (col.type === 'checkbox') {
+    return `<select class="form-select ti-cond-value"><option value="true" ${value==='true'?'selected':''}>Sí (marcado)</option><option value="false" ${value==='false'?'selected':''}>No (desmarcado)</option></select>`;
+  }
+  if (col.type === 'fecha') {
+    return `<input type="date" class="form-input ti-cond-value" value="${escAttr(value||'')}">`;
+  }
+  if ((col.type === 'estado-ciclico' || col.type === 'badge') && col.states && col.states.length) {
+    return `<select class="form-select ti-cond-value">${col.states.map(st => `<option value="${escAttr(st.value)}" ${st.value===value?'selected':''}>${esc(st.value)}</option>`).join('')}</select>`;
+  }
+  if (col.type === 'select' && col.opciones && col.opciones.length) {
+    return `<select class="form-select ti-cond-value">${col.opciones.map(o => `<option value="${escAttr(o)}" ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select>`;
+  }
+  return `<input type="text" class="form-input ti-cond-value" value="${escAttr(value||'')}" placeholder="Valor">`;
+}
+function _tiRefreshCondRow(i) {
+  const list = document.getElementById('ti-rule-conditions-list');
+  const row = list && list.children[i];
+  if (!row) return;
+  const colId = row.querySelector('.ti-cond-col').value;
+  const col = STATE.tablaInteractiva.contenido.columns.find(c => c.id === colId);
+  const comparadores = TI_COMPARADORES[col && col.type] || TI_COMPARADORES.texto;
+  row.querySelector('.ti-cond-comp').innerHTML = comparadores.map(([v,l]) => `<option value="${v}">${esc(l)}</option>`).join('');
+  row.querySelector('.ti-cond-value-wrap').innerHTML = _tiCondValueControl(col, '');
+}
+function _tiAddCondRow() {
+  const list = document.getElementById('ti-rule-conditions-list');
+  const idx = list.children.length;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = _tiCondRowHTML(null, idx);
+  list.appendChild(wrap.firstElementChild);
+  _tiToggleLogicaVisibility();
+}
+function _tiReindexCondRows() {
+  const list = document.getElementById('ti-rule-conditions-list');
+  Array.from(list.children).forEach((row, newIdx) => {
+    row.dataset.idx = newIdx;
+    row.querySelector('.ti-cond-col').setAttribute('onchange', `_tiRefreshCondRow(${newIdx})`);
+    const delBtn = row.querySelector('[title="Eliminar condición"]');
+    if (delBtn) delBtn.setAttribute('onclick', `_tiRemoveCondRow(${newIdx})`);
+  });
+}
+function _tiRemoveCondRow(idx) {
+  const list = document.getElementById('ti-rule-conditions-list');
+  if (list.children.length <= 1) { notify('Debe quedar al menos una condición'); return; }
+  const row = list.children[idx];
+  if (row) row.remove();
+  _tiReindexCondRows();
+  _tiToggleLogicaVisibility();
+}
+function _tiToggleLogicaVisibility() {
+  const list = document.getElementById('ti-rule-conditions-list');
+  const wrap = document.getElementById('ti-rule-logica-wrap');
+  if (wrap) wrap.style.display = (list && list.children.length > 1) ? 'block' : 'none';
+}
+function _tiToggleAlcanceTarget() {
+  const alcance = document.querySelector('input[name="ti-rule-alcance"]:checked');
+  const wrap = document.getElementById('ti-rule-target-col-wrap');
+  if (wrap) wrap.style.display = (alcance && alcance.value === 'celda') ? 'block' : 'none';
+}
+function _tiRuleModalBodyHTML(regla) {
+  const cols = STATE.tablaInteractiva.contenido.columns || [];
+  const conds = regla ? regla.condiciones : [null];
+  const alcance = regla ? regla.alcance : 'fila';
+  const targetOptions = cols.map(c => `<option value="${c.id}" ${regla && regla.colId===c.id?'selected':''}>${esc(c.label)}</option>`).join('');
+  const bgSw = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="_tiSetRuleDraftColor('bg','${c}')"></span>`).join('');
+  const txtSw = BLOCK_PALETTE.map(c => `<span class="bcp-sw" style="background:${c}" title="${c}" onclick="_tiSetRuleDraftColor('text','${c}')"></span>`).join('');
+  return `
+    <label style="font-weight:600;font-size:13px">Condiciones</label>
+    <div id="ti-rule-conditions-list">${conds.map((c,i) => _tiCondRowHTML(c,i)).join('')}</div>
+    <button class="btn btn-sm" style="margin:6px 0 10px" onclick="_tiAddCondRow()">➕ Añadir condición</button>
+    <div id="ti-rule-logica-wrap" style="display:${conds.length>1?'block':'none'};margin-bottom:14px">
+      <label style="font-weight:600;font-size:13px">Combinar condiciones con</label>
+      <select class="form-select" id="ti-rule-logica" style="margin-top:4px">
+        <option value="AND" ${(!regla||regla.logica==='AND')?'selected':''}>Y (todas deben cumplirse)</option>
+        <option value="OR" ${regla&&regla.logica==='OR'?'selected':''}>O (basta con una)</option>
+      </select>
+    </div>
+    <label style="font-weight:600;font-size:13px">Alcance</label>
+    <div style="display:flex;gap:16px;margin:6px 0 12px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="radio" name="ti-rule-alcance" value="fila" ${alcance==='fila'?'checked':''} onchange="_tiToggleAlcanceTarget()"> Fila completa</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="radio" name="ti-rule-alcance" value="celda" ${alcance==='celda'?'checked':''} onchange="_tiToggleAlcanceTarget()"> Solo una celda</label>
+    </div>
+    <div id="ti-rule-target-col-wrap" style="display:${alcance==='celda'?'block':'none'};margin-bottom:14px">
+      <label style="font-weight:600;font-size:13px">Columna a colorear</label>
+      <select class="form-select" id="ti-rule-target-col" style="margin-top:4px">${targetOptions}</select>
+    </div>
+    <label style="font-weight:600;font-size:13px">Color de fondo</label>
+    <div class="bcp-grid">${bgSw}</div>
+    <div class="color-row" style="margin:4px 0 12px">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
+      <input type="color" id="ti-rule-bg-custom" value="${regla ? regla.colorFondo : '#FCF0E5'}" oninput="_tiSetRuleDraftColor('bg',this.value)">
+    </div>
+    <label style="font-weight:600;font-size:13px">Color de texto</label>
+    <div class="bcp-grid">${txtSw}</div>
+    <div class="color-row" style="margin:4px 0">
+      <span style="font-size:11px;color:var(--text-muted);flex:1">Personalizado</span>
+      <input type="color" id="ti-rule-text-custom" value="${regla ? regla.colorTexto : '#E8622A'}" oninput="_tiSetRuleDraftColor('text',this.value)">
+    </div>`;
+}
+function _tiSetRuleDraftColor(which, hex) {
+  const input = document.getElementById(which === 'bg' ? 'ti-rule-bg-custom' : 'ti-rule-text-custom');
+  if (input) input.value = hex;
+}
+function saveRuleBuilder() {
+  const ti = STATE.tablaInteractiva;
+  if (!ti) return;
+  const condRows = Array.from(document.querySelectorAll('#ti-rule-conditions-list .ti-cond-row'));
+  const condiciones = condRows.map(row => ({
+    colId: row.querySelector('.ti-cond-col').value,
+    comparador: row.querySelector('.ti-cond-comp').value,
+    valor: row.querySelector('.ti-cond-value').value
+  }));
+  const alcance = document.querySelector('input[name="ti-rule-alcance"]:checked').value;
+  const targetColEl = document.getElementById('ti-rule-target-col');
+  if (!ti.contenido.reglas) ti.contenido.reglas = [];
+  let regla = _tiEditingRuleId ? ti.contenido.reglas.find(r => r.id === _tiEditingRuleId) : null;
+  const isNew = !regla;
+  if (isNew) { regla = { id: uid(), prioridad: ti.contenido.reglas.length + 1 }; ti.contenido.reglas.push(regla); }
+  regla.condiciones = condiciones;
+  regla.logica = document.getElementById('ti-rule-logica') ? document.getElementById('ti-rule-logica').value : 'AND';
+  regla.alcance = alcance;
+  regla.colId = alcance === 'celda' && targetColEl ? targetColEl.value : null;
+  regla.colorFondo = document.getElementById('ti-rule-bg-custom').value;
+  regla.colorTexto = document.getElementById('ti-rule-text-custom').value;
+  closeModal('modal-ti-rule');
+  renderRulesPanel();
+  renderTablaEditor();
+  scheduleLocalSaveTabla();
+  _tiEditingRuleId = null;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -3111,6 +3556,9 @@ h1{font-size:20px;margin:0 0 16px;max-width:1100px;margin-left:auto;margin-right
 #tbl [contenteditable]:hover{outline:1px dashed #C9C7BE}
 #tbl [contenteditable]:focus{outline:2px solid #2563EB;border-radius:3px}
 .ti-cell:hover{filter:brightness(.95)}
+#tbl select,#tbl input[type=date]{font-family:inherit;font-size:13px;border:1px solid #e2e8f0;border-radius:4px;padding:3px 6px;background:#fff;color:inherit}
+#tbl .ti-cell,#tbl select.ti-badge-select{border-radius:20px;padding:4px 10px;font-weight:600;font-size:12px;cursor:pointer;border:none}
+#tbl a{color:#2563EB;text-decoration:none;font-size:12px}
 table{table-layout:auto}
 @media(max-width:640px){#tbl{padding:10px}table{font-size:12px}th,td{padding:7px 8px!important}}`;
 }
@@ -3120,11 +3568,32 @@ function _tiHTML(contenido) {
   const headers = cols.map(col => `<th style="background:${col.headerColor||'#1B3A4B'};color:${col.headerTextColor||'#ffffff'};text-align:${col.align||'left'};padding:10px 12px;font-size:13px;font-weight:600" contenteditable="true" spellcheck="false">${esc(col.label||'')}</th>`).join('');
   const bodyRows = rows.map(row => {
     const cells = cols.map(col => {
-      if (col.type === 'estado-ciclico') {
-        return `<td style="text-align:${col.align||'center'};padding:9px 12px;border-bottom:1px solid #e2e8f0"><span class="ti-cell" data-col="${col.id}" data-v="${row.values[col.id]||0}" onclick="_tiCycle(this)"></span></td>`;
+      const val = row.values[col.id];
+      const align = col.align || (col.type==='checkbox'||col.type==='estado-ciclico'||col.type==='badge' ? 'center' : 'left');
+      const tdStyle = `text-align:${align};padding:9px 12px;border-bottom:1px solid #e2e8f0`;
+      switch (col.type) {
+        case 'estado-ciclico':
+          return `<td style="${tdStyle}"><span class="ti-cell" data-row="${row.id}" data-col="${col.id}" data-v="${val||0}" onclick="_tiCycle(this)"></span></td>`;
+        case 'badge': {
+          const opts = (col.states||[]).map((st,i)=>`<option value="${i}" ${i===(val||0)?'selected':''}>${esc(st.value)}</option>`).join('');
+          return `<td style="${tdStyle}"><select class="ti-badge-select" data-row="${row.id}" data-col="${col.id}" onchange="_tiBadgeChange(this)">${opts}</select></td>`;
+        }
+        case 'select': {
+          const opts = ['',...(col.opciones||[])].map(o=>`<option value="${escAttr(o)}" ${o===(val||'')?'selected':''}>${esc(o||'—')}</option>`).join('');
+          return `<td style="${tdStyle}"><select data-row="${row.id}" data-col="${col.id}" onchange="_tiSetCell(this,'select')">${opts}</select></td>`;
+        }
+        case 'checkbox':
+          return `<td style="text-align:center;padding:9px 12px;border-bottom:1px solid #e2e8f0"><input type="checkbox" data-row="${row.id}" data-col="${col.id}" ${val?'checked':''} onchange="_tiSetCell(this,'checkbox')"></td>`;
+        case 'fecha':
+          return `<td style="${tdStyle}"><input type="date" data-row="${row.id}" data-col="${col.id}" value="${escAttr(val||'')}" onchange="_tiSetCell(this,'date')"></td>`;
+        case 'enlace': {
+          const v = val || '';
+          const safeUrl = _tiSafeUrl(v);
+          return `<td style="${tdStyle}"><span contenteditable="true" spellcheck="false" data-row="${row.id}" data-col="${col.id}" oninput="_tiSetCell(this,'text')">${esc(v)}</span>${safeUrl?` <a href="${escAttr(safeUrl)}" target="_blank" rel="noopener noreferrer">↗</a>`:''}</td>`;
+        }
+        default:
+          return `<td style="${tdStyle}"><span contenteditable="true" spellcheck="false" data-row="${row.id}" data-col="${col.id}" oninput="_tiSetCell(this,'text')">${esc(val!=null?val:'')}</span></td>`;
       }
-      const val = row.values[col.id] != null ? row.values[col.id] : '';
-      return `<td style="text-align:${col.align||'left'};padding:9px 12px;border-bottom:1px solid #e2e8f0"><span contenteditable="true" spellcheck="false">${esc(val)}</span></td>`;
     }).join('');
     return `<tr data-row-id="${row.id}">${cells}</tr>`;
   }).join('');
@@ -3138,51 +3607,72 @@ ${legend}
 </div>`;
 }
 function _tiJS(contenido) {
-  const colsMap = {};
-  (contenido.columns || []).forEach(col => {
-    if (col.type === 'estado-ciclico') {
-      colsMap[col.id] = { states: (col.states||[]).map(st => ({ value: st.value, bg: st.bg, color: st.color, iconHtml: st.icon ? iconSVG(st.icon, 14, st.color) : '' })) };
-    }
-  });
-  const hr = contenido.highlightRule || { enabled: false, columnIds: [], matchValue: '', minCount: 1, borderColor: '#E8622A' };
+  const withIconHtml = { ...contenido, columns: (contenido.columns||[]).map(col => {
+    if (col.type !== 'estado-ciclico' && col.type !== 'badge') return col;
+    return { ...col, states: (col.states||[]).map(st => ({ ...st, iconHtml: st.icon ? iconSVG(st.icon, 14, st.color) : '' })) };
+  }) };
   const safe = json => JSON.stringify(json).replace(/<\/script/gi, '<\\/script');
+  // Se embeben las MISMAS funciones puras que usa el editor en vivo (evaluarCeldaColor,
+  // evaluarFilaColor, _tiCompare, _tiCellCompareValue) vía fn.toString() — así el export
+  // standalone nunca puede divergir de la lógica de reglas condicionales del editor.
+  const sharedFns = [_tiCellCompareValue, _tiCompare, evaluarCeldaColor, evaluarFilaColor].map(fn => fn.toString()).join('\n');
   return `(function(){
-var TI_COLUMNS = ${safe(colsMap)};
-var TI_HIGHLIGHT = ${safe(hr)};
+var TI_CONTENIDO = ${safe(withIconHtml)};
+${sharedFns}
 function escHtml(s){var d=document.createElement('div');d.textContent=s==null?'':s;return d.innerHTML;}
-function hexToLight(hex){hex=(hex||'#000000').replace('#','');if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);return 'rgba('+r+','+g+','+b+',0.12)';}
-function paintCell(el){
-  var col = TI_COLUMNS[el.dataset.col]; if(!col) return;
-  var idx = parseInt(el.dataset.v||'0',10);
-  var st = col.states[idx] || col.states[0];
-  el.innerHTML = (st.iconHtml||'') + (st.iconHtml?'&nbsp;':'') + escHtml(st.value);
-  el.style.display='inline-block';el.style.minWidth='44px';el.style.textAlign='center';el.style.padding='4px 10px';el.style.borderRadius='20px';el.style.fontSize='12px';el.style.fontWeight='600';el.style.cursor='pointer';el.style.userSelect='none';
-  el.style.background = st.bg; el.style.color = st.color;
+function findRow(rowId){ return (TI_CONTENIDO.rows||[]).filter(function(r){return r.id===rowId;})[0]; }
+function findCol(colId){ return (TI_CONTENIDO.columns||[]).filter(function(c){return c.id===colId;})[0]; }
+function applyCellColor(td, rowId, colId){
+  var ruleColor = evaluarCeldaColor(TI_CONTENIDO, rowId, colId);
+  td.style.background = ruleColor ? ruleColor.colorFondo : '';
+  td.style.color = ruleColor ? ruleColor.colorTexto : '';
 }
-function paintRow(tr){
-  if (!tr || !TI_HIGHLIGHT.enabled || !TI_HIGHLIGHT.columnIds.length) return;
-  var count = 0;
-  TI_HIGHLIGHT.columnIds.forEach(function(cid){
-    var cell = tr.querySelector('.ti-cell[data-col="'+cid+'"]');
-    if (!cell) return;
-    var col = TI_COLUMNS[cid]; if (!col) return;
-    var st = col.states[parseInt(cell.dataset.v||'0',10)];
-    if (st && st.value === TI_HIGHLIGHT.matchValue) count++;
+function paintCyclic(el){
+  var col = findCol(el.dataset.col), row = findRow(el.dataset.row); if(!col||!row) return;
+  var idx = row.values[col.id] || 0;
+  var st = col.states[idx] || col.states[0];
+  var ruleColor = evaluarCeldaColor(TI_CONTENIDO, row.id, col.id);
+  el.innerHTML = (st.iconHtml||'') + (st.iconHtml?'&nbsp;':'') + escHtml(st.value);
+  el.style.background = ruleColor ? ruleColor.colorFondo : st.bg;
+  el.style.color = ruleColor ? ruleColor.colorTexto : st.color;
+}
+function paintBadge(sel){
+  var col = findCol(sel.dataset.col), row = findRow(sel.dataset.row); if(!col||!row) return;
+  var idx = row.values[col.id] || 0;
+  var st = col.states[idx] || col.states[0] || {bg:'#fff',color:'#000'};
+  var ruleColor = evaluarCeldaColor(TI_CONTENIDO, row.id, col.id);
+  sel.style.background = ruleColor ? ruleColor.colorFondo : st.bg;
+  sel.style.color = ruleColor ? ruleColor.colorTexto : st.color;
+}
+function repaintRow(rowId){
+  var tr = document.querySelector('tr[data-row-id="'+rowId+'"]'); if (!tr) return;
+  var filaColor = evaluarFilaColor(TI_CONTENIDO, rowId);
+  tr.style.borderLeft = filaColor ? '3px solid '+(filaColor.colorTexto||filaColor.colorFondo) : '';
+  (TI_CONTENIDO.columns||[]).forEach(function(col){
+    var el = tr.querySelector('[data-col="'+col.id+'"]'); if (!el) return;
+    if (col.type === 'estado-ciclico') { paintCyclic(el); return; }
+    if (col.type === 'badge') { paintBadge(el); return; }
+    var td = el.closest('td'); if (td) applyCellColor(td, rowId, col.id);
   });
-  var hit = count >= (TI_HIGHLIGHT.minCount||1);
-  tr.style.background = hit ? hexToLight(TI_HIGHLIGHT.borderColor) : '';
-  tr.style.borderLeft = hit ? '3px solid '+TI_HIGHLIGHT.borderColor : '';
 }
 window._tiCycle = function(el){
-  var col = TI_COLUMNS[el.dataset.col]; if(!col) return;
-  var idx = parseInt(el.dataset.v||'0',10);
-  idx = (idx+1) % col.states.length;
-  el.dataset.v = idx;
-  paintCell(el);
-  paintRow(el.closest('tr'));
+  var col = findCol(el.dataset.col), row = findRow(el.dataset.row); if(!col||!row) return;
+  var idx = row.values[col.id] || 0;
+  row.values[col.id] = (idx+1) % col.states.length;
+  repaintRow(row.id);
 };
-document.querySelectorAll('.ti-cell').forEach(paintCell);
-document.querySelectorAll('tr[data-row-id]').forEach(paintRow);
+window._tiBadgeChange = function(sel){
+  var row = findRow(sel.dataset.row); if(!row) return;
+  row.values[sel.dataset.col] = parseInt(sel.value, 10);
+  repaintRow(row.id);
+};
+window._tiSetCell = function(el, kind){
+  var row = findRow(el.dataset.row); if(!row) return;
+  var val = kind === 'checkbox' ? el.checked : (kind === 'text' ? el.textContent : el.value);
+  row.values[el.dataset.col] = val;
+  repaintRow(row.id);
+};
+(TI_CONTENIDO.rows||[]).forEach(function(row){ repaintRow(row.id); });
 })();`;
 }
 function exportTablaInteractivaHTML() {
@@ -3234,15 +3724,41 @@ async function exportTablaInteractivaImagen() {
     container.style.cssText = 'position:fixed;top:0;left:-9999px;width:1100px;background:#f8fafc;padding:24px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1e293b;box-sizing:border-box';
     container.innerHTML = `<h1 style="font-size:20px;margin:0 0 16px">${esc(titulo)}</h1>${_tiHTML(ti.contenido)}`;
     document.body.appendChild(container);
-    container.querySelectorAll('.ti-cell').forEach(el => {
-      const col = ti.contenido.columns.find(c => c.id === el.dataset.col);
-      if (!col) return;
-      const idx = parseInt(el.dataset.v || '0', 10);
-      const st = (col.states && col.states[idx]) || (col.states && col.states[0]) || { value:'', bg:'#fff', color:'#000' };
-      el.innerHTML = _tiPillInner(st);
-      el.style.display = 'inline-block'; el.style.minWidth = '44px'; el.style.textAlign = 'center'; el.style.padding = '4px 10px';
-      el.style.borderRadius = '20px'; el.style.fontSize = '12px'; el.style.fontWeight = '600';
-      el.style.background = st.bg; el.style.color = st.color;
+    // html2canvas no renderiza de forma fiable <select>/<input> nativos — se aplanan
+    // a spans/texto estático con el color de regla ya resuelto antes de capturar.
+    (ti.contenido.rows||[]).forEach(row => {
+      (ti.contenido.columns||[]).forEach(col => {
+        const el = container.querySelector(`tr[data-row-id="${row.id}"] [data-col="${col.id}"]`);
+        if (!el) return;
+        const ruleColor = evaluarCeldaColor(ti.contenido, row.id, col.id);
+        const val = row.values[col.id];
+        if (col.type === 'estado-ciclico' || col.type === 'badge') {
+          const idx = val || 0;
+          const st = (col.states && col.states[idx]) || (col.states && col.states[0]) || { value:'', bg:'#fff', color:'#000' };
+          const span = document.createElement('span');
+          span.innerHTML = _tiPillInner(st);
+          span.style.cssText = 'display:inline-block;min-width:44px;text-align:center;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600';
+          span.style.background = ruleColor ? ruleColor.colorFondo : st.bg;
+          span.style.color = ruleColor ? ruleColor.colorTexto : st.color;
+          el.replaceWith(span);
+        } else if (col.type === 'checkbox') {
+          el.outerHTML = `<span style="font-size:14px">${val ? '☑' : '☐'}</span>`;
+        } else if (col.type === 'select' || col.type === 'fecha') {
+          const td = el.closest('td');
+          const span = document.createElement('span');
+          span.textContent = val || '';
+          el.replaceWith(span);
+          if (td && ruleColor) { td.style.background = ruleColor.colorFondo; td.style.color = ruleColor.colorTexto; }
+        } else {
+          const td = el.closest('td');
+          if (td && ruleColor) { td.style.background = ruleColor.colorFondo; td.style.color = ruleColor.colorTexto; }
+        }
+      });
+      const filaColor = evaluarFilaColor(ti.contenido, row.id);
+      if (filaColor) {
+        const tr = container.querySelector(`tr[data-row-id="${row.id}"]`);
+        if (tr) tr.style.borderLeft = `3px solid ${filaColor.colorTexto||filaColor.colorFondo}`;
+      }
     });
     const canvas = await window.html2canvas(container, { scale: 3, backgroundColor: '#f8fafc', useCORS: true });
     document.body.removeChild(container);
@@ -3272,12 +3788,14 @@ function exportTablaInteractivaExcel() {
   const csvEsc = v => '"' + String(v == null ? '' : v).replace(/"/g,'""') + '"';
   const headerLine = cols.map(c => csvEsc(c.label||'')).join(';');
   const bodyLines = rows.map(row => cols.map(col => {
-    if (col.type === 'estado-ciclico') {
-      const idx = row.values[col.id] || 0;
+    const val = row.values[col.id];
+    if (col.type === 'estado-ciclico' || col.type === 'badge') {
+      const idx = val || 0;
       const st = (col.states && col.states[idx]) || {};
       return csvEsc(st.value||'');
     }
-    return csvEsc(row.values[col.id]||'');
+    if (col.type === 'checkbox') return csvEsc(val ? 'Sí' : 'No');
+    return csvEsc(val||'');
   }).join(';')).join('\r\n');
   const csv = '﻿' + headerLine + '\r\n' + bodyLines;
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
