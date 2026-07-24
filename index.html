@@ -772,15 +772,35 @@
     </div>
   </div>
   <div class="ti-toolbar">
-    <button class="btn btn-sm" onclick="addColumnTexto()">➕ Columna de texto</button>
-    <button class="btn btn-sm" onclick="addColumnEstado()">➕ Columna de estado</button>
+    <button class="btn btn-sm" onclick="addColumnTexto()">➕ Texto</button>
+    <button class="btn btn-sm" onclick="addColumnEstado()">➕ Estado cíclico</button>
+    <select class="form-select ti-add-col-select" onchange="addTiColumnOfType(this.value); this.selectedIndex=0;">
+      <option value="">➕ Más tipos de columna…</option>
+      <option value="select">Lista desplegable</option>
+      <option value="checkbox">Casilla</option>
+      <option value="fecha">Fecha</option>
+      <option value="badge">Insignia</option>
+      <option value="enlace">Enlace</option>
+    </select>
     <button class="btn btn-sm" onclick="addTiRow()">➕ Fila</button>
-    <button class="btn btn-sm" onclick="openHighlightRuleModal()">🎨 Resaltado de fila</button>
+    <button class="btn btn-sm" onclick="toggleRulesPanel()">🔀 Reglas condicionales</button>
+    <input type="text" class="form-input ti-search-input" placeholder="🔍 Buscar en la tabla…" oninput="searchTiRows(this.value)">
   </div>
   <div class="ti-table-wrap">
     <table class="ti-table" id="ti-table"></table>
   </div>
   <div class="ti-legend" id="ti-legend" contenteditable="true" spellcheck="false" oninput="updateLegend(this.innerHTML)"></div>
+
+  <div class="ti-rules-panel" id="ti-rules-panel">
+    <div class="ti-rules-panel-header">
+      <span>Reglas condicionales</span>
+      <button class="ti-col-btn" onclick="toggleRulesPanel()">✕</button>
+    </div>
+    <div class="ti-rules-panel-body" id="ti-rules-list"></div>
+    <div class="ti-rules-panel-footer">
+      <button class="btn btn-primary btn-sm" style="width:100%" onclick="openRuleBuilderModal(null)">➕ Nueva regla</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-ti-column">
@@ -794,13 +814,13 @@
   </div>
 </div>
 
-<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-ti-highlight">
-  <div class="modal modal-md">
-    <div class="modal-header"><h3>Resaltado de fila</h3><button class="modal-close" onclick="closeModal('modal-ti-highlight')">×</button></div>
-    <div class="modal-body" id="ti-highlight-modal-body"></div>
+<div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-ti-rule">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3 id="ti-rule-modal-title">Nueva regla</h3><button class="modal-close" onclick="closeModal('modal-ti-rule')">×</button></div>
+    <div class="modal-body" id="ti-rule-modal-body"></div>
     <div class="modal-footer">
-      <button class="btn btn-primary" onclick="saveHighlightRuleModal()">Guardar</button>
-      <button class="btn" onclick="closeModal('modal-ti-highlight')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRuleBuilder()">Guardar regla</button>
+      <button class="btn" onclick="closeModal('modal-ti-rule')">Cancelar</button>
     </div>
   </div>
 </div>
