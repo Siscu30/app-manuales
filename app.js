@@ -1948,7 +1948,13 @@ function scheduleLocalSave() {
 function startAutoSave() {
   if (STATE.autoSaveTimer) clearInterval(STATE.autoSaveTimer);
   STATE.autoSaveTimer = setInterval(async () => {
-    if (STATE.isDirty && STATE.user && STATE.manual.id) {
+    if (STATE.appMode === 'tablas') {
+      if (STATE.tablaInteractiva?.isDirty && STATE.user && STATE.role !== 'visualizador') {
+        let ok = await guardarTablaInteractiva();
+        if (!ok) ok = await guardarTablaInteractiva(); // reintento unico
+        if (!ok) setSaveStatus('⚠ Sin sincronizar — reintento en 1 min');
+      }
+    } else if (STATE.isDirty && STATE.user && STATE.manual.id) {
       let ok = await guardar();
       if (!ok) ok = await guardar(); // reintento unico
       if (!ok) setSaveStatus('⚠ Sin sincronizar — reintento en 1 min');
@@ -2442,10 +2448,13 @@ async function nuevaTablaInteractiva() {
   openTablaEditor();
 }
 
+let _tiSaving = false;
 async function guardarTablaInteractiva() {
   if (!STATE.tablaInteractiva) return;
   if (!STATE.user) { openAuthModal('Guarda la tabla para sincronizar en la nube'); return; }
   if (STATE.role === 'visualizador') { notify('⚠️ Los visualizadores no pueden guardar'); return; }
+  if (_tiSaving) return false;
+  _tiSaving = true;
   const titleInput = document.getElementById('tabla-titulo');
   if (titleInput) STATE.tablaInteractiva.titulo = titleInput.value || 'Sin título';
   const btn = document.getElementById('btn-guardar-tabla');
@@ -2460,6 +2469,7 @@ async function guardarTablaInteractiva() {
       user_id: STATE.user.id,
       created_by: STATE.tablaInteractiva.createdBy || STATE.user.id
     };
+    const _prevDraftKey = 'tabla_draft_' + (STATE.tablaInteractiva.id || 'guest');
     let result;
     if (STATE.tablaInteractiva.id) {
       result = await sb.from('tablas_interactivas').update(tablaData).eq('id', STATE.tablaInteractiva.id).select().single();
@@ -2469,18 +2479,27 @@ async function guardarTablaInteractiva() {
     if (result.error) throw result.error;
     STATE.tablaInteractiva.id = result.data.id;
     STATE.tablaInteractiva.isDirty = false;
-    try { localStorage.setItem('last_tabla_id', STATE.tablaInteractiva.id); } catch(e){}
+    try {
+      localStorage.setItem('last_tabla_id', STATE.tablaInteractiva.id);
+      localStorage.removeItem(_prevDraftKey);
+    } catch(e){}
     _tiLastSavedAt = Date.now();
     setSaveStatus('✓ Guardado');
     notify('✅ Tabla guardada');
+    return true;
   } catch(e) {
     notify('❌ Error al guardar: ' + (e.message||e), 4000);
+    return false;
   } finally {
     if (btn) { btn.textContent = '💾 Guardar'; btn.disabled = false; }
+    _tiSaving = false;
   }
 }
 
 async function loadTablaInteractiva(id) {
+  if (STATE.tablaInteractiva?.isDirty) {
+    if (!confirm('¿Abrir otra tabla? Los cambios no guardados se perderán.')) return;
+  }
   try {
     const { data, error } = await sb.from('tablas_interactivas').select('*').eq('id', id).single();
     if (error) throw error;
@@ -2525,6 +2544,12 @@ function scheduleLocalSaveTabla() {
 function localSaveTabla() {
   if (!STATE.tablaInteractiva) return;
   try { localStorage.setItem('tabla_draft_' + (STATE.tablaInteractiva.id || 'guest'), JSON.stringify(STATE.tablaInteractiva)); } catch(e) {}
+}
+function loadLocalDraftTabla(id) {
+  try {
+    const raw = localStorage.getItem('tabla_draft_' + (id||'guest'));
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
 }
 
 function _tiCol(colId) {
@@ -2761,7 +2786,7 @@ function renderTablaEditor() {
   if (table) table.innerHTML = `<thead><tr>${theadCells}<th class="ti-row-actions-head"></th></tr></thead><tbody>${tbodyRows}</tbody>`;
 
   const legend = document.getElementById('ti-legend');
-  if (legend && document.activeElement !== legend) legend.innerHTML = ti.contenido.legend || '';
+  if (legend && document.activeElement !== legend) legend.innerHTML = sanitizeRichHtml(ti.contenido.legend || '');
   updateTiStats();
 }
 
@@ -6593,6 +6618,19 @@ async function handleSession(session) {
         // abrir directo el último manual editado.
         openManualesPanel();
       }
+
+      // Tablas Interactivas: mismo patrón de restauración que Manuales arriba.
+      const lastTablaId = localStorage.getItem('last_tabla_id');
+      const tablaDraft = loadLocalDraftTabla(lastTablaId || 'guest');
+      if (tablaDraft && !STATE.tablaInteractiva) {
+        STATE.tablaInteractiva = tablaDraft;
+        if (STATE.appMode === 'tablas') {
+          openTablaEditor();
+          if (STATE.tablaInteractiva.isDirty) setSaveStatus('⚠ Sin guardar');
+        }
+      } else if (!tablaDraft && !STATE.tablaInteractiva && STATE.appMode === 'tablas') {
+        openMisTablas();
+      }
     }
   } else {
     _sessionInitialized = false;
@@ -6842,7 +6880,10 @@ async function init() {
   q('#manual-empresa').addEventListener('input', scheduleLocalSave);
   startAutoSave();
   window.addEventListener('beforeunload', e => {
+    if (STATE.isDirty) { clearTimeout(STATE.saveTimer); localSave(); }
+    if (STATE.tablaInteractiva?.isDirty) { clearTimeout(_tiSaveTimer); localSaveTabla(); }
     if (STATE.isDirty && STATE.user && STATE.blocks.length) { e.preventDefault(); e.returnValue = ''; }
+    if (STATE.tablaInteractiva?.isDirty && STATE.user) { e.preventDefault(); e.returnValue = ''; }
   });
 
   // 1. Mostrar login inmediatamente, sin esperar nada
