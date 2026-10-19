@@ -2164,8 +2164,9 @@ async function loadManualesPanel(tab) {
         </div>
       </div>`;
     }).join('');
+    filterList('mp2-list', document.getElementById('mp2-search')?.value);
   } catch(e) {
-    list.innerHTML = `<div class="mp2-empty" style="color:#dc2626">Error: ${e.message}</div>`;
+    list.innerHTML = `<div class="mp2-empty" style="color:#dc2626">Error: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2340,6 +2341,25 @@ function switchTablasTab(tab) {
   loadTablasPanel(tab);
 }
 
+// Buscador de Mis Manuales / Mis Tablas: filtra en el navegador por el texto visible de cada
+// tarjeta (título, empresa, estado), sin distinguir acentos ni mayúsculas.
+function _normTxt(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+function filterList(listId, query) {
+  const list = document.getElementById(listId); if (!list) return;
+  const qn = _normTxt(query);
+  let visibles = 0;
+  list.querySelectorAll('.mp2-card').forEach(card => {
+    const ok = !qn || _normTxt(card.querySelector('.mp2-card-info')?.textContent).includes(qn);
+    card.style.display = ok ? '' : 'none';
+    if (ok) visibles++;
+  });
+  let msg = list.querySelector('.mp2-nomatch');
+  if (qn && !visibles && list.querySelector('.mp2-card')) {
+    if (!msg) { msg = document.createElement('div'); msg.className = 'mp2-empty mp2-nomatch'; msg.setAttribute('role', 'status'); list.appendChild(msg); }
+    msg.textContent = `Ningún resultado para «${String(query).trim()}»`;
+  } else if (msg) msg.remove();
+}
+
 async function loadTablasPanel(tab) {
   const list = document.getElementById('tp2-list');
   if (!list) return;
@@ -2380,12 +2400,13 @@ async function loadTablasPanel(tab) {
         </div>
         <div class="mp2-card-actions">
           <button class="btn" style="font-size:12px" data-id="${t.id}" data-titulo="${escAttr(t.titulo||'Sin título')}" onclick="duplicateTablaInteractiva(this.dataset.id, this.dataset.titulo)">⧉ Duplicar</button>
-          <button class="btn" style="font-size:12px;color:#dc2626" data-id="${t.id}" data-titulo="${escAttr(t.titulo||'Sin título')}" onclick="softDeleteTablaInteractiva(this.dataset.id, this.dataset.titulo)">🗑</button>
+          <button class="btn" style="font-size:12px;color:#dc2626" aria-label="Mover a la papelera" title="Mover a la papelera" data-id="${t.id}" data-titulo="${escAttr(t.titulo||'Sin título')}" onclick="softDeleteTablaInteractiva(this.dataset.id, this.dataset.titulo)">🗑</button>
         </div>
       </div>`;
     }).join('');
+    filterList('tp2-list', document.getElementById('tp2-search')?.value);
   } catch(e) {
-    list.innerHTML = `<div class="mp2-empty" style="color:#dc2626">Error: ${e.message}</div>`;
+    list.innerHTML = `<div class="mp2-empty" style="color:#dc2626">Error: ${esc(e.message)}</div>`;
   }
 }
 

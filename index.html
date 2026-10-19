@@ -797,6 +797,7 @@
       <button class="mp2-tab active" id="mp2-tab-activos" onclick="switchManualesTab('activos')">📄 Activos</button>
       <button class="mp2-tab" id="mp2-tab-papelera" onclick="switchManualesTab('papelera')">🗑 Papelera</button>
     </div>
+    <input type="search" id="mp2-search" class="form-input mp2-search" placeholder="Buscar por título o empresa…" aria-label="Buscar manuales" autocomplete="off" spellcheck="false" oninput="filterList('mp2-list', this.value)">
     <div id="mp2-list"></div>
   </div>
 </div>
@@ -815,6 +816,7 @@
       <button class="mp2-tab active" id="tp2-tab-activos" onclick="switchTablasTab('activos')">📊 Activas</button>
       <button class="mp2-tab" id="tp2-tab-papelera" onclick="switchTablasTab('papelera')">🗑 Papelera</button>
     </div>
+    <input type="search" id="tp2-search" class="form-input mp2-search" placeholder="Buscar por título…" aria-label="Buscar tablas" autocomplete="off" spellcheck="false" oninput="filterList('tp2-list', this.value)">
     <div id="tp2-list" class="mp2-list-target"></div>
   </div>
 </div>
