@@ -94,6 +94,16 @@ test('evaluarCeldaColor: lógica OR', () => {
   assert.equal(evaluarCeldaColor(c, 'r0', 'chk'), null);
 });
 
+test('_estadoInfo: etiquetas legibles y nunca el valor crudo de la BD', () => {
+  const constLine = SRC.match(/\nconst _ESTADOS = [^\n]+/)[0];
+  const _estadoInfo = new Function(constLine + '\n' + extract('_estadoInfo') + '\nreturn _estadoInfo;')();
+  assert.deepEqual(_estadoInfo('en_revision'), { cls: 'en_revision', label: 'En revisión' });
+  assert.deepEqual(_estadoInfo(null), { cls: 'borrador', label: 'Borrador' });
+  const malicioso = _estadoInfo('x"><img src=x onerror=alert(1)>');
+  assert.deepEqual(malicioso, { cls: 'borrador', label: 'Estado desconocido' });
+  assert.equal(_estadoInfo('__proto__').label, 'Estado desconocido');
+});
+
 test('evaluarFilaColor solo considera reglas de alcance fila', () => {
   assert.deepEqual(evaluarFilaColor(contenido, 'r0'), { colorFondo: '#0f0', colorTexto: '#000' });
   const soloCelda = { ...contenido, reglas: [contenido.reglas[0]] };

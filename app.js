@@ -2117,6 +2117,15 @@ function switchManualesTab(tab) {
   loadManualesPanel(tab);
 }
 
+// Estado de un manual -> clase CSS y etiqueta legible. Lista blanca: el valor viene de la BD
+// y un editor puede escribir cualquier texto en él por la API; nunca se pinta en crudo.
+const _ESTADOS = { borrador: 'Borrador', en_revision: 'En revisión', publicado: 'Publicado', rechazado: 'Rechazado', papelera: 'Papelera', plantilla: 'Plantilla' };
+function _estadoInfo(estado) {
+  const e = estado || 'borrador';
+  if (Object.prototype.hasOwnProperty.call(_ESTADOS, e)) return { cls: e, label: _ESTADOS[e] };
+  return { cls: 'borrador', label: 'Estado desconocido' };
+}
+
 async function loadManualesPanel(tab) {
   const list = document.getElementById('mp2-list');
   if (!list) return;
@@ -2154,13 +2163,13 @@ async function loadManualesPanel(tab) {
           <div class="mp2-card-title">${isActive?'▶ ':''}${esc(m.titulo||'Sin título')}</div>
           <div class="mp2-card-sub">
             ${esc(m.empresa||'')}${m.empresa?' · ':''}${dateStr}
-            <span class="badge ${m.estado||'borrador'}">${m.estado||'borrador'}</span>
+            <span class="badge ${_estadoInfo(m.estado).cls}">${_estadoInfo(m.estado).label}</span>
           </div>
         </div>
         <div class="mp2-card-actions">
           <button class="btn" style="font-size:12px" onclick="openVersionHistoryFor('${m.id}')">🕐 Versiones</button>
           <button class="btn" style="font-size:12px" data-id="${m.id}" data-titulo="${escAttr(m.titulo||'Sin título')}" onclick="duplicateManual(this.dataset.id, this.dataset.titulo)">⧉ Duplicar</button>
-          <button class="btn" style="font-size:12px;color:#dc2626" data-id="${m.id}" data-titulo="${escAttr(m.titulo||'Sin título')}" onclick="softDeleteManual(this.dataset.id, this.dataset.titulo)">🗑</button>
+          <button class="btn" style="font-size:12px;color:#dc2626" aria-label="Mover a la papelera" title="Mover a la papelera" data-id="${m.id}" data-titulo="${escAttr(m.titulo||'Sin título')}" onclick="softDeleteManual(this.dataset.id, this.dataset.titulo)">🗑</button>
         </div>
       </div>`;
     }).join('');
