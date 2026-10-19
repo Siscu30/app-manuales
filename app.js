@@ -4800,10 +4800,22 @@ function closeImportModal() {
   document.getElementById('modal-import').classList.add('hidden');
 }
 
+// Integridad (SRI) de las librerías externas que se cargan a demanda: si el CDN sirviera un
+// archivo distinto, el navegador lo bloquea. Al cambiar de versión hay que recalcular el hash:
+//   curl -s URL | openssl dgst -sha384 -binary | openssl base64 -A
+const _SRI = {
+  'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js': 'sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js': 'sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js': 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk',
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js': 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js': 'sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e',
+  'https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js': 'sha384-GPb5RlngihS9H0z1D137JsvzmeZ7tCpWEF4t5YDoTZyMsPP8S7h7vFDh4XhheU83',
+};
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
     const s = document.createElement('script');
+    if (_SRI[src]) { s.integrity = _SRI[src]; s.crossOrigin = 'anonymous'; }
     s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('No se pudo cargar: ' + src));
     document.head.appendChild(s);
   });
@@ -7538,3 +7550,34 @@ async function openAnnotationEditor(blockId, slot) {
   }
   document.addEventListener('keydown', _annKeydown);
 }
+
+// ═══════════════════════════════════════════════════════
+// ACCESIBILIDAD: div/span clicables usables con teclado
+// ═══════════════════════════════════════════════════════
+// Cabeceras del sidebar, opciones de menú, tarjetas, muestras de color… se hacen alcanzables con
+// Tab y activables con Enter/Espacio sin tocar sus estilos. Se excluyen los fondos de modal
+// (onclick que solo cierra al pulsar fuera) y los que solo detienen la propagación.
+const _A11Y_SKIP_IDS = new Set(['lightbox-overlay', 'modal-iconify']);
+const _A11Y_SEL = 'div[onclick],span[onclick]';
+function _a11yClickable(root) {
+  const list = [...(root.querySelectorAll ? root.querySelectorAll(_A11Y_SEL) : [])];
+  if (root.matches && root.matches(_A11Y_SEL)) list.push(root);
+  for (const el of list) {
+    if (el.hasAttribute('tabindex') || _A11Y_SKIP_IDS.has(el.id)) continue;
+    const h = el.getAttribute('onclick') || '';
+    if (/^\s*if\s*\(\s*event\.target/.test(h) || /^\s*event\.stopPropagation\(\)\s*;?\s*$/.test(h)) continue;
+    el.setAttribute('tabindex', '0');
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+  }
+}
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  const el = ev.target;
+  if (!el || el.tagName === 'BUTTON' || el.isContentEditable || el.getAttribute?.('role') !== 'button') return;
+  ev.preventDefault();
+  el.click();
+});
+new MutationObserver(muts => {
+  for (const m of muts) for (const n of m.addedNodes) if (n.nodeType === 1) _a11yClickable(n);
+}).observe(document.documentElement, { childList: true, subtree: true });
+_a11yClickable(document);

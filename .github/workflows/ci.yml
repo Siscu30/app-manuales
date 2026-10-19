@@ -1,0 +1,25 @@
+# Comprobaciones mínimas en cada PR y push a main: sintaxis de app.js y pruebas de las
+# funciones puras (motor de reglas de Tablas Interactivas y validadores). Sin dependencias.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sintaxis de app.js
+        run: node --check app.js
+      - name: Pruebas
+        run: node --test tests/
