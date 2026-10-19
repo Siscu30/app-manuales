@@ -177,6 +177,12 @@ body.mode-manuales .tablas-only{display:none!important}
 .alerta-tipos{display:flex;gap:4px;opacity:.4;transition:opacity .12s}
 .b-alerta:hover .alerta-tipos{opacity:1}
 .alerta-tipo-btn{cursor:pointer;font-size:13px;padding:0 5px;border-radius:5px;border:1px solid transparent;line-height:1.6;user-select:none}
+/* Objetivos táctiles: controles de bloque, tipos de alerta y botones de columna miden al menos
+   24px (WCAG 2.5.8; antes 20-23px) y 36px con puntero táctil. Las cabeceras de columna de las
+   tablas se quedan en 24px para no alargarlas en el móvil. */
+.block-bar button,.block-bar .del,.alerta-tipo-btn,button.ti-col-btn{min-width:24px;min-height:24px}
+.alerta-tipo-btn{display:inline-flex;align-items:center;justify-content:center}
+@media(pointer:coarse){.block-bar button,.block-bar .del,.alerta-tipo-btn{min-width:36px;min-height:36px}}
 .alerta-tipo-btn:hover{background:rgba(0,0,0,.06)}
 .alerta-tipo-btn.active{background:rgba(0,0,0,.12);border-color:rgba(0,0,0,.18)}
 
@@ -512,6 +518,14 @@ body.mode-manuales .tablas-only{display:none!important}
 /* ── panel lateral de reglas condicionales ── */
 .ti-rules-panel{position:fixed;top:0;right:-340px;width:320px;height:100%;background:var(--sidebar);border-left:1px solid rgba(var(--shell-fg-rgb),.1);z-index:2001;transition:right .2s;display:flex;flex-direction:column;box-shadow:-8px 0 24px rgba(0,0,0,.2)}
 .ti-rules-panel.open{right:0}
+/* Paneles fuera de pantalla: ocultos de verdad mientras están cerrados, para que Tab no lleve el
+   foco a controles invisibles. El retardo de visibility conserva la animación de salida. */
+.ti-rules-panel{visibility:hidden;transition:right .2s,visibility 0s .2s}
+.ti-rules-panel.open{visibility:visible;transition:right .2s,visibility 0s}
+@media(max-width:768px){
+  #sidebar{visibility:hidden;transition:transform .25s,visibility 0s .25s}
+  #sidebar.open{visibility:visible;transition:transform .25s,visibility 0s}
+}
 .ti-rules-panel-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;font-weight:700;font-size:14px;color:rgb(var(--shell-fg-rgb));border-bottom:1px solid rgba(var(--shell-fg-rgb),.1);flex-shrink:0}
 .ti-rules-panel-header .ti-col-btn{background:rgba(var(--shell-fg-rgb),.1);color:rgb(var(--shell-fg-rgb))}
 .ti-rules-panel-body{flex:1;overflow-y:auto;padding:10px}
