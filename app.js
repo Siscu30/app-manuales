@@ -507,8 +507,8 @@ const BLOCK_TYPES = {
       const subC = isLightColor(bgC) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.7)';
       return `<div class="b-titulo block-inner" style="background:${bgC};border-left:none;text-align:center;color:${textC}">
         <span class="b-emoji" onclick="openEmojiPicker('${b.id}')" title="Cambiar emoji">${b.emoji||'📋'}</span>
-        <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-rich="1" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${b.titulo||''}</div>
-        <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-rich="1" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)" style="color:${subC}">${b.subtitulo||''}</div>
+        <div contenteditable="true" class="b-titulo-t" data-id="${b.id}" data-field="titulo" data-rich="1" data-placeholder="Título de sección" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${_rich(b.titulo)}</div>
+        <div contenteditable="true" class="subtitulo" data-id="${b.id}" data-field="subtitulo" data-rich="1" data-placeholder="Subtítulo opcional..." spellcheck="false" onblur="saveInlineEdit(this)" style="color:${subC}">${_rich(b.subtitulo)}</div>
       </div>`;
     },
     toTeamsText(b) { return `${b.emoji||'📋'} **${b.titulo||''}**\n${b.subtitulo ? b.subtitulo+'\n' : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`; }
@@ -520,7 +520,7 @@ const BLOCK_TYPES = {
       const bgC = normalizeHex(b.blockBgColor || '#64748b');
       const textC = isLightColor(bgC) ? '#1a1a1a' : '#ffffff';
       return `<div class="b-subtitulo block-inner" style="background:${bgC};text-align:center;color:${textC}">
-        <div contenteditable="true" class="sub-text" data-id="${b.id}" data-field="texto" data-rich="1" data-placeholder="Subtítulo del tema" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${b.texto||''}</div>
+        <div contenteditable="true" class="sub-text" data-id="${b.id}" data-field="texto" data-rich="1" data-placeholder="Subtítulo del tema" spellcheck="false" onblur="saveInlineEdit(this)" style="color:${textC}">${_rich(b.texto)}</div>
       </div>`;
     },
     toTeamsText(b) { return `**${(b.texto||'').replace(/<[^>]+>/g,'')}**`; }
@@ -531,7 +531,7 @@ const BLOCK_TYPES = {
     render(b) {
       const icons = {info:'ℹ️', advertencia:'⚠️', peligro:'🚨', exito:'✅'};
       const _aIcon = b.icon ? iconSVG(b.icon,18) : (icons[b.tipo||'info']||'ℹ️');
-      const _aItems = (b.texto||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
+      const _aItems = (b.texto||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${_rich(l)}</li>`).join('');
       const TIPOS = [['info','ℹ️'],['advertencia','⚠️'],['peligro','🚨'],['exito','✅']];
       const tipoBtns = TIPOS.map(([t,ic])=>`<span class="alerta-tipo-btn${(b.tipo||'info')===t?' active':''}" onmousedown="event.preventDefault()" onclick="event.stopPropagation();setAlertaTipo('${b.id}','${t}')" title="${t}">${ic}</span>`).join('');
       return `<div class="b-alerta block-inner ${b.tipo||'info'}">
@@ -566,12 +566,12 @@ const BLOCK_TYPES = {
         : _hasImg1
         ? `${_pasoImageSlotHTML(b, 1)}<div class="paso-add2">${_uploadArea(2, 'Añadir 2ª imagen')}</div>`
         : _uploadArea(1, 'Subir');
-      const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${l}</li>`).join('');
+      const _descItems = (b.descripcion||'').split('\n').filter(l=>l.trim()).map(l=>`<li>${_rich(l)}</li>`).join('');
       return `<div class="b-paso block-inner">
         <div class="b-paso-header">
           <div class="paso-num${b.resetStep?' paso-reset':''}" title="${b.resetStep?'Reinicia contador desde 1':'Click para reiniciar contador aqui'}" onclick="event.stopPropagation();toggleResetStep('${b.id}')" style="cursor:pointer;position:relative">${pasoN}${b.resetStep?'<span style="position:absolute;top:-7px;right:-7px;background:#f97316;color:#fff;font-size:8px;border-radius:3px;padding:1px 3px;line-height:1;pointer-events:none">R1</span>':''}</div>
           <div class="paso-body">
-            <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-rich="1" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${b.titulo||''}</div>
+            <div contenteditable="true" class="paso-titulo" data-id="${b.id}" data-field="titulo" data-rich="1" data-placeholder="Título del paso" spellcheck="false" onblur="saveInlineEdit(this)">${_rich(b.titulo)}</div>
             <ul contenteditable="true" class="paso-desc-ul" data-id="${b.id}" data-field="descripcion" data-placeholder="Descripción del paso..." spellcheck="false" onblur="saveInlineEdit(this)">${_descItems}</ul>
           </div>
         </div>
@@ -724,14 +724,12 @@ const BLOCK_TYPES = {
         ? `<div class="b-texto-imgwrap">${imgTag}<button class="b-texto-imgdel" onmousedown="event.stopPropagation()" onclick="removeBlockImage('${b.id}')" title="Quitar imagen">✕</button></div>`
         : `<label class="b-texto-addimg" title="Añadir imagen">📷 Imagen<input type="file" accept="image/*" style="display:none" onchange="uploadBlockImage(this,'${b.id}')"></label>`;
       return `<div class="b-texto-wrap block-inner">
-        <div class="b-texto-edit" contenteditable="true" data-id="${b.id}" data-field="html" onblur="saveInlineEdit(this)" onkeydown="handleTextoKey(event)">${b.html||''}</div>
+        <div class="b-texto-edit" contenteditable="true" data-id="${b.id}" data-field="html" onblur="saveInlineEdit(this)" onkeydown="handleTextoKey(event)">${_rich(b.html)}</div>
         ${imgArea}
       </div>`;
     },
     toTeamsText(b) {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = b.html||'';
-      return tmp.textContent||'';
+      return _htmlText(b.html);
     }
   },
   video: {
@@ -986,15 +984,26 @@ function escAttr(str){ return String(str==null?'':str).replace(/&/g,'&amp;').rep
 function sanitizeRichHtml(html) {
   const tpl = document.createElement('template');
   tpl.innerHTML = html || '';
-  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta,form').forEach(n=>n.remove());
+  tpl.content.querySelectorAll('script,style,iframe,object,embed,link,meta,form,base').forEach(n=>n.remove());
   tpl.content.querySelectorAll('*').forEach(el=>{
     [...el.attributes].forEach(a=>{
       const n=a.name.toLowerCase(), v=String(a.value||'');
-      if (n.startsWith('on') || ((n==='href'||n==='src'||n==='xlink:href') && /^\s*javascript:/i.test(v))) el.removeAttribute(a.name);
+      const isUrl = n==='href'||n==='src'||n==='xlink:href'||n==='action'||n==='formaction';
+      if (n.startsWith('on') || n==='srcdoc' || n==='formaction'
+          || (isUrl && /^\s*(javascript|vbscript):/i.test(v))
+          || ((n==='href'||n==='xlink:href') && /^\s*data:/i.test(v))) el.removeAttribute(a.name);
     });
   });
   return tpl.innerHTML;
 }
+// Contenido rico guardado (bloques del manual): se sanea al PINTARLO, no solo al guardarlo,
+// porque los datos pueden llegar a Supabase sin pasar por el editor.
+// Solo admin y editor escriben. Rol desconocido o aún sin cargar = sin escritura.
+function _canWrite() { return STATE.role === 'admin' || STATE.role === 'editor'; }
+// Texto plano de un HTML guardado. DOMParser crea un documento inerte: no carga imágenes
+// ni dispara onerror (un div suelto con innerHTML SÍ lo hace aunque no esté en la página).
+function _htmlText(html) { return new DOMParser().parseFromString(String(html || ''), 'text/html').body.textContent || ''; }
+function _rich(html) { return sanitizeRichHtml(html || ''); }
 document.addEventListener('paste', ev => {
   const ce = ev.target && ev.target.closest ? ev.target.closest('[contenteditable="true"]') : null;
   if (!ce) return;
@@ -1141,7 +1150,7 @@ function updateStats() {
   let words = 0;
   STATE.blocks.forEach(b => {
     const parts = [b.titulo||'', b.subtitulo||'', b.descripcion||'', b.texto||'', b.caption||''];
-    if (b.html) { const tmp = document.createElement('div'); tmp.innerHTML = b.html; parts.push(tmp.textContent); }
+    if (b.html) parts.push(_htmlText(b.html));
     if (b.items) b.items.forEach(it => parts.push(it.texto||''));
     if (b.code) parts.push(b.code);
     words += parts.join(' ').trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -1873,12 +1882,11 @@ function filterColumnBtns(qtext) {
 // ── Buscador global del manual (Ctrl+F): busca en todas las páginas ──
 function _blockText(b) {
   const parts = [b.titulo, b.subtitulo, b.descripcion, b.texto, b.caption, b.code, b.url];
-  if (b.html) { const t = document.createElement('div'); t.innerHTML = b.html; parts.push(t.textContent); }
+  if (b.html) parts.push(_htmlText(b.html));
   if (b.items) b.items.forEach(it => parts.push(it.texto));
   if (b.columnas) parts.push(b.columnas.join(' '));
   if (b.filas) b.filas.forEach(r => parts.push((r||[]).join(' ')));
-  const t2 = document.createElement('div'); t2.innerHTML = parts.filter(Boolean).join(' ');
-  return t2.textContent || '';
+  return _htmlText(parts.filter(Boolean).join(' '));
 }
 function openGlobalSearch() {
   let panel = document.getElementById('global-search');
@@ -1949,7 +1957,7 @@ function startAutoSave() {
   if (STATE.autoSaveTimer) clearInterval(STATE.autoSaveTimer);
   STATE.autoSaveTimer = setInterval(async () => {
     if (STATE.appMode === 'tablas') {
-      if (STATE.tablaInteractiva?.isDirty && STATE.user && STATE.role !== 'visualizador') {
+      if (STATE.tablaInteractiva?.isDirty && STATE.user && _canWrite()) {
         let ok = await guardarTablaInteractiva();
         if (!ok) ok = await guardarTablaInteractiva(); // reintento unico
         if (!ok) setSaveStatus('⚠ Sin sincronizar — reintento en 1 min');
@@ -2018,7 +2026,7 @@ window.addEventListener('storage', ev=>{
 async function guardar() {
   // Auth gate
   if (!STATE.user) { openAuthModal('Guarda el manual para sincronizar en la nube'); return; }
-  if (STATE.role === 'visualizador') { notify('⚠️ Los visualizadores no pueden guardar'); return; }
+  if (!_canWrite()) { notify('⚠️ Tu rol no permite guardar'); return; }
 
   STATE.manual.titulo = q('#manual-titulo').value || 'Sin título';
   STATE.manual.empresa = q('#manual-empresa').value || '';
@@ -2452,7 +2460,7 @@ let _tiSaving = false;
 async function guardarTablaInteractiva() {
   if (!STATE.tablaInteractiva) return;
   if (!STATE.user) { openAuthModal('Guarda la tabla para sincronizar en la nube'); return; }
-  if (STATE.role === 'visualizador') { notify('⚠️ Los visualizadores no pueden guardar'); return; }
+  if (!_canWrite()) { notify('⚠️ Tu rol no permite guardar'); return; }
   if (_tiSaving) return false;
   _tiSaving = true;
   const titleInput = document.getElementById('tabla-titulo');
@@ -3442,7 +3450,7 @@ function renderBlockForExport(b, pasoN) {
       const hasCustom = !!b.blockBgColor && b.blockBgColor.toLowerCase() !== '#64748b';
       const _sBg = hasCustom ? normalizeHex(b.blockBgColor) : colorLight;
       const _sTxt = hasCustom ? (isLightColor(_sBg) ? '#1a1a1a' : '#ffffff') : color;
-      return `<div style="padding:11px 20px 9px;background:${_sBg};border-radius:10px;margin-bottom:14px;text-align:center"><div style="font-weight:700;font-size:17px;color:${_sTxt}">${b.texto||''}</div></div>`;
+      return `<div style="padding:11px 20px 9px;background:${_sBg};border-radius:10px;margin-bottom:14px;text-align:center"><div style="font-weight:700;font-size:17px;color:${_sTxt}">${_rich(b.texto)}</div></div>`;
     }
     case 'titulo': {
       const hasCustom = !!b.blockBgColor;
@@ -3450,7 +3458,7 @@ function renderBlockForExport(b, pasoN) {
       const _refColor = hasCustom ? normalizeHex(b.blockBgColor) : color;
       const _txtC = hasCustom && isLightColor(_refColor) ? '#1a1a1a' : '#ffffff';
       const _subC = hasCustom && isLightColor(_refColor) ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.75)';
-      return `<div style="padding:28px 24px 24px;${_bgC};border-left:none;border-radius:16px;margin-bottom:18px;text-align:center;color:${_txtC};box-shadow:0 10px 30px -8px ${hexToLight(color)}"><h2 style="font-size:24px;font-weight:700;margin:0;text-align:center;color:${_txtC};letter-spacing:-.01em">${b.titulo||''}</h2>${b.subtitulo?`<p style="margin-top:6px;text-align:center;color:${_subC};font-size:14px">${b.subtitulo}</p>`:''}</div>`;
+      return `<div style="padding:28px 24px 24px;${_bgC};border-left:none;border-radius:16px;margin-bottom:18px;text-align:center;color:${_txtC};box-shadow:0 10px 30px -8px ${hexToLight(color)}"><h2 style="font-size:24px;font-weight:700;margin:0;text-align:center;color:${_txtC};letter-spacing:-.01em">${_rich(b.titulo)}</h2>${b.subtitulo?`<p style="margin-top:6px;text-align:center;color:${_subC};font-size:14px">${_rich(b.subtitulo)}</p>`:''}</div>`;
     }
     case 'alerta': {
       const styles={info:'background:#eff6ff;border-left:4px solid #3b82f6',advertencia:'background:#fefce8;border-left:4px solid #eab308',peligro:'background:#fef2f2;border-left:4px solid #ef4444',exito:'background:#f0fdf4;border-left:4px solid #22c55e'};
@@ -3458,21 +3466,21 @@ function renderBlockForExport(b, pasoN) {
       const _aiIcon = b.icon ? iconSVG(b.icon,18,'#374151') : icons[b.tipo||'info'];
       const _aiLines = (b.texto||'').split('\n').filter(l=>l.trim());
       const _aiHtml = _aiLines.length > 0
-        ? `<ul style="margin:0;padding-left:16px">${_aiLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
+        ? `<ul style="margin:0;padding-left:16px">${_aiLines.map(l=>`<li style="font-size:14px;line-height:1.6">${_rich(l)}</li>`).join('')}</ul>`
         : '';
       return `<div style="padding:14px 16px;border-radius:14px;display:flex;gap:12px;align-items:flex-start;${styles[b.tipo||'info']||styles.info};margin-bottom:18px;box-shadow:${cardShadow}"><span style="font-size:18px;flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.65);display:flex;align-items:center;justify-content:center">${_aiIcon}</span><div>${_aiHtml}</div></div>`;
     }
     case 'paso': {
       const _dLines = (b.descripcion||'').split('\n').filter(l=>l.trim());
       const _dHtml = _dLines.length > 0
-        ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${l}</li>`).join('')}</ul>`
+        ? `<ul style="list-style:disc;padding-left:18px;margin-top:4px;color:#374151">${_dLines.map(l=>`<li style="font-size:14px;line-height:1.6">${_rich(l)}</li>`).join('')}</ul>`
         : '';
       const _expSingle = (src,cap,w) => src ? `<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:0 auto"><div style="font-size:12px;color:#64748b;padding:6px 16px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(cap||'')}</div>` : '';
       const _expCard = (src,cap,w,num) => `<div style="flex:1;min-width:0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;display:flex;flex-direction:column"><div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative">${num?`<span style="position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:${stepBg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.35)">${num}</span>`:''}<img src="${src}" class="lb-img" onclick="_lbOpen(this.src)" style="width:${w||'100%'};display:block;margin:auto"></div><div style="font-size:12px;color:#64748b;padding:5px 10px;background:#fafafa">${esc(cap||'')}</div></div>`;
       const _imgArea = (b.src && b.src2)
         ? `<div class="mp-img-pair" style="display:flex;gap:8px;padding:8px;align-items:stretch">${_expCard(b.src,b.caption,b.imgWidth,1)}${_expCard(b.src2,b.caption2,b.imgWidth2,2)}</div>`
         : _expSingle(b.src,b.caption,b.imgWidth);
-      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;box-shadow:${cardShadow}"><div style="display:flex;gap:12px;padding:16px"><div style="width:34px;height:34px;border-radius:50%;background:${stepBg};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px ${hexToLight(color)}">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${b.titulo||''}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
+      return `<div style="background:${wrapStyle?b.blockBgColor:'#fff'};border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;box-shadow:${cardShadow}"><div style="display:flex;gap:12px;padding:16px"><div style="width:34px;height:34px;border-radius:50%;background:${stepBg};color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px ${hexToLight(color)}">${pasoN}</div><div style="flex:1">${`<div style="font-weight:600;font-size:15px">${_rich(b.titulo)}</div>`}${_dHtml}</div></div>${_imgArea}</div>`;
     }
     case 'imagen': return `<div style="background:#fff;border-radius:14px;${cardBorder};overflow:hidden;margin-bottom:18px;box-shadow:${cardShadow}">${imgTag(b.src)}<div style="font-size:12px;color:#64748b;padding:6px 12px;border-top:1px solid #e2e8f0;background:#fafafa">${esc(b.caption||'')}</div></div>`;
     case 'tabla': {
@@ -3497,7 +3505,7 @@ function renderBlockForExport(b, pasoN) {
     case 'separador': return `<div style="padding:14px 0;margin-bottom:18px;display:flex;align-items:center;gap:10px"><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#e2e8f0)"></div><div style="width:6px;height:6px;border-radius:50%;background:${color}"></div><div style="flex:1;height:1px;background:linear-gradient(90deg,#e2e8f0,transparent)"></div></div>`;
     case 'texto': {
       const _tImg = b.src ? `<img src="${b.src}" style="width:100%;display:block;border-radius:8px;margin-top:10px" alt="">` : '';
-      return `<div style="padding:14px 18px;background:#fff;border-radius:14px;${cardBorder};font-size:14px;line-height:1.6;margin-bottom:18px;box-shadow:${cardShadow}">${b.html||''}${_tImg}</div>`;
+      return `<div style="padding:14px 18px;background:#fff;border-radius:14px;${cardBorder};font-size:14px;line-height:1.6;margin-bottom:18px;box-shadow:${cardShadow}">${_rich(b.html)}${_tImg}</div>`;
     }
     case 'flujos': {
       const _fAlign = b.align||['left','left'];
@@ -4055,15 +4063,6 @@ async function loadUserRole(_userId) {
   return data;
 }
 
-async function ensureAdminExists(userId) {
-  // If no roles exist at all, make this user admin
-  const { count } = await sb.from('user_roles').select('*', {count:'exact',head:true});
-  if (count === 0) {
-    await sb.from('user_roles').insert({ user_id: userId, role: 'admin' });
-    return 'admin';
-  }
-  return null;
-}
 
 function applyRoleUI(role) {
   q('#account-dropdown').style.display = 'block';
@@ -5115,7 +5114,7 @@ function _afterImport() {
     _importedTextFragments = [];
     scheduleLocalSave();
     // Persistir en la nube para poder continuar tras recargar o en otro dispositivo
-    if (STATE.user && STATE.role !== 'visualizador') guardar().then(() => _notifyOpenBank(_n));
+    if (STATE.user && _canWrite()) guardar().then(() => _notifyOpenBank(_n));
     else _notifyOpenBank(_n);
   }
   if (_docxExtractedMedia.length) openImportMediaDialog();
@@ -5162,7 +5161,7 @@ async function confirmImportMedia() {
   if (btn) btn.textContent = 'Cargar seleccionadas';
   _docxExtractedMedia = [];
   scheduleLocalSave();
-  if (STATE.user && STATE.role !== 'visualizador') await guardar(); // persistir el repositorio en la nube
+  if (STATE.user && _canWrite()) await guardar(); // persistir el repositorio en la nube
   notify(`✅ ${ok} imágenes añadidas al repositorio`);
   openMediaGallery();
 }
@@ -5323,7 +5322,7 @@ function _fragmentText(b) {
     case 'paso': return [b.titulo, b.descripcion].filter(Boolean).join('\n');
     case 'alerta': return b.texto || '';
     case 'lista': return (b.items || []).map(i => i.texto).filter(Boolean).join('\n');
-    case 'texto': { const d = document.createElement('div'); d.innerHTML = b.html || ''; return (d.textContent || '').trim(); }
+    case 'texto': return _htmlText(b.html).trim();
     case 'tabla': return (b.columnas || []).join(' | ') + '\n' + (b.filas || []).map(r => (r || []).join(' | ')).join('\n');
     default: return '';
   }
@@ -6068,7 +6067,7 @@ function getBlockPreviewText(b) {
     case 'titulo': return b.titulo||'';
     case 'subtitulo': return b.texto||'';
     case 'paso':   return (b.titulo||'') + (b.descripcion ? ': '+b.descripcion : '');
-    case 'texto':  { const d=document.createElement('div'); d.innerHTML=b.html||''; return d.textContent; }
+    case 'texto':  return _htmlText(b.html);
     case 'alerta': case 'callout': return b.texto||'';
     case 'lista':  return (b.items||[]).map(i=>i.texto).join(', ');
     case 'tabla':  return (b.columnas||[]).join(', ');
@@ -6576,17 +6575,12 @@ async function handleSession(session) {
     hideAuthScreen();
     STATE.user = session.user;
 
-    // Apply pending invitation role
-    const pendingRole = localStorage.getItem('pending_role_' + session.user.email);
-    if (pendingRole) {
-      await sb.from('user_roles').upsert({ user_id: session.user.id, role: pendingRole });
-      localStorage.removeItem('pending_role_' + session.user.email);
-    }
-
-    let role = await loadUserRole(session.user.id);
-    if (!role) role = await ensureAdminExists(session.user.id);
-    if (!role) role = await loadUserRole(session.user.id);
-    STATE.role = role || 'editor';
+    // El rol SOLO lo asigna el servidor (Edge Function admin-users / SQL). El cliente nunca
+    // escribe en user_roles: antes leía un rol de localStorage (editable por el propio usuario)
+    // y se autoasignaba 'admin' si no veía filas, lo que permitía escalar privilegios.
+    // Sin rol asignado -> modo de solo lectura (mínimo privilegio).
+    const role = await loadUserRole(session.user.id);
+    STATE.role = role || 'visualizador';
     applyRoleUI(STATE.role);
     loadUserPrefs();
             loadManualesPanel('activos');
