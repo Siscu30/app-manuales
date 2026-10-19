@@ -170,13 +170,13 @@
     <h1>Manualia</h1>
     <p class="auth-sub" id="auth-subtitle">Introduce tus credenciales</p>
     <div class="form-group">
-      <input type="email" id="auth-email" class="form-input" placeholder="tu@empresa.com" autocomplete="email" onkeydown="if(event.key==='Enter')q('#auth-password').focus()">
+      <input type="email" id="auth-email" aria-label="Correo electrónico" spellcheck="false" class="form-input" placeholder="tu@empresa.com" autocomplete="email" onkeydown="if(event.key==='Enter')q('#auth-password').focus()">
     </div>
     <div class="form-group" id="auth-pass-group">
-      <input type="password" id="auth-password" class="form-input" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')loginWithPassword()">
+      <input type="password" id="auth-password" aria-label="Contraseña" class="form-input" placeholder="Contraseña" autocomplete="current-password" onkeydown="if(event.key==='Enter')loginWithPassword()">
     </div>
     <div class="form-group" id="auth-pass2-group" style="display:none">
-      <input type="password" id="auth-password2" class="form-input" placeholder="Repite la contraseña" autocomplete="new-password" onkeydown="if(event.key==='Enter')setNewPassword()">
+      <input type="password" id="auth-password2" aria-label="Repite la contraseña" class="form-input" placeholder="Repite la contraseña" autocomplete="new-password" onkeydown="if(event.key==='Enter')setNewPassword()">
     </div>
     <button class="btn btn-primary" id="auth-btn" style="width:100%;justify-content:center;padding:10px" onclick="loginWithPassword()">Entrar</button>
     <p style="margin-top:10px;font-size:12px;color:var(--text-muted);text-align:center">
@@ -325,7 +325,7 @@
     <div style="padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
       <strong style="flex:1;color:var(--ui-text);font-size:15px">✱ Insertar icono</strong>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">Color <input type="color" id="ico-color-modal" value="#374151" oninput="_icoSetColor(this.value)" style="width:30px;height:26px;border:none;background:none;cursor:pointer;padding:0"></label>
-      <button onclick="closeIconifyPicker()" style="background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;line-height:1">×</button>
+      <button onclick="closeIconifyPicker()" aria-label="Cerrar" style="background:none;border:none;font-size:22px;color:var(--text-muted);cursor:pointer;line-height:1">×</button>
     </div>
     <div style="padding:12px 18px 8px"><input id="ico-search-modal" placeholder="Buscar… (warning, user, gear, check, mail…)" oninput="_icoOnSearch(this.value)" style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--ui-text);font-size:14px;font-family:inherit;outline:none"></div>
     <div id="ico-cats-modal" style="display:flex;flex-wrap:wrap;gap:5px;padding:0 18px 8px"></div>
@@ -568,7 +568,7 @@
 <!-- Mis Manuales -->
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-manuales">
   <div class="modal modal-md">
-    <div class="modal-header"><h3>📂 Mis manuales</h3><button class="modal-close" onclick="closeModal('modal-manuales')">×</button></div>
+    <div class="modal-header"><h3>📂 Mis manuales</h3><button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-manuales')">×</button></div>
     <div class="modal-body" id="manuales-list" style="min-height:200px"></div>
     <div class="modal-footer"><button class="btn" onclick="closeModal('modal-manuales')">Cerrar</button></div>
   </div>
@@ -577,7 +577,7 @@
 <!-- Teams copy -->
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-teams">
   <div class="modal modal-md">
-    <div class="modal-header"><h3>💬 Copiar para Teams</h3><button class="modal-close" onclick="closeModal('modal-teams')">×</button></div>
+    <div class="modal-header"><h3>💬 Copiar para Teams</h3><button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-teams')">×</button></div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Copia el texto y pégalo en Teams. Las imágenes no se incluyen.</p>
       <textarea id="teams-text" class="form-textarea" style="min-height:300px;font-family:monospace;font-size:12px" readonly></textarea>
@@ -592,7 +592,7 @@
 <!-- Block editor (generic) -->
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-block-editor">
   <div class="modal modal-md">
-    <div class="modal-header"><h3 id="block-editor-title">Editar bloque</h3><button class="modal-close" onclick="closeModal('modal-block-editor')">×</button></div>
+    <div class="modal-header"><h3 id="block-editor-title">Editar bloque</h3><button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-block-editor')">×</button></div>
     <div class="modal-body" id="block-editor-body"></div>
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="saveBlockEditor()">Guardar</button>
@@ -604,7 +604,7 @@
 <!-- Gestionar usuarios (admin) -->
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-users">
   <div class="modal modal-md">
-    <div class="modal-header"><h3>👥 Gestionar usuarios</h3><button class="modal-close" onclick="closeModal('modal-users')">×</button></div>
+    <div class="modal-header"><h3>👥 Gestionar usuarios</h3><button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-users')">×</button></div>
     <div class="modal-body" id="users-body">
       <div class="form-group">
         <label class="form-label">Invitar usuario (email)</label>
@@ -631,7 +631,7 @@
   <div class="modal modal-lg">
     <div class="modal-header">
       <h3>📥 Importar PDF o Word</h3>
-      <button class="modal-close" onclick="closeImportModal()">×</button>
+      <button class="modal-close" aria-label="Cerrar" onclick="closeImportModal()">×</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -660,7 +660,7 @@
   <div class="modal modal-md">
     <div class="modal-header">
       <h3>📜 Historial de versiones</h3>
-      <button class="modal-close" onclick="closeModal('modal-versions')">×</button>
+      <button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-versions')">×</button>
     </div>
     <div class="modal-body" style="max-height:70vh;overflow-y:auto">
       <div id="versions-body"><p>Cargando...</p></div>
@@ -677,7 +677,7 @@
   <div class="modal modal-md">
     <div class="modal-header">
       <h3>📋 Plantillas</h3>
-      <button class="modal-close" onclick="closeModal('modal-templates')">×</button>
+      <button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-templates')">×</button>
     </div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Elige una plantilla para empezar. <strong>Reemplazará los bloques actuales.</strong></p>
@@ -706,7 +706,7 @@
   <div class="modal modal-lg">
     <div class="modal-header">
       <h3>📥 Importar manual</h3>
-      <button class="modal-close" onclick="closeModal('modal-import-unified')">×</button>
+      <button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-import-unified')">×</button>
     </div>
     <div class="modal-body">
       <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--panel-border)">
@@ -756,7 +756,7 @@
 </div>
 
 <!-- Notification -->
-<div id="notif"></div>
+<div id="notif" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- Format toolbar -->
 <div id="format-toolbar" style="display:none;position:fixed;z-index:400;background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:8px;padding:4px 6px;align-items:center;gap:2px;box-shadow:0 4px 16px rgba(0,0,0,.4)">
@@ -833,7 +833,7 @@
 
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-ti-column">
   <div class="modal modal-lg">
-    <div class="modal-header"><h3 id="ti-col-modal-title">Configurar columna</h3><button class="modal-close" onclick="closeModal('modal-ti-column')">×</button></div>
+    <div class="modal-header"><h3 id="ti-col-modal-title">Configurar columna</h3><button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-ti-column')">×</button></div>
     <div class="modal-body" id="ti-col-modal-body"></div>
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="saveColumnConfig()">Guardar</button>
@@ -844,7 +844,7 @@
 
 <div class="modal-backdrop hidden" role="dialog" aria-modal="true" id="modal-ti-rule">
   <div class="modal modal-lg">
-    <div class="modal-header"><h3 id="ti-rule-modal-title">Nueva regla</h3><button class="modal-close" onclick="closeModal('modal-ti-rule')">×</button></div>
+    <div class="modal-header"><h3 id="ti-rule-modal-title">Nueva regla</h3><button class="modal-close" aria-label="Cerrar" onclick="closeModal('modal-ti-rule')">×</button></div>
     <div class="modal-body" id="ti-rule-modal-body"></div>
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="saveRuleBuilder()">Guardar regla</button>
