@@ -3960,6 +3960,14 @@ document.addEventListener('click', ev=>{
 // ═══════════════════════════════════════════════════════
 function showAuthScreen() { q('#auth-screen').classList.remove('hidden'); }
 function hideAuthScreen() { q('#auth-screen').classList.add('hidden'); }
+// Error de red (Supabase caído o pausado) -> mensaje entendible en vez de "Failed to fetch".
+function _authErrorText(error) {
+  const m = String(error?.message || error || '');
+  if (error?.name === 'AuthRetryableFetchError' || /failed to fetch|networkerror|load failed/i.test(m)) {
+    return '❌ No se puede conectar con el servidor. Inténtalo en unos minutos; si persiste, avisa al administrador.';
+  }
+  return '❌ ' + m;
+}
 function openAuthModal(msg='') { q('#auth-msg').textContent=msg||''; showAuthScreen(); }
 
 function showMagicLinkForm() {
@@ -3982,7 +3990,7 @@ async function loginWithPassword() {
     if (error.message?.includes('Invalid login credentials') || error.message?.includes('Email not confirmed')) {
       q('#auth-msg').textContent = '⚠️ Contraseña incorrecta. Usa el enlace por email para acceder la primera vez.';
     } else {
-      q('#auth-msg').textContent = '❌ ' + error.message;
+      q('#auth-msg').textContent = _authErrorText(error);
     }
     q('#auth-btn').disabled = false;
     return;
@@ -3994,8 +4002,9 @@ async function loginWithPassword() {
 }
 
 async function sendMagicLink() {
-  const email = q('#auth-email').value.trim() || 'fparedes3093@protonmail.com';
-  q('#auth-msg').textContent = 'Enviando enlace...';
+  const email = q('#auth-email').value.trim();
+  if (!email) { q('#auth-msg').textContent = 'Introduce tu email primero'; return; }
+  q('#auth-msg').textContent = 'Enviando enlace…';
   const { error } = await sb.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: window.location.origin + window.location.pathname }
@@ -4005,7 +4014,7 @@ async function sendMagicLink() {
     if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('exceeded')) {
       q('#auth-msg').textContent = '⏳ Demasiados intentos. Espera ~1 hora antes de reintentar. Prueba a usar "Restablecer contraseña" en su lugar.';
     } else {
-      q('#auth-msg').textContent = '❌ ' + msg;
+      q('#auth-msg').textContent = _authErrorText(error);
     }
     return;
   }
@@ -4024,7 +4033,7 @@ async function sendPasswordReset() {
     if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('too many') || msg.toLowerCase().includes('exceeded')) {
       q('#auth-msg').textContent = '⏳ Límite de emails alcanzado. Espera ~1 hora e inténtalo de nuevo.';
     } else {
-      q('#auth-msg').textContent = '❌ ' + msg;
+      q('#auth-msg').textContent = _authErrorText(error);
     }
     return;
   }
