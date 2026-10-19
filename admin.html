@@ -410,7 +410,7 @@ async function loadUsers() {
           <tr id="user-row-${u.user_id}">
             <td style="font-weight:500">${esc(u.email)}</td>
             <td>
-              <span class="role-badge ${u.role}" id="badge-${u.user_id}">${u.role}</span>
+              <span class="role-badge ${_roleCls(u.role)}" id="badge-${u.user_id}">${esc(u.role)}</span>
             </td>
             <td style="color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('es')}</td>
             <td>
@@ -551,7 +551,7 @@ function renderInviteHistory() {
     <div class="invite-row">
       <div>
         <span style="font-weight:500">${esc(inv.email)}</span>
-        <span class="role-badge ${inv.role}" style="margin-left:8px">${inv.role}</span>
+        <span class="role-badge ${_roleCls(inv.role)}" style="margin-left:8px">${esc(inv.role)}</span>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <span style="font-size:12px;color:var(--text-muted)">${inv.ts.toLocaleTimeString('es')}</span>
@@ -651,6 +651,8 @@ function notify(msg) {
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────
+// Clase CSS de un rol: solo valores conocidos (el rol llega de la BD).
+function _roleCls(role) { return ['admin', 'editor', 'visualizador'].includes(role) ? role : ''; }
 function esc(str) {
   return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
