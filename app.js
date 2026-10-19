@@ -4140,30 +4140,51 @@ async function viewManual(id) {
 // ═══════════════════════════════════════════════════════
 // USER MANAGEMENT (admin)
 // ═══════════════════════════════════════════════════════
+// Gestión de usuarios: SIEMPRE a través de la Edge Function admin-users, que comprueba en el
+// servidor que quien llama es admin y escribe user_roles con la service role. El cliente no
+// escribe roles directamente.
+async function _adminApi(method, path, body) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error('Sesión no válida');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-users${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
 async function inviteUser() {
   const email = q('#invite-email').value.trim();
   const role = q('#invite-role').value;
   if (!email) { notify('Introduce un email'); return; }
-
-  // Send magic link + create role (role created after first login via trigger or manual)
-  // For simplicity: store pending invitation in a separate approach
-  // We use signInWithOtp to invite, then admin must assign role after user logs in
-  const { error } = await sb.auth.signInWithOtp({ email, options:{emailRedirectTo: window.location.origin + window.location.pathname} });
-  if (error) { notify('❌ '+error.message); return; }
-
-  // Store the intended role (we'll apply it when user first logs in)
-  localStorage.setItem('pending_role_'+email, role);
-  notify(`✅ Invitación enviada a ${email} como ${role}`);
-  q('#invite-email').value='';
-  loadUsersList();
+  let res;
+  try { res = await _adminApi('POST', '/invite', { email, role }); }
+  catch (e) { notify('❌ ' + e.message, 4000); return; }
+  q('#invite-email').value = '';
+  await loadUsersList();
+  // La función crea el usuario con su rol y devuelve un enlace de acceso (no envía email).
+  if (res.setup_link) {
+    const box = document.createElement('div');
+    box.style.cssText = 'padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;background:var(--bg)';
+    box.innerHTML = `<div style="font-size:12px;margin-bottom:6px">✅ ${esc(email)} creado como <b>${esc(role)}</b>. Envíale este enlace de acceso:</div>
+      <div style="display:flex;gap:6px"><input class="form-input" readonly aria-label="Enlace de acceso" style="flex:1;font-size:12px" value="${escAttr(res.setup_link)}">
+      <button class="btn btn-sm" type="button">Copiar</button></div>`;
+    box.querySelector('button').onclick = () => navigator.clipboard.writeText(res.setup_link).then(() => notify('📋 Enlace copiado'));
+    q('#users-list').prepend(box);
+  } else {
+    notify(`✅ ${email} creado como ${role}. Usa "Acceder sin contraseña" para su primer acceso.`, 5000);
+  }
 }
 
 async function loadUsersList() {
   const list = q('#users-list');
   list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">Cargando...</div>';
 
-  const [rolesRes, manualesRes] = await Promise.all([
-    sb.from('user_roles').select('user_id,role,created_at'),
+  const [usersRes, manualesRes] = await Promise.all([
+    _adminApi('GET', '/').then(d => ({ data: d.users || [] }), e => ({ error: e })),
     sb.from('manuales').select('id,titulo,empresa,estado,updated_at').eq('estado','en_revision').order('updated_at',{ascending:false})
   ]);
 
@@ -4182,13 +4203,15 @@ async function loadUsersList() {
     html += '<hr style="margin:12px 0;border-color:var(--border)">';
   }
 
-  if (rolesRes.error || !rolesRes.data?.length) {
+  if (usersRes.error) {
+    html += `<p style="color:var(--danger,#dc2626);font-size:13px">❌ No se pudo cargar la lista de usuarios: ${esc(usersRes.error.message)}</p>`;
+  } else if (!usersRes.data.length) {
     html += '<p style="color:var(--text-muted);font-size:13px">No hay usuarios registrados</p>';
   } else {
-    html += `<p style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Usuarios (${rolesRes.data.length})</p>`;
-    html += rolesRes.data.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div><div style="font-size:13px;font-weight:500">${u.user_id.slice(0,8)}…</div><div style="font-size:12px;color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('es')}</div></div>
-      <select class="form-select" style="font-size:12px;padding:4px" onchange="changeUserRole('${u.user_id}',this.value)">
+    html += `<p style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Usuarios (${usersRes.data.length})</p>`;
+    html += usersRes.data.map(u=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div><div style="font-size:13px;font-weight:500">${esc(u.email || u.user_id.slice(0,8)+'…')}</div><div style="font-size:12px;color:var(--text-muted)">${new Date(u.created_at).toLocaleDateString('es')}</div></div>
+      <select class="form-select" style="font-size:12px;padding:4px" aria-label="Rol de ${escAttr(u.email || 'usuario')}" onchange="changeUserRole('${u.user_id}',this.value)">
         ${['admin','editor','visualizador'].map(r=>`<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('')}
       </select>
     </div>`).join('');
@@ -4213,9 +4236,8 @@ async function adminReject(id) {
 }
 
 async function changeUserRole(userId, role) {
-  const { error } = await sb.from('user_roles').update({role}).eq('user_id',userId);
-  if (error) notify('❌ '+error.message);
-  else notify('✅ Rol actualizado');
+  try { await _adminApi('PATCH', '/role', { user_id: userId, role }); notify('✅ Rol actualizado'); }
+  catch (e) { notify('❌ ' + e.message, 4000); loadUsersList(); }
 }
 
 q('#modal-users').addEventListener('click', ev=>{
