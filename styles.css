@@ -717,3 +717,26 @@ body.tb-dock-open #revision-banner{ margin-right:var(--tb-dock-w) }
 :focus-visible:not(input):not(textarea):not([contenteditable]){outline:2px solid var(--primary);outline-offset:2px}
 /* Accesibilidad: respeta la preferencia de movimiento reducido del sistema */
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+/* ── Móvil: barra superior sin controles fuera de pantalla ──
+   A 375px Guardar, Recursos, Tema y Cuenta quedaban fuera de la vista. En pantallas
+   pequeñas los botones pasan a solo icono (nombre en aria-label), se ocultan las
+   estadísticas y el cambio de tema se ofrece dentro del menú de Cuenta. */
+#acc-tema{display:none}
+@media(max-width:768px){
+  #stats-indicator{display:none!important}
+  #topbar .tb-lbl{display:none}
+  #topbar .tb-btn{min-width:36px;min-height:36px;justify-content:center;padding:6px 8px}
+  #btn-theme-toggle{display:none!important}
+  #acc-tema{display:flex}
+  #manual-titulo,#tabla-titulo{min-width:0;flex:1 1 auto}
+  #save-status{max-width:76px;overflow:hidden;text-overflow:ellipsis}
+}
+/* ── Móvil: tarjetas de Mis Manuales / Mis Tablas ──
+   La fila de botones no encogía y dejaba el título en una sola letra: se apilan. */
+@media(max-width:600px){
+  .mp2-card{flex-wrap:wrap;align-items:flex-start}
+  .mp2-card-info{flex:1 1 100%}
+  .mp2-card-actions{width:100%;justify-content:flex-end;gap:8px}
+  .mp2-card-actions .btn{min-height:36px}
+}
