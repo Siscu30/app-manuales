@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, expect, test } from 'vitest';
 import { htmlToText, legacyToV2, v2BlockToLegacy, v2ToLegacy, type LegacyBlock } from './convert';
 
@@ -71,7 +72,7 @@ describe('ediciones', () => {
       }],
     };
     const out = v2ToLegacy(doc as never) as LegacyBlock[];
-    expect(out.map((b) => [b.type, b.html ?? b.texto])).toEqual([['texto', 'Ver manual'], ['alerta', 'Ojo']]);
+    expect(out.map((b) => [b.type, b.html ?? b.texto])).toEqual([['texto', '<b>Ver </b><a href="https://x">manual</a>'], ['alerta', 'Ojo']]);
   });
   test('tipos que la app antigua no conoce se descartan al volver', () => {
     expect(v2BlockToLegacy({ type: 'checkListItem', props: {}, content: [] })).toBeNull();

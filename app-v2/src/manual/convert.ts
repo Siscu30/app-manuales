@@ -4,21 +4,22 @@
 // Garantía: legado → v2 → legado devuelve EXACTAMENTE lo mismo si no se ha editado nada.
 // Cada bloque v2 nacido de uno antiguo guarda el original en props.legacy (JSON). Al volver,
 // si el texto no ha cambiado se restaura el original tal cual (con su HTML, colores e iconos);
-// si ha cambiado, se actualiza solo ese campo de texto, escapado.
+// si ha cambiado, se actualiza solo ese campo con HTML enriquecido seguro.
 // Los tipos que el editor nuevo aún no edita (imagen, vídeo, enlace, flujos, código, icono, tabla,
 // lista, separador) viajan intactos en un bloque «legado» de solo lectura.
+
+import { htmlToInline, inlineToHtml, type RichInline } from './richtext';
 
 export type LegacyBlock = { id?: string; type: string; [k: string]: unknown };
 export type LegacyContenido =
   | LegacyBlock[]
   | { blocks?: LegacyBlock[]; pages?: { id: string; blocks?: LegacyBlock[]; [k: string]: unknown }[]; [k: string]: unknown };
 
-type Inline = { type: 'text'; text: string; styles: Record<string, never> };
 export interface V2Block {
   id?: string;
   type: string;
   props: Record<string, string | number | boolean>;
-  content?: Inline[] | AnyInline[];
+  content?: RichInline[];
   children?: V2Block[];
 }
 export interface ContenidoV2 {
@@ -48,12 +49,6 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-const text = (t: string): Inline[] => (t ? [{ type: 'text', text: t, styles: {} }] : []);
-// El editor también produce enlaces ({ type: 'link', content: [...] }): se toma su texto.
-type AnyInline = { type?: string; text?: string; content?: AnyInline[] | string };
-const inlineToText = (c?: AnyInline[] | string): string =>
-  typeof c === 'string' ? c : (c ?? []).map((i) => (typeof i.text === 'string' ? i.text : inlineToText(i.content))).join('');
-
 // Campo de texto principal de cada tipo editable.
 const TEXT_FIELD: Record<string, string> = { titulo: 'titulo', subtitulo: 'texto', texto: 'html', alerta: 'texto', paso: 'titulo' };
 const ALERTA_TIPOS = ['info', 'advertencia', 'peligro', 'exito'];
@@ -61,16 +56,16 @@ const ALERTA_TIPOS = ['info', 'advertencia', 'peligro', 'exito'];
 export function legacyBlockToV2(b: LegacyBlock): V2Block {
   const legacy = JSON.stringify(b);
   const field = TEXT_FIELD[b.type];
-  const t = field ? htmlToText(b[field]) : '';
+  const content = htmlToInline(field && typeof b[field] === 'string' ? b[field] : '');
   switch (b.type) {
-    case 'titulo': return { type: 'heading', props: { level: 2, legacy }, content: text(t) };
-    case 'subtitulo': return { type: 'heading', props: { level: 3, legacy }, content: text(t) };
-    case 'texto': return { type: 'paragraph', props: { legacy }, content: text(t) };
+    case 'titulo': return { type: 'heading', props: { level: 2, legacy }, content };
+    case 'subtitulo': return { type: 'heading', props: { level: 3, legacy }, content };
+    case 'texto': return { type: 'paragraph', props: { legacy }, content };
     case 'alerta': {
       const tipo = ALERTA_TIPOS.includes(String(b.tipo)) ? String(b.tipo) : 'info';
-      return { type: 'alerta', props: { tipo, legacy }, content: text(t) };
+      return { type: 'alerta', props: { tipo, legacy }, content };
     }
-    case 'paso': return { type: 'paso', props: { descripcion: htmlToText(b.descripcion), legacy }, content: text(t) };
+    case 'paso': return { type: 'paso', props: { descripcion: htmlToText(b.descripcion), legacy }, content };
     default: return { type: 'legado', props: { tipo: String(b.type), legacy } };
   }
 }
@@ -88,7 +83,6 @@ export function v2BlockToLegacy(b: V2Block): LegacyBlock | null {
   const orig = parseLegacy(b.props?.legacy);
   if (b.type === 'legado') return orig;
 
-  const t = inlineToText(b.content);
   const typeFor = (): string | null => {
     if (b.type === 'heading') return Number(b.props.level) <= 2 ? 'titulo' : 'subtitulo';
     if (b.type === 'paragraph') return 'texto';
@@ -100,8 +94,11 @@ export function v2BlockToLegacy(b: V2Block): LegacyBlock | null {
 
   const out: LegacyBlock = orig && orig.type === type ? { ...orig } : { id: newId(), type };
   const field = TEXT_FIELD[type];
-  // Texto sin cambios: se conserva el HTML original (negritas, colores…). Con cambios: texto escapado.
-  if (!(orig && orig.type === type && htmlToText(orig[field]) === t)) out[field] = escapeHtml(t);
+  const opts = { newline: type === 'alerta' ? '\n' as const : 'br' as const };
+  const html = inlineToHtml(b.content, opts);
+  // Sin cambios de texto ni formato se restaura el HTML original byte por byte.
+  const originalHtml = orig && typeof orig[field] === 'string' ? orig[field] : '';
+  if (!(orig && orig.type === type && inlineToHtml(htmlToInline(originalHtml), opts) === html)) out[field] = html;
   if (type === 'alerta') out.tipo = ALERTA_TIPOS.includes(String(b.props.tipo)) ? String(b.props.tipo) : 'info';
   if (type === 'paso') {
     const d = String(b.props.descripcion ?? '');

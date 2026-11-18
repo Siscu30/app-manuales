@@ -1,6 +1,7 @@
-import { BlockNoteSchema, defaultBlockSpecs, insertOrUpdateBlockForSlashMenu } from '@blocknote/core';
-import { createReactBlockSpec } from '@blocknote/react';
+import { BlockNoteSchema, defaultBlockSpecs, defaultStyleSpecs, insertOrUpdateBlockForSlashMenu } from '@blocknote/core';
+import { createReactBlockSpec, createReactStyleSpec } from '@blocknote/react';
 import type { DefaultReactSuggestionItem } from '@blocknote/react';
+import { validHexColor } from './richtext';
 
 // Bloques propios del editor nuevo. Todo el texto se pinta como texto (React escapa): ningún
 // valor de la base de datos se inserta como HTML.
@@ -85,8 +86,14 @@ export const Legado = createReactBlockSpec(
   },
 );
 
+const hexColor = createReactStyleSpec(
+  { type: 'hexColor', propSchema: 'string' },
+  { render: ({ value, contentRef }) => <span style={{ color: validHexColor(value) }} ref={contentRef} /> },
+);
+
 export const schema = BlockNoteSchema.create({
   blockSpecs: { ...defaultBlockSpecs, paso: Paso(), alerta: Alerta(), legado: Legado() },
+  styleSpecs: { ...defaultStyleSpecs, hexColor },
 });
 export type ManualEditor = typeof schema.BlockNoteEditor;
 
