@@ -23,3 +23,24 @@ jobs:
         run: node --check app.js
       - name: Pruebas
         run: node --test tests/
+
+  app-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: app-v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app-v2/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Pruebas
+        run: npm test
+      - name: Compilación
+        run: npm run build

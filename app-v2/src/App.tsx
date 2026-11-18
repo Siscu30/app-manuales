@@ -1,0 +1,99 @@
+import { useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { motion } from 'motion/react';
+import { sb } from './lib/supabase';
+import { estadoInfo } from './lib/estado';
+import { useThemePrefs } from './theme/useThemePrefs';
+import { ThemePicker } from './components/ThemePicker';
+import { Login } from './components/Login';
+
+interface ManualRow { id: string; titulo: string | null; empresa: string | null; estado: string | null; updated_at: string | null }
+
+const fecha = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+
+export default function App() {
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const { prefs, update } = useThemePrefs(session?.user.id ?? null);
+
+  useEffect(() => {
+    sb.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) return null;
+  if (!session) return <Login />;
+
+  return (
+    <div className="shell">
+      <nav className="side" aria-label="Secciones">
+        <div className="logo"><i aria-hidden="true" />Manualia</div>
+        <a className="nav on" href="#manuales" aria-current="page">Mis manuales</a>
+        <a className="nav" href="../index.html">Tablas <small>en la app actual</small></a>
+        <a className="nav" href="../index.html">Plantillas <small>próximamente</small></a>
+        <div className="side-foot">
+          <p className="side-label">Apariencia</p>
+          <ThemePicker prefs={prefs} onChange={update} />
+          <button className="btn ghost" onClick={() => sb.auth.signOut()}>Cerrar sesión</button>
+        </div>
+      </nav>
+      <Inicio />
+    </div>
+  );
+}
+
+function Inicio() {
+  const [rows, setRows] = useState<ManualRow[] | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    sb.from('manuales').select('id,titulo,empresa,estado,updated_at').order('updated_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setError('No se pudieron cargar los manuales. Comprueba la conexión y recarga la página.');
+        else setRows((data ?? []) as ManualRow[]);
+      });
+  }, []);
+
+  return (
+    <main className="main">
+      <header className="bar">
+        <h1>Mis manuales</h1>
+        <div className="row">
+          <a className="btn ghost" href="../index.html">Abrir la app actual</a>
+          <PopButton>Nuevo manual</PopButton>
+        </div>
+      </header>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {rows === null && !error && <p className="muted">Cargando manuales…</p>}
+      {rows?.length === 0 && <div className="empty"><h2>Aún no hay manuales</h2><p className="muted">Crea el primero con «Nuevo manual» o importa un Word o PDF.</p></div>}
+      {rows && rows.length > 0 && (
+        <ul className="cards">
+          {rows.map((m) => {
+            const st = estadoInfo(m.estado);
+            return (
+              <li key={m.id} className="card">
+                <div className="thumb" aria-hidden="true"><b /></div>
+                <h2>{m.titulo || 'Sin título'}</h2>
+                <span className={`pill ${st.tono}`}>{st.label}</span>
+                <div className="meta">
+                  {m.empresa && <span>{m.empresa}</span>}
+                  {m.updated_at && <span>{fecha.format(new Date(m.updated_at))}</span>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </main>
+  );
+}
+
+// Botón principal con respuesta física: se hunde al pulsar y rebota al soltar (muelle corto).
+function PopButton({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.button className="btn" whileTap={{ scale: 0.94 }} whileHover={{ y: -1 }}
+      transition={{ type: 'spring', stiffness: 600, damping: 22 }}>
+      {children}
+    </motion.button>
+  );
+}
