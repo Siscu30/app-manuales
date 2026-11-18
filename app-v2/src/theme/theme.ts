@@ -17,6 +17,12 @@ export function sanitizePrefs(raw: unknown): Prefs {
   return { estilo, modo };
 }
 
+// user_prefs.prefs lo comparten las dos apps: se sustituye solo `tema` y se conserva lo demás.
+export function mergePrefsTema(remote: unknown, tema: Prefs): Record<string, unknown> {
+  const base = remote && typeof remote === 'object' && !Array.isArray(remote) ? (remote as Record<string, unknown>) : {};
+  return { ...base, tema: sanitizePrefs(tema) };
+}
+
 export function resolveModo(modo: Modo, systemDark: boolean): 'light' | 'dark' {
   return modo === 'auto' ? (systemDark ? 'dark' : 'light') : modo;
 }

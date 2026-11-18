@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { sb } from '../lib/supabase';
-import { applyPrefs, DEFAULT_PREFS, sanitizePrefs, type Prefs } from './theme';
+import { applyPrefs, DEFAULT_PREFS, mergePrefsTema, sanitizePrefs, type Prefs } from './theme';
 
 const LS_KEY = 'manualia-v2-prefs';
 
@@ -47,7 +47,7 @@ export function useThemePrefs(userId: string | null) {
       const next = sanitizePrefs({ ...prev, ...patch });
       writeLocal(next);
       if (userId) {
-        remote.current = { ...remote.current, tema: next };
+        remote.current = mergePrefsTema(remote.current, next);
         void sb.from('user_prefs')
           .upsert({ user_id: userId, prefs: remote.current, updated_at: new Date().toISOString() })
           .then(({ error }) => { if (error) console.warn('No se pudo guardar el tema en el perfil:', error.message); });

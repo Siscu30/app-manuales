@@ -9,13 +9,25 @@ import { Login } from './components/Login';
 
 interface ManualRow { id: string; titulo: string | null; empresa: string | null; estado: string | null; updated_at: string | null }
 
-const fecha = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+// Modo demostración SOLO en desarrollo (?demo): datos de ejemplo, sin sesión ni red. Vite lo
+// elimina de la compilación de producción porque import.meta.env.DEV es false.
+const DEMO = import.meta.env.DEV && new URLSearchParams(location.search).has('demo');
+const DEMO_ROWS: ManualRow[] = [
+  { id: '1', titulo: 'Central AX PRO: instalación', empresa: 'Seguridad Norte', estado: 'publicado', updated_at: '2026-11-18T10:00:00Z' },
+  { id: '2', titulo: 'Detector PIR exterior: ajuste de zona', empresa: 'Seguridad Norte', estado: 'en_revision', updated_at: '2026-11-17T09:00:00Z' },
+  { id: '3', titulo: 'Cámara IP: alta en el NVR', empresa: null, estado: 'borrador', updated_at: '2026-11-15T12:00:00Z' },
+  { id: '4', titulo: 'Checklist de puesta en marcha', empresa: 'Instalaciones Sur', estado: 'publicado', updated_at: '2026-11-04T08:00:00Z' },
+  { id: '5', titulo: 'Mantenimiento anual de baterías', empresa: null, estado: 'x"><img src=x onerror=alert(1)>', updated_at: '2026-10-20T08:00:00Z' },
+];
+
+const fecha =new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const { prefs, update } = useThemePrefs(session?.user.id ?? null);
+  const { prefs, update } = useThemePrefs(DEMO ? null : session?.user.id ?? null);
 
   useEffect(() => {
+    if (DEMO) { setSession({ user: { id: 'demo' } } as Session); return; }
     sb.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => data.subscription.unsubscribe();
@@ -47,6 +59,7 @@ function Inicio() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (DEMO) { setRows(DEMO_ROWS); return; }
     sb.from('manuales').select('id,titulo,empresa,estado,updated_at').order('updated_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) setError('No se pudieron cargar los manuales. Comprueba la conexión y recarga la página.');

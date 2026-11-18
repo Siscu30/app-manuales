@@ -1,5 +1,18 @@
 import { describe, expect, test } from 'vitest';
-import { resolveModo, sanitizePrefs } from './theme';
+import { mergePrefsTema, resolveModo, sanitizePrefs } from './theme';
+
+describe('mergePrefsTema', () => {
+  test('conserva las claves de la app actual y sustituye solo el tema', () => {
+    const remote = { sidebar: { a: true }, blockOrder: ['titulo'], tema: { estilo: 'obra', modo: 'auto' } };
+    expect(mergePrefsTema(remote, { estilo: 'atlas', modo: 'dark' })).toEqual({
+      sidebar: { a: true }, blockOrder: ['titulo'], tema: { estilo: 'atlas', modo: 'dark' },
+    });
+  });
+  test('tolera prefs vacío o con forma inesperada', () => {
+    expect(mergePrefsTema(null, { estilo: 'obra', modo: 'auto' })).toEqual({ tema: { estilo: 'obra', modo: 'auto' } });
+    expect(mergePrefsTema([1, 2], { estilo: 'obra', modo: 'auto' })).toEqual({ tema: { estilo: 'obra', modo: 'auto' } });
+  });
+});
 
 describe('sanitizePrefs', () => {
   test('acepta valores válidos', () => {

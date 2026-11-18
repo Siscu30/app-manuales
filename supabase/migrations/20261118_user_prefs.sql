@@ -1,10 +1,7 @@
--- Registro de lo ejecutado el 2026-11-18. La tabla public.user_prefs YA EXISTÍA
--- (user_id uuid, prefs jsonb default '{}', updated_at) con políticas "own prefs select/insert/update"
--- equivalentes, así que el CREATE TABLE IF NOT EXISTS no hizo nada.
--- app-v2 guarda su tema dentro de prefs.tema = { estilo, modo } y fusiona el resto de claves.
---
--- Lo único que se creó fueron estas 3 políticas, duplicadas de las existentes (misma condición
--- user_id = auth.uid(), limitadas a `authenticated`). Son inofensivas; para dejarlas como estaban:
---   drop policy "user_prefs select own" on public.user_prefs;
---   drop policy "user_prefs insert own" on public.user_prefs;
---   drop policy "user_prefs update own" on public.user_prefs;
+-- Estado real a 2026-11-18: SIN CAMBIOS en la base de datos.
+-- public.user_prefs ya existía (user_id uuid PK, prefs jsonb default '{}', updated_at timestamptz)
+-- con las políticas "own prefs select/insert/update" (auth.uid() = user_id).
+-- app-v2 guarda su tema en prefs.tema = { estilo, modo } y fusiona el resto de claves;
+-- app.js conserva prefs.tema al guardar sus propias preferencias.
+-- (Se crearon y después se borraron 3 políticas duplicadas; verificado en pg_policies.)
+select 1;
