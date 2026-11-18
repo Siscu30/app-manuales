@@ -2248,6 +2248,9 @@ async function loadManual(id) {
     renderPagesPanel();
     setSaveStatus('');
     updateRevisionBanner();
+    // contenido_v2 lo escribe la app nueva (app-v2). Esta app no lo lee ni lo toca: solo avisa
+    // para que nadie edite dos copias distintas del mismo manual sin saberlo.
+    if (data.contenido_v2) notify('Este manual se ha editado en la versión nueva de Manualia. Los cambios hechos allí no se ven aquí.', 7000);
     notify('📂 Manual cargado');
   } catch(e) { setSaveStatus(''); notify('❌ Error al cargar: '+(e.message||e), 4000); }
 }

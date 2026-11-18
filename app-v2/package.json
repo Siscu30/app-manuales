@@ -11,6 +11,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@blocknote/core": "^0.57.0",
+    "@blocknote/mantine": "^0.57.0",
+    "@blocknote/react": "^0.57.0",
+    "@mantine/core": "^9.8.1",
+    "@mantine/hooks": "^9.8.1",
     "@supabase/supabase-js": "^2.119.1",
     "motion": "^14.14.0",
     "react": "^19.0.0",

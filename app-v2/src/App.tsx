@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { motion } from 'motion/react';
 import { sb } from './lib/supabase';
@@ -6,6 +6,9 @@ import { estadoInfo } from './lib/estado';
 import { useThemePrefs } from './theme/useThemePrefs';
 import { ThemePicker } from './components/ThemePicker';
 import { Login } from './components/Login';
+
+// El editor (BlockNote) pesa bastante: se descarga solo al abrir un manual.
+const EditorManual = lazy(() => import('./manual/EditorManual').then((m) => ({ default: m.EditorManual })));
 
 interface ManualRow { id: string; titulo: string | null; empresa: string | null; estado: string | null; updated_at: string | null }
 
@@ -24,7 +27,7 @@ const fecha =new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', 
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const { prefs, update } = useThemePrefs(DEMO ? null : session?.user.id ?? null);
+  const { prefs, update, mode } = useThemePrefs(DEMO ? null : session?.user.id ?? null);
 
   useEffect(() => {
     if (DEMO) { setSession({ user: { id: 'demo' } } as Session); return; }
@@ -33,6 +36,24 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  // Rol solo desde el servidor (get_my_role). Sin rol o con error: solo lectura (restrictivo por defecto).
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => {
+    if (DEMO) { setRole('editor'); return; }
+    if (!session) { setRole(null); return; }
+    sb.rpc('get_my_role').then(({ data, error }) => setRole(error ? null : (data as string | null)));
+  }, [session]);
+  const canWrite = role === 'admin' || role === 'editor';
+
+  // Ruta mínima por hash: #manual-<id> abre el editor; cualquier otro valor, la lista.
+  const [route, setRoute] = useState(() => location.hash);
+  useEffect(() => {
+    const on = () => setRoute(location.hash);
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  const manualId = route.startsWith('#manual-') ? decodeURIComponent(route.slice(8)) : null;
+
   if (session === undefined) return null;
   if (!session) return <Login />;
 
@@ -40,7 +61,7 @@ export default function App() {
     <div className="shell">
       <nav className="side" aria-label="Secciones">
         <div className="logo"><i aria-hidden="true" />Manualia</div>
-        <a className="nav on" href="#manuales" aria-current="page">Mis manuales</a>
+        <a className={`nav${manualId ? '' : ' on'}`} href="#manuales" aria-current={manualId ? undefined : 'page'}>Mis manuales</a>
         <a className="nav" href="../index.html">Tablas <small>en la app actual</small></a>
         <a className="nav" href="../index.html">Plantillas <small>próximamente</small></a>
         <div className="side-foot">
@@ -49,7 +70,13 @@ export default function App() {
           <button className="btn ghost" onClick={() => sb.auth.signOut()}>Cerrar sesión</button>
         </div>
       </nav>
-      <Inicio />
+      {manualId
+        ? (
+          <Suspense fallback={<main className="main"><p className="muted">Cargando el editor…</p></main>}>
+            <EditorManual key={manualId} id={manualId} demo={DEMO} canWrite={canWrite} mode={mode} onBack={() => { location.hash = 'manuales'; }} />
+          </Suspense>
+        )
+        : <Inicio />}
     </div>
   );
 }
@@ -86,7 +113,7 @@ function Inicio() {
             return (
               <li key={m.id} className="card">
                 <div className="thumb" aria-hidden="true"><b /></div>
-                <h2>{m.titulo || 'Sin título'}</h2>
+                <h2><a className="card-link" href={`#manual-${encodeURIComponent(m.id)}`}>{m.titulo || 'Sin título'}</a></h2>
                 <span className={`pill ${st.tono}`}>{st.label}</span>
                 <div className="meta">
                   {m.empresa && <span>{m.empresa}</span>}
