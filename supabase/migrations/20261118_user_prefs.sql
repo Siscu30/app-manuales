@@ -1,18 +1,10 @@
--- Preferencias visuales por usuario (estilo y modo del espacio de trabajo).
--- Solo añade una tabla nueva: no modifica ni borra datos existentes.
-create table if not exists public.user_prefs (
-  user_id    uuid primary key references auth.users(id) on delete cascade,
-  estilo     text not null default 'obra' check (estilo in ('obra','atlas','cuaderno')),
-  modo       text not null default 'auto' check (modo in ('light','dark','auto')),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.user_prefs enable row level security;
-
--- Cada usuario solo ve y edita su propia fila.
-create policy "user_prefs select own" on public.user_prefs
-  for select to authenticated using (user_id = auth.uid());
-create policy "user_prefs insert own" on public.user_prefs
-  for insert to authenticated with check (user_id = auth.uid());
-create policy "user_prefs update own" on public.user_prefs
-  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- Registro de lo ejecutado el 2026-11-18. La tabla public.user_prefs YA EXISTÍA
+-- (user_id uuid, prefs jsonb default '{}', updated_at) con políticas "own prefs select/insert/update"
+-- equivalentes, así que el CREATE TABLE IF NOT EXISTS no hizo nada.
+-- app-v2 guarda su tema dentro de prefs.tema = { estilo, modo } y fusiona el resto de claves.
+--
+-- Lo único que se creó fueron estas 3 políticas, duplicadas de las existentes (misma condición
+-- user_id = auth.uid(), limitadas a `authenticated`). Son inofensivas; para dejarlas como estaban:
+--   drop policy "user_prefs select own" on public.user_prefs;
+--   drop policy "user_prefs insert own" on public.user_prefs;
+--   drop policy "user_prefs update own" on public.user_prefs;

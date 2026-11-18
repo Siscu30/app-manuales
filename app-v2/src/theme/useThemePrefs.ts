@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { sb } from '../lib/supabase';
 import { applyPrefs, DEFAULT_PREFS, sanitizePrefs, type Prefs } from './theme';
 
@@ -12,10 +12,12 @@ function writeLocal(p: Prefs) {
 }
 
 // Tema del espacio de trabajo. Se aplica al instante desde localStorage (sin parpadeo) y,
-// si hay sesión, se sincroniza con la tabla user_prefs, que manda sobre la copia local.
+// si hay sesión, se sincroniza con user_prefs.prefs.tema. La tabla ya existía y la app actual
+// guarda en `prefs` otras claves (sidebar, órdenes de paleta): siempre se fusiona, nunca se pisa.
 export function useThemePrefs(userId: string | null) {
   const [prefs, setPrefs] = useState<Prefs>(readLocal);
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const remote = useRef<Record<string, unknown>>({});
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -29,9 +31,11 @@ export function useThemePrefs(userId: string | null) {
   useEffect(() => {
     if (!userId) return;
     let cancel = false;
-    sb.from('user_prefs').select('estilo,modo').eq('user_id', userId).maybeSingle().then(({ data, error }) => {
-      if (cancel || error || !data) return; // sin fila o tabla aún no creada: se queda la copia local
-      const p = sanitizePrefs(data);
+    sb.from('user_prefs').select('prefs').eq('user_id', userId).maybeSingle().then(({ data, error }) => {
+      if (cancel || error || !data?.prefs || typeof data.prefs !== 'object') return;
+      remote.current = data.prefs as Record<string, unknown>;
+      if (!remote.current.tema) return;
+      const p = sanitizePrefs(remote.current.tema);
       setPrefs(p);
       writeLocal(p);
     });
@@ -43,8 +47,9 @@ export function useThemePrefs(userId: string | null) {
       const next = sanitizePrefs({ ...prev, ...patch });
       writeLocal(next);
       if (userId) {
+        remote.current = { ...remote.current, tema: next };
         void sb.from('user_prefs')
-          .upsert({ user_id: userId, ...next, updated_at: new Date().toISOString() })
+          .upsert({ user_id: userId, prefs: remote.current, updated_at: new Date().toISOString() })
           .then(({ error }) => { if (error) console.warn('No se pudo guardar el tema en el perfil:', error.message); });
       }
       return next;
