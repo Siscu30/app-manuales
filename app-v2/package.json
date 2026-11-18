@@ -11,6 +11,11 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@blocknote/core": "^0.57.0",
+    "@blocknote/mantine": "^0.57.0",
+    "@blocknote/react": "^0.57.0",
+    "@mantine/core": "^9.8.1",
+    "@mantine/hooks": "^9.8.1",
     "@supabase/supabase-js": "^2.119.1",
     "motion": "^14.14.0",
     "react": "^19.0.0",
@@ -25,6 +30,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^15.15.0",
+    "happy-dom": "^15.11.7",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
     "vite": "^6.2.0",

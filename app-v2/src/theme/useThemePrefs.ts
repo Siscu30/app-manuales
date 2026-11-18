@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { sb } from '../lib/supabase';
-import { applyPrefs, DEFAULT_PREFS, mergePrefsTema, sanitizePrefs, type Prefs } from './theme';
+import { applyPrefs, DEFAULT_PREFS, mergePrefsTema, resolveModo, sanitizePrefs, type Prefs } from './theme';
 
 const LS_KEY = 'manualia-v2-prefs';
 
@@ -56,5 +56,5 @@ export function useThemePrefs(userId: string | null) {
     });
   }, [userId]);
 
-  return { prefs, update };
+  return { prefs, update, mode: resolveModo(prefs.modo, systemDark) };
 }
