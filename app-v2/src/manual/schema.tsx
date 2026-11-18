@@ -92,7 +92,25 @@ const hexColor = createReactStyleSpec(
 );
 
 export const schema = BlockNoteSchema.create({
-  blockSpecs: { ...defaultBlockSpecs, paso: Paso(), alerta: Alerta(), legado: Legado() },
+  blockSpecs: {
+    ...defaultBlockSpecs,
+    // Conserva el original al cargar el documento, sin sustituir el comportamiento de BlockNote.
+    paragraph: {
+      ...defaultBlockSpecs.paragraph,
+      config: {
+        ...defaultBlockSpecs.paragraph.config,
+        propSchema: { ...defaultBlockSpecs.paragraph.config.propSchema, legacy: { default: '' } },
+      },
+    },
+    heading: {
+      ...defaultBlockSpecs.heading,
+      config: {
+        ...defaultBlockSpecs.heading.config,
+        propSchema: { ...defaultBlockSpecs.heading.config.propSchema, legacy: { default: '' } },
+      },
+    },
+    paso: Paso(), alerta: Alerta(), legado: Legado(),
+  },
   styleSpecs: { ...defaultStyleSpecs, hexColor },
 });
 export type ManualEditor = typeof schema.BlockNoteEditor;

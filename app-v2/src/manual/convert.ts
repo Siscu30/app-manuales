@@ -147,7 +147,7 @@ export function v2ToLegacy(input: ContenidoV2): LegacyContenido {
       const l = v2BlockToLegacy(b);
       if (l) pages[pages.length - 1].blocks.push(l);
     }
-    const { _hadBlocks, _blocks, ...extras } = v2.extras as Record<string, unknown> & { _hadBlocks?: boolean };
+    const { _hadBlocks, _blocks, ...extras } = v2.extras as Record<string, unknown> & { _hadBlocks?: boolean; _blocks?: LegacyBlock[] };
     const active = pages.find((p) => p.id === extras.activePage) ?? pages[0];
     return { ...(Object.prototype.hasOwnProperty.call(v2.extras, '_blocks') ? { blocks: _blocks } : _hadBlocks === false ? {} : { blocks: active ? active.blocks : [] }), pages, ...extras };
   }
