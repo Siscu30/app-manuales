@@ -34,6 +34,12 @@ describe('ida y vuelta sin cambios', () => {
     const c = { blocks: p2.blocks, pages: [p1, p2], activePage: 'p2', mediaLibrary: [], textBank: [], trash: [] };
     expect(v2ToLegacy(legacyToV2(c))).toEqual(c);
   });
+  test('páginas con activePage inexistente y blocks obsoletos quedan idénticas', () => {
+    const p1 = { id: 'p1', nombre: 'Intro', blocks: TODOS.slice(0, 4) };
+    const p2 = { id: 'p2', nombre: 'Anexo', blocks: TODOS.slice(4) };
+    const c = { blocks: [{ id: 'stale', type: 'texto', html: '<p>Copia obsoleta</p>' }], pages: [p1, p2], activePage: 'nope', mediaLibrary: [], textBank: [], trash: [] };
+    expect(v2ToLegacy(legacyToV2(c))).toEqual(c);
+  });
   test('no modifica la entrada', () => {
     const copia = structuredClone(TODOS);
     legacyToV2(TODOS);

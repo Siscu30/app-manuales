@@ -119,8 +119,10 @@ export function legacyToV2(contenido: unknown): ContenidoV2 {
       out.push({ type: 'legado', props: { tipo: 'pagina', legacy: JSON.stringify({ type: 'pagina', ...meta }) } });
       out.push(...pb.map(legacyBlockToV2));
     }
-    // `blocks` en formato con páginas es una copia de la página activa: se reconstruye al volver.
-    return { version: 1, blocks: out, extras: { ...extras, _hadBlocks: Array.isArray(c.blocks) }, paged: true };
+    // Conserva `blocks` si no coincide con la página activa; en caso contrario se reconstruye al volver.
+    const active = pages.find((p) => p.id === c.activePage);
+    const preserveBlocks = Array.isArray(c.blocks) && JSON.stringify(c.blocks) !== JSON.stringify(active?.blocks);
+    return { version: 1, blocks: out, extras: { ...extras, _hadBlocks: Array.isArray(c.blocks), ...(preserveBlocks ? { _blocks: c.blocks } : {}) }, paged: true };
   }
   return { version: 1, blocks: (blocks as LegacyBlock[]).map(legacyBlockToV2), extras, paged: false };
 }
@@ -145,9 +147,9 @@ export function v2ToLegacy(input: ContenidoV2): LegacyContenido {
       const l = v2BlockToLegacy(b);
       if (l) pages[pages.length - 1].blocks.push(l);
     }
-    const { _hadBlocks, ...extras } = v2.extras as Record<string, unknown> & { _hadBlocks?: boolean };
+    const { _hadBlocks, _blocks, ...extras } = v2.extras as Record<string, unknown> & { _hadBlocks?: boolean };
     const active = pages.find((p) => p.id === extras.activePage) ?? pages[0];
-    return { ...(_hadBlocks === false ? {} : { blocks: active ? active.blocks : [] }), pages, ...extras };
+    return { ...(Object.prototype.hasOwnProperty.call(v2.extras, '_blocks') ? { blocks: _blocks } : _hadBlocks === false ? {} : { blocks: active ? active.blocks : [] }), pages, ...extras };
   }
   const blocks = v2.blocks.map(v2BlockToLegacy).filter((b): b is LegacyBlock => b !== null);
   return Object.keys(v2.extras).length ? { blocks, ...v2.extras } : blocks;
