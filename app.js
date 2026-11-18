@@ -4660,12 +4660,15 @@ const _SIDEBAR_PANELS = [
   { id: 'sid-chips-columnas',      arrowId: 'arrow-columnas' },
 ];
 let _prefsTimer = null;
+let _prefsTema; // prefs.tema escrito por app-v2; no se toca, solo se conserva
 
 async function loadUserPrefs() {
   if (!STATE.user) return;
   try {
     const { data } = await sb.from('user_prefs').select('prefs').eq('user_id', STATE.user.id).single();
     if (!data?.prefs) return;
+    // El tema de la app nueva (app-v2) vive en prefs.tema: se conserva al guardar.
+    _prefsTema = data.prefs.tema && typeof data.prefs.tema === 'object' ? data.prefs.tema : undefined;
     const s = data.prefs.sidebar;
     if (s) {
       _SIDEBAR_PANELS.forEach(({ id, arrowId }) => {
@@ -4716,7 +4719,7 @@ function saveUserPrefs() {
     const pagesPanel = document.getElementById('pages-panel-body');
     if (pagesPanel) s['pages-panel'] = pagesPanel.style.display !== 'none';
     try {
-      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s, blockOrder: STATE.blockPaletteOrder || DEFAULT_BLOCK_ORDER, manualesOrder: STATE.manualesActionsOrder || DEFAULT_MANUALES_ORDER, tablasOrder: STATE.tablasActionsOrder || DEFAULT_TABLAS_ORDER }, updated_at: new Date().toISOString() });
+      await sb.from('user_prefs').upsert({ user_id: STATE.user.id, prefs: { sidebar: s, blockOrder: STATE.blockPaletteOrder || DEFAULT_BLOCK_ORDER, manualesOrder: STATE.manualesActionsOrder || DEFAULT_MANUALES_ORDER, tablasOrder: STATE.tablasActionsOrder || DEFAULT_TABLAS_ORDER, ...(_prefsTema ? { tema: _prefsTema } : {}) }, updated_at: new Date().toISOString() });
     } catch(e) { console.warn('saveUserPrefs:', e); }
   }, 500);
 }

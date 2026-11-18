@@ -1,0 +1,52 @@
+# Publica la web en GitHub Pages: la app actual tal cual en la raíz y la compilación de la
+# app nueva en /app-v2/. Requiere Settings → Pages → Source: "GitHub Actions".
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app-v2/package-lock.json
+      - name: Compilar app-v2
+        working-directory: app-v2
+        run: npm ci && npm run build
+      - name: Montar el sitio
+        run: |
+          mkdir _site
+          # App actual: los mismos ficheros que servía la publicación por rama.
+          rsync -a --exclude='.git' --exclude='.github' --exclude='app-v2' --exclude='supabase' --exclude='tests' --exclude='node_modules' ./ _site/
+          cp -r app-v2/dist _site/app-v2
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
