@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { motion } from 'motion/react';
 import { sb } from './lib/supabase';
@@ -9,6 +9,8 @@ import { Login } from './components/Login';
 
 // El editor (BlockNote) pesa bastante: se descarga solo al abrir un manual.
 const EditorManual = lazy(() => import('./manual/EditorManual').then((m) => ({ default: m.EditorManual })));
+const EditorTabla = lazy(() => import('./tablas/EditorTabla').then(m => ({ default: m.EditorTabla })));
+const Tablas = lazy(() => import('./tablas/Tablas').then(m => ({ default: m.Tablas })));
 
 interface ManualRow { id: string; titulo: string | null; empresa: string | null; estado: string | null; updated_at: string | null }
 
@@ -47,12 +49,21 @@ export default function App() {
 
   // Ruta mínima por hash: #manual-<id> abre el editor; cualquier otro valor, la lista.
   const [route, setRoute] = useState(() => location.hash);
+  const tableGuard = useRef<(() => Promise<boolean>) | null>(null);
+  const registerGuard = useCallback((guard: (() => Promise<boolean>) | null) => { tableGuard.current = guard; }, []);
   useEffect(() => {
-    const on = () => setRoute(location.hash);
+    const on = async () => {
+      const next = location.hash;
+      if (next === route) return;
+      if (tableGuard.current && !await tableGuard.current()) { location.hash = route; return; }
+      if (location.hash === next) setRoute(next);
+    };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
-  }, []);
+  }, [route]);
   const manualId = route.startsWith('#manual-') ? decodeURIComponent(route.slice(8)) : null;
+  const tablaId = route.startsWith('#tabla-') ? decodeURIComponent(route.slice(7)) : null;
+  const isTablas = route === '#tablas' || tablaId !== null;
 
   if (session === undefined) return null;
   if (!session) return <Login />;
@@ -61,8 +72,8 @@ export default function App() {
     <div className="shell">
       <nav className="side" aria-label="Secciones">
         <div className="logo"><i aria-hidden="true" />Manualia</div>
-        <a className={`nav${manualId ? '' : ' on'}`} href="#manuales" aria-current={manualId ? undefined : 'page'}>Mis manuales</a>
-        <a className="nav" href="../index.html">Tablas <small>en la app actual</small></a>
+        <a className={`nav${isTablas ? '' : ' on'}`} href="#manuales" aria-current={isTablas ? undefined : 'page'}>Mis manuales</a>
+        <a className={`nav${isTablas ? ' on' : ''}`} href="#tablas" aria-current={isTablas ? 'page' : undefined}>Tablas</a>
         <a className="nav" href="../index.html">Plantillas <small>próximamente</small></a>
         <div className="side-foot">
           <p className="side-label">Apariencia</p>
@@ -70,7 +81,9 @@ export default function App() {
           <button className="btn ghost" onClick={() => sb.auth.signOut()}>Cerrar sesión</button>
         </div>
       </nav>
-      {manualId
+      {isTablas ? <Suspense fallback={<main className="main"><p role="status">Cargando tablas…</p></main>}>
+        {tablaId ? <EditorTabla key={tablaId} id={tablaId} demo={DEMO} canWrite={canWrite} registerGuard={registerGuard} /> : <Tablas demo={DEMO} />}
+      </Suspense> : manualId
         ? (
           <Suspense fallback={<main className="main"><p className="muted">Cargando el editor…</p></main>}>
             <EditorManual key={manualId} id={manualId} demo={DEMO} canWrite={canWrite} mode={mode} onBack={() => { location.hash = 'manuales'; }} />
